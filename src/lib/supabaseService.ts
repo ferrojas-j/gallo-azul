@@ -206,26 +206,19 @@ export const dbExpenses = {
     supabase.from('expenses').update({ status: 'archived' }).in('id', ids),
 };
 
-export const dbDailySummaries = {
-  getAll: () => supabase.from('daily_summaries').select('*').order('created_at', { ascending: false }),
-  insert: async (summary: {
+export const dbShiftSummaries = {
+  getAll: () => supabase.from('shift_summaries').select('*').order('created_at', { ascending: false }),
+  insert: (summary: {
     income: number;
-    expenses: number;
     cash_income: number;
     transfer_income: number;
+    expenses: number;
     accounts_count: number;
     expenses_list: any[];
     closed_by: string;
-  }) => {
-    const res = await supabase.from('daily_summaries').insert(summary);
-    if (res.error) {
-      const { cash_income, transfer_income, ...basicSummary } = summary;
-      return supabase.from('daily_summaries').insert(basicSummary);
-    }
-    return res;
-  },
+  }) => supabase.from('shift_summaries').insert(summary).select().single(),
   getFiltered: ({ start, end }: { start?: string, end?: string }) => {
-    let query = supabase.from('daily_summaries').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('shift_summaries').select('*').order('created_at', { ascending: false });
     if (start) query = query.gte('created_at', start);
     if (end) query = query.lte('created_at', end);
     return query;

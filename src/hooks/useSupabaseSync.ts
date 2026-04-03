@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbDailySummaries,
+  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbShiftSummaries,
 } from '../lib/supabaseService';
 import type {
   TableRow, OrderRow, OrderItemRow, MenuItemRow, UserRow,
@@ -132,9 +132,10 @@ export function useSupabaseSync() {
   }, []);
 
   const fetchDailySummaries = useCallback(async () => {
-    const { data } = await dbDailySummaries.getAll();
+    const { data } = await dbShiftSummaries.getAll();
     if (data) setDailySummaries(data);
   }, []);
+
 
   const fetchAll = useCallback(async () => {
     if (fetching.current) return;
@@ -169,7 +170,9 @@ export function useSupabaseSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, fetchMenu)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_summaries' }, fetchDailySummaries)
       .subscribe();
+
 
     return () => { supabase.removeChannel(channel); };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -332,7 +335,8 @@ export function useSupabaseSync() {
 
   const closeDay = useCallback(async (adminName: string) => {
     // 1. Create the summary record
-    const { data: _data, error } = await dbDailySummaries.insert({
+    const { error } = await dbShiftSummaries.insert({
+
       income: todayIncome,
       cash_income: todayCashIncome,
       transfer_income: todayTransferIncome,
