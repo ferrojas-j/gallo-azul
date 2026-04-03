@@ -682,7 +682,9 @@ export default function App() {
         </div>
       ) : (
         <div className="pedidos-list">
-          {pendingItems.map(item => (
+          {pendingItems.map(item => {
+            const category = menuItems.find(m => m.name === item.name)?.category ?? '';
+            return (
             <div className="qa-card" key={item.id}>
               <div className="qa-header">
                 <div className="qa-table-badge">Mesa {item.table_id}</div>
@@ -690,6 +692,17 @@ export default function App() {
               </div>
               <div className="qa-body">
                 <div className="qa-info">
+                  {category && (
+                    <div style={{
+                      display: 'inline-block',
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                      textTransform: 'uppercase', color: '#6366f1',
+                      background: '#eef2ff', borderRadius: 6,
+                      padding: '2px 8px', marginBottom: 4,
+                    }}>
+                      {category}
+                    </div>
+                  )}
                   <div className="qa-name">{item.name}</div>
                   {item.variant_label && <div className="qa-variant">{item.variant_label}</div>}
                   {item.notes && (
@@ -707,7 +720,8 @@ export default function App() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
