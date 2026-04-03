@@ -367,6 +367,11 @@ export function useSupabaseSync() {
     fetchDailySummaries, fetchTodayTotals
   ]);
 
+  const deleteShiftSummary = useCallback(async (id: string) => {
+    setDailySummaries(prev => prev.filter((s: any) => s.id !== id));
+    await dbShiftSummaries.delete(id);
+  }, []);
+
   return {
     // State
     tables,
@@ -403,5 +408,6 @@ export function useSupabaseSync() {
     updateUser,
     closeSession,
     closeDay,
+    deleteShiftSummary,
   };
 }

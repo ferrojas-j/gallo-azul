@@ -23,8 +23,9 @@ export default function App() {
     updateMenuItem, updateMenuVariant, updateCategory,
     addTable, deleteTable,
     addUser, deleteUser, updateUser, closeSession,
-    closeDay,
+    closeDay, deleteShiftSummary,
   } = useSupabaseSync();
+
 
   // UI state
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' } | null>(null);
@@ -93,7 +94,9 @@ export default function App() {
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deliveryConfirm, setDeliveryConfirm] = useState<string | null>(null);
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   useEffect(() => {
+
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -1007,6 +1010,17 @@ export default function App() {
                 <div className="report-card-footer">
                   <span>Balance Neto:</span>
                   <strong>${(report.income - report.expenses).toFixed(0)}</strong>
+                  <button
+                    onClick={() => setDeleteReportId(report.id)}
+                    style={{
+                      marginLeft: 'auto', background: 'none', border: 'none',
+                      cursor: 'pointer', color: '#ef4444', padding: '4px 8px',
+                      borderRadius: 8, display: 'flex', alignItems: 'center', gap: 4,
+                      fontSize: 12, fontWeight: 500,
+                    }}
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
                 </div>
               </div>
             ))}
@@ -1566,6 +1580,38 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Delete Report Confirmation Modal */}
+      {deleteReportId && (
+        <div className="modal-overlay" onClick={() => setDeleteReportId(null)}>
+          <div className="modal-content" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ color: '#ef4444' }}>Eliminar Reporte</h3>
+              <button className="modal-close" onClick={() => setDeleteReportId(null)}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '16px 0 8px', color: '#475569', fontSize: 14, lineHeight: 1.6 }}>
+              ¿Confirmas que deseas eliminar este reporte de cierre? Esta acción <strong>no se puede deshacer</strong>.
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button
+                onClick={() => setDeleteReportId(null)}
+                style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteShiftSummary(deleteReportId);
+                  setDeleteReportId(null);
+                }}
+                style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

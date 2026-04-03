@@ -223,4 +223,5 @@ export const dbShiftSummaries = {
     if (end) query = query.lte('created_at', end);
     return query;
   },
+  delete: (id: string) => supabase.from('shift_summaries').delete().eq('id', id),
 };
