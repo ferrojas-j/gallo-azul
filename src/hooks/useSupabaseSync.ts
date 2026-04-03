@@ -227,17 +227,16 @@ export function useSupabaseSync() {
     const order = tableOrders[tableId];
     if (!order) return;
     
-    // Calculate total at checkout point (pre-payment) to ensure it's up to date
+    // Calculate total at checkout point
     const items = activeItems.filter(i => i.table_id === tableId);
     const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
     const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
 
+    // Only update the order status — table stays 'occupied' until payment is confirmed
     await dbOrders.updateStatus(order.id, 'paying', { total, items_summary: summary });
-    await dbTables.updateStatus(tableId, 'paying');
     
-    // Explicitly refetch to ensure UI reflects 'paying' state immediately
-    await Promise.all([fetchTables(), fetchOrdersAndItems()]);
-  }, [tableOrders, activeItems, fetchTables, fetchOrdersAndItems]);
+    await fetchOrdersAndItems();
+  }, [tableOrders, activeItems, fetchOrdersAndItems]);
 
   const confirmPayment = useCallback(async (tableId: number, method: string) => {
     const order = tableOrders[tableId];

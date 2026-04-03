@@ -431,15 +431,11 @@ export default function App() {
   };
 
   const renderSalon = () => {
-    // Derive status from live data: if there's an active order → occupied; if paying → paying; else free
-    const getEffectiveStatus = (tableId: number): 'free' | 'occupied' | 'paying' => {
-      const order = tableOrders[tableId];
-      if (!order) return 'free';
-      if (order.status === 'paying') return 'paying';
-      return 'occupied';
+    // Derive status from live data: table is occupied if there's any active order, free otherwise
+    const getEffectiveStatus = (tableId: number): 'free' | 'occupied' => {
+      return tableOrders[tableId] ? 'occupied' : 'free';
     };
     const occupiedCount = tables.filter(t => getEffectiveStatus(t.id) === 'occupied').length;
-    const payingCount = tables.filter(t => getEffectiveStatus(t.id) === 'paying').length;
     const freeCount = tables.filter(t => getEffectiveStatus(t.id) === 'free').length;
 
     return (
@@ -449,10 +445,6 @@ export default function App() {
           <div className="salon-stat ocp">
             <div className="salon-stat-count">{occupiedCount}</div>
             <div className="salon-stat-label">Ocupadas</div>
-          </div>
-          <div className="salon-stat pay">
-            <div className="salon-stat-count">{payingCount}</div>
-            <div className="salon-stat-label">Pagando</div>
           </div>
           <div className="salon-stat free">
             <div className="salon-stat-count">{freeCount}</div>
@@ -467,9 +459,6 @@ export default function App() {
           </div>
           <div className="salon-legend-item occupied">
             <div className="salon-legend-pip" /> Ocupada
-          </div>
-          <div className="salon-legend-item paying">
-            <div className="salon-legend-pip" /> Pagando
           </div>
         </div>
 
@@ -506,9 +495,6 @@ export default function App() {
                       <span className="tc-items">{itemCount} ítem{itemCount !== 1 ? 's' : ''}</span>
                       <span className="tc-total">${total.toFixed(0)}</span>
                     </>
-                  )}
-                  {effectiveStatus === 'paying' && (
-                    <span className="tc-paying-badge">⏳ Cobrando</span>
                   )}
                 </div>
               </div>
