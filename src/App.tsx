@@ -8,6 +8,7 @@ import {
 import './index.css';
 import { CATEGORIES } from './data/menu';
 import type { MenuItem, MenuVariant } from './data/menu';
+import { supabase } from './lib/supabase';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
 import type { UserRow } from './lib/supabaseService';
 
@@ -292,10 +293,38 @@ export default function App() {
       setLoginError('Usuario o contraseña incorrectos');
       return;
     }
+    // Mark session active in DB so 'connected users' list updates for everyone
+    await supabase.from('users').update({ session_active: true }).eq('id', found.id);
     const session = { id: found.id, name: found.name, role: found.role };
     localStorage.setItem('mora_session', JSON.stringify(session));
     setCurrentUser(session);
   };
+
+  // Mark session active when restoring from localStorage (page refresh)
+  useEffect(() => {
+    const stored = localStorage.getItem('mora_session');
+    if (stored) {
+      try {
+        const s = JSON.parse(stored);
+        supabase.from('users').update({ session_active: true }).eq('id', s.id);
+      } catch {}
+    }
+    // Clean up on tab close
+    const handleUnload = () => {
+      const stored2 = localStorage.getItem('mora_session');
+      if (stored2) {
+        try {
+          const s = JSON.parse(stored2);
+          navigator.sendBeacon(
+            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/users?id=eq.${s.id}`,
+            JSON.stringify({ session_active: false })
+          );
+        } catch {}
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
 
 
   if (isLoading) {
@@ -1248,7 +1277,11 @@ export default function App() {
             <button
               className="header-logout-btn"
               title="Cerrar sesión"
-              onClick={() => {
+              onClick={async () => {
+                // Mark this user as offline in DB before clearing state
+                if (currentUser?.id) {
+                  await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
+                }
                 localStorage.removeItem('mora_session');
                 setCurrentUser(null);
                 setLoginName('');

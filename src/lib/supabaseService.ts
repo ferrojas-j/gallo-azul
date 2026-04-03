@@ -189,6 +189,8 @@ export const dbUsers = {
     supabase.from('users').delete().eq('id', id),
   update: (id: string, name: string, role: string) =>
     supabase.from('users').update({ name, role }).eq('id', id),
+  setSessionActive: (id: string, active: boolean) =>
+    supabase.from('users').update({ session_active: active }).eq('id', id),
   closeSession: (id: string) =>
     supabase.from('users').update({ session_active: false }).eq('id', id),
 };
