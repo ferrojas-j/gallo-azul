@@ -15,7 +15,7 @@ import type { UserRow } from './lib/supabaseService';
 export default function App() {
   // Supabase sync
   const {
-    tables, activeItems, menuItems, users,
+    tables, tableOrders, activeItems, menuItems, users,
     todayIncome, todayCashIncome, todayTransferIncome, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, dailySummaries, isLoading,
     addItemToOrder, removeItem, markItemDone, updateItemNotes,
     checkoutTable, confirmPayment, addExpense,
@@ -28,7 +28,10 @@ export default function App() {
 
 
   // UI state
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' } | null>(() => {
+    try { const s = localStorage.getItem('mora_session'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+
   const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -287,8 +290,11 @@ export default function App() {
       setLoginError('Usuario o contraseña incorrectos');
       return;
     }
-    setCurrentUser({ id: found.id, name: found.name, role: found.role });
+    const session = { id: found.id, name: found.name, role: found.role };
+    localStorage.setItem('mora_session', JSON.stringify(session));
+    setCurrentUser(session);
   };
+
 
   if (isLoading) {
     return (
@@ -343,7 +349,7 @@ export default function App() {
   // ── Renders ──────────────────────────────────────────
 
   const renderHome = () => {
-    const freeTables = tables.filter(t => t.status === 'free').length;
+    const freeTables = tables.filter(t => !tableOrders[t.id]).length;
     const activePedidos = pendingItems.length;
     const connectedStaff = users.filter(u => u.session_active);
 
@@ -425,9 +431,16 @@ export default function App() {
   };
 
   const renderSalon = () => {
-    const occupiedCount = tables.filter(t => t.status === 'occupied').length;
-    const payingCount = tables.filter(t => t.status === 'paying').length;
-    const freeCount = tables.filter(t => t.status === 'free').length;
+    // Derive status from live data: if there's an active order → occupied; if paying → paying; else free
+    const getEffectiveStatus = (tableId: number): 'free' | 'occupied' | 'paying' => {
+      const order = tableOrders[tableId];
+      if (!order) return 'free';
+      if (order.status === 'paying') return 'paying';
+      return 'occupied';
+    };
+    const occupiedCount = tables.filter(t => getEffectiveStatus(t.id) === 'occupied').length;
+    const payingCount = tables.filter(t => getEffectiveStatus(t.id) === 'paying').length;
+    const freeCount = tables.filter(t => getEffectiveStatus(t.id) === 'free').length;
 
     return (
       <div className="fade-in">
@@ -463,6 +476,7 @@ export default function App() {
         {/* Table grid */}
         <div className="card-grid">
           {tables.map(table => {
+            const effectiveStatus = getEffectiveStatus(table.id);
             const tableItems = activeItems.filter(i => i.table_id === table.id);
             const total = tableItems.reduce((s, i) => s + i.price * i.qty, 0);
             const itemCount = tableItems.length;
@@ -470,7 +484,7 @@ export default function App() {
             return (
               <div
                 key={table.id}
-                className={`table-card ${table.status}`}
+                className={`table-card ${effectiveStatus}`}
                 onClick={() => openTable(table.id)}
               >
                 {/* Header */}
@@ -484,16 +498,16 @@ export default function App() {
 
                 {/* Footer info by status */}
                 <div className="tc-footer">
-                  {table.status === 'free' && (
+                  {effectiveStatus === 'free' && (
                     <span className="tc-status-free">Libre</span>
                   )}
-                  {table.status === 'occupied' && (
+                  {effectiveStatus === 'occupied' && (
                     <>
                       <span className="tc-items">{itemCount} ítem{itemCount !== 1 ? 's' : ''}</span>
                       <span className="tc-total">${total.toFixed(0)}</span>
                     </>
                   )}
-                  {table.status === 'paying' && (
+                  {effectiveStatus === 'paying' && (
                     <span className="tc-paying-badge">⏳ Cobrando</span>
                   )}
                 </div>
@@ -1212,11 +1226,13 @@ export default function App() {
               className="header-logout-btn"
               title="Cerrar sesión"
               onClick={() => {
+                localStorage.removeItem('mora_session');
                 setCurrentUser(null);
                 setLoginName('');
                 setLoginPassword('');
                 setCurrentView('home');
               }}
+
             >
               <LogOut size={15} />
             </button>
