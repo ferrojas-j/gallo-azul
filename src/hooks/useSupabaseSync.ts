@@ -48,6 +48,7 @@ export function useSupabaseSync() {
 
   // Prevent duplicate fetches with a ref
   const fetching = useRef(false);
+  const lastClosed = useRef<Record<number, number>>({});
 
   // ── Loaders ─────────────────────────────────────────
 
@@ -66,8 +67,13 @@ export function useSupabaseSync() {
 
     const orderMap: Record<number, OrderRow> = {};
     const orderIdToTable: Record<string, number> = {};
+    const now = Date.now();
     
     orders.forEach(o => {
+      // Prevent stale data from reverting table status during 5 seconds after a payment
+      if (lastClosed.current[o.table_id] && (now - lastClosed.current[o.table_id] < 5000)) {
+        return; 
+      }
       orderMap[o.table_id] = o;
       orderIdToTable[o.id] = o.table_id;
     });
@@ -247,6 +253,9 @@ export function useSupabaseSync() {
     const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
     const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
 
+    // Block stale realtime fetches for 5 seconds
+    lastClosed.current[tableId] = Date.now();
+
     // Optimistically free the table in UI immediately
     setTableOrders(prev => {
       const copy = { ...prev };
@@ -256,16 +265,26 @@ export function useSupabaseSync() {
     setActiveItems(prev => prev.filter(i => i.table_id !== tableId));
 
     // 1. Close ALL active orders for this table (prevents ghost orders)
-    await dbOrders.closeAllActiveForTable(tableId, { 
+    const { error: orderError } = await dbOrders.closeAllActiveForTable(tableId, { 
       payment_method: method, 
       total, 
       items_summary: summary 
     });
+
+    if (orderError) {
+      console.error(orderError);
+      alert("Error crítico al cerrar orden: " + orderError.message);
+      return;
+    }
     
     // 2. Free the table
-    await dbTables.updateStatus(tableId, 'free');
+    const { error: tableError } = await dbTables.updateStatus(tableId, 'free');
+    if (tableError) {
+      console.error(tableError);
+      alert("Error crítico al liberar mesa: " + tableError.message);
+    }
     
-    // 3. Force refresh everything to ensure consistency
+    // 3. Force refresh totals safely (orders will ignore this table for 5s)
     await Promise.all([
       fetchTodayTotals(),
       fetchTables(),
