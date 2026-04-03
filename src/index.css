@@ -389,6 +389,12 @@ html, body, #root {
   box-shadow: 0 4px 18px rgba(239,68,68,0.12);
 }
 
+.table-card.free {
+  background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #86efac;
+  box-shadow: 0 4px 18px rgba(34,197,94,0.12);
+}
+
 .table-card.paying {
   background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%);
   border-color: #fcd34d;
@@ -421,6 +427,10 @@ html, body, #root {
   background: #ef4444;
   box-shadow: 0 0 0 3px rgba(239,68,68,0.18);
 }
+.table-card.free .tc-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+}
 .table-card.paying .tc-dot {
   background: #f59e0b;
   box-shadow: 0 0 0 3px rgba(245,158,11,0.2);
@@ -441,6 +451,7 @@ html, body, #root {
   color: #dde3ee;
 }
 .table-card.occupied .tc-number { color: #fca5a5; }
+.table-card.free .tc-number { color: #86efac; }
 .table-card.paying .tc-number { color: #fcd34d; }
 
 .tc-footer {
@@ -455,7 +466,7 @@ html, body, #root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #cbd5e1;
+  color: #22c55e;
 }
 
 .tc-items {
