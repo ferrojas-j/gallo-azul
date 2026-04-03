@@ -242,10 +242,18 @@ export function useSupabaseSync() {
     const order = tableOrders[tableId];
     if (!order) return;
 
-    // Last minute recalculation just in case items changed while in 'paying'
+    // Last minute recalculation
     const items = activeItems.filter(i => i.table_id === tableId);
     const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
     const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+
+    // Optimistically free the table in UI immediately
+    setTableOrders(prev => {
+      const copy = { ...prev };
+      delete copy[tableId];
+      return copy;
+    });
+    setActiveItems(prev => prev.filter(i => i.table_id !== tableId));
 
     // 1. Close the order with finalized data
     await dbOrders.updateStatus(order.id, 'closed', { 
@@ -371,6 +379,15 @@ export function useSupabaseSync() {
     await dbShiftSummaries.delete(id);
   }, []);
 
+  const createOrderForTable = useCallback(async (tableId: number) => {
+    if (!tableOrders[tableId]) {
+      const { data } = await dbOrders.create(tableId);
+      if (data) {
+        setTableOrders(prev => ({ ...prev, [tableId]: data }));
+      }
+    }
+  }, [tableOrders]);
+
   return {
     // State
     tables,
@@ -388,6 +405,7 @@ export function useSupabaseSync() {
     dailySummaries,
     isLoading,
     // Operations
+    createOrderForTable,
     addItemToOrder,
     removeItem,
     markItemDone,

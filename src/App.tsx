@@ -18,7 +18,7 @@ export default function App() {
   const {
     tables, tableOrders, activeItems, menuItems, users,
     todayIncome, todayCashIncome, todayTransferIncome, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, dailySummaries, isLoading,
-    addItemToOrder, removeItem, markItemDone, updateItemNotes,
+    createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes,
     checkoutTable, confirmPayment, addExpense,
     toggleMenuItem, toggleMenuVariant,
     updateMenuItem, updateMenuVariant, updateCategory,
@@ -186,7 +186,14 @@ export default function App() {
     if (view === 'admin') setAdminSubView('main');
   };
 
-  const openTable = (id: number) => {
+  const openTable = async (id: number) => {
+    const isOccupied = !!tableOrders[id];
+    if (!isOccupied) {
+      if (!window.confirm(`¿Confirmas que quieres abrir una cuenta en la Mesa ${id}?`)) {
+        return;
+      }
+      await createOrderForTable(id);
+    }
     setSelectedTableId(id);
     setCurrentView('mesa');
     setMesaTab('orden');
@@ -217,6 +224,7 @@ export default function App() {
 
   const handleConfirmPayment = async () => {
     if (!selectedTableId) return;
+    if (!window.confirm("¿Confirmas que esta cuenta se cierra ya pagada?")) return;
     await confirmPayment(selectedTableId, paymentMethod);
     navTo('salon');
   };
