@@ -65,6 +65,13 @@ export default function App() {
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff'>('Staff');
 
+  // Unified Custom Confirm Modal for tables (opening accounts and confirming payments)
+  const [tableConfirmModal, setTableConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'open' | 'pay';
+    tableId: number | null;
+  }>({ isOpen: false, type: 'open', tableId: null });
+
   // Edit menu modal
   type EditTarget = { type: 'item'; id: string; name: string; price: number } | { type: 'variant'; id: string; label: string; price: number } | { type: 'category'; id: string; name: string };
   const [isCierreModalOpen, setIsCierreModalOpen] = useState(false);
@@ -189,16 +196,28 @@ export default function App() {
   const openTable = async (id: number) => {
     const isOccupied = !!tableOrders[id];
     if (!isOccupied) {
-      if (!window.confirm(`¿Confirmas que quieres abrir una cuenta en la Mesa ${id}?`)) {
-        return;
-      }
-      await createOrderForTable(id);
+      // Free table -> Show custom UI prompt
+      setTableConfirmModal({ isOpen: true, type: 'open', tableId: id });
+      return;
     }
+    // Already occupied -> open directly
     setSelectedTableId(id);
     setCurrentView('mesa');
     setMesaTab('orden');
     setMenuCategory(CATEGORIES[0]);
     setMenuSearch('');
+  };
+
+  const handleConfirmOpenTable = async () => {
+    if (tableConfirmModal.tableId) {
+      await createOrderForTable(tableConfirmModal.tableId);
+      setSelectedTableId(tableConfirmModal.tableId);
+      setCurrentView('mesa');
+      setMesaTab('orden');
+      setMenuCategory(CATEGORIES[0]);
+      setMenuSearch('');
+    }
+    setTableConfirmModal({ isOpen: false, type: 'open', tableId: null });
   };
 
   const handleAddItem = (item: MenuItem, variant?: MenuVariant) => {
@@ -224,8 +243,13 @@ export default function App() {
 
   const handleConfirmPayment = async () => {
     if (!selectedTableId) return;
-    if (!window.confirm("¿Confirmas que esta cuenta se cierra ya pagada?")) return;
-    await confirmPayment(selectedTableId, paymentMethod);
+    setTableConfirmModal({ isOpen: true, type: 'pay', tableId: selectedTableId });
+  };
+
+  const executePayment = async () => {
+    if (!tableConfirmModal.tableId) return;
+    await confirmPayment(tableConfirmModal.tableId, paymentMethod);
+    setTableConfirmModal({ isOpen: false, type: 'pay', tableId: null });
     navTo('salon');
   };
 
@@ -1391,6 +1415,50 @@ export default function App() {
               <button className="confirm-cancel" onClick={() => setConfirmPending(null)}>Cancelar</button>
               <button className="confirm-ok" onClick={confirmAddItem}>
                 <Plus size={16} /> Agregar a la orden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Actions Confirm Modal (Open / Pay) */}
+      {tableConfirmModal.isOpen && (
+        <div className="confirm-overlay" onClick={() => setTableConfirmModal({ ...tableConfirmModal, isOpen: false })}>
+          <div className="confirm-sheet" style={{ padding: 32, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ marginBottom: 16 }}>
+              {tableConfirmModal.type === 'open' ? (
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#3b82f6' }}>
+                  <Plus size={32} />
+                </div>
+              ) : (
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#10b981' }}>
+                  <Check size={32} />
+                </div>
+              )}
+            </div>
+            
+            <h3 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+              {tableConfirmModal.type === 'open' ? `Abrir Mesa ${tableConfirmModal.tableId}` : `Cuenta Pagada`}
+            </h3>
+            
+            <p style={{ fontSize: 16, color: '#64748b', marginBottom: 32, lineHeight: 1.5, padding: '0 12px' }}>
+              {tableConfirmModal.type === 'open' 
+                ? '¿Confirmas que deseas iniciar el registro de una cuenta nueva en esta mesa?' 
+                : '¿Confirmas que los productos han sido pagados y se liberará la mesa?'}
+            </p>
+            
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button 
+                onClick={() => setTableConfirmModal({ ...tableConfirmModal, isOpen: false })}
+                style={{ flex: 1, padding: '16px', borderRadius: 16, border: '1px solid var(--border-color)', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 15 }}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={tableConfirmModal.type === 'open' ? handleConfirmOpenTable : executePayment}
+                style={{ flex: 1, padding: '16px', borderRadius: 16, background: tableConfirmModal.type === 'open' ? '#3b82f6' : '#10b981', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15 }}
+              >
+                Sí, Confirmar
               </button>
             </div>
           </div>

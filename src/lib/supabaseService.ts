@@ -110,6 +110,18 @@ export const dbOrders = {
   },
   archiveOrders: (ids: string[]) =>
     supabase.from('orders').update({ status: 'archived' }).in('id', ids),
+  closeAllActiveForTable: (tableId: number, params: {
+    payment_method: string;
+    total: number;
+    items_summary: string;
+  }) =>
+    supabase.from('orders').update({
+      status: 'closed',
+      payment_method: params.payment_method,
+      total: params.total,
+      items_summary: params.items_summary,
+      closed_at: new Date().toISOString()
+    }).eq('table_id', tableId).in('status', ['open', 'paying']),
 };
 
 export const dbOrderItems = {

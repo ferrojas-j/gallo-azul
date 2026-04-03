@@ -255,8 +255,8 @@ export function useSupabaseSync() {
     });
     setActiveItems(prev => prev.filter(i => i.table_id !== tableId));
 
-    // 1. Close the order with finalized data
-    await dbOrders.updateStatus(order.id, 'closed', { 
+    // 1. Close ALL active orders for this table (prevents ghost orders)
+    await dbOrders.closeAllActiveForTable(tableId, { 
       payment_method: method, 
       total, 
       items_summary: summary 
