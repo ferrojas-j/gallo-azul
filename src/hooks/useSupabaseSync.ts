@@ -332,7 +332,7 @@ export function useSupabaseSync() {
 
   const closeDay = useCallback(async (adminName: string) => {
     // 1. Create the summary record
-    const { data, error } = await dbDailySummaries.insert({
+    const { data: _data, error } = await dbDailySummaries.insert({
       income: todayIncome,
       cash_income: todayCashIncome,
       transfer_income: todayTransferIncome,
