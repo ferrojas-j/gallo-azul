@@ -3,7 +3,7 @@ import {
   LayoutGrid, ClipboardCheck, Settings, ChevronLeft, Users, Check, X,
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
   LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Search, StickyNote,
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap,
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff,
 } from 'lucide-react';
 import './index.css';
 import { CATEGORIES } from './data/menu';
@@ -36,6 +36,8 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'admin' | 'mesa' | 'checkout'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
@@ -313,10 +315,12 @@ export default function App() {
         <div className="login-logo">🍴</div>
         <h1 className="login-title">La Mora</h1>
         <p className="login-subtitle">Sistema de punto de venta</p>
-        <form className="login-form" onSubmit={handleLogin}>
+        <form className="login-form" onSubmit={handleLogin} autoComplete="on">
           <div className="form-group">
-            <label>Nombre de usuario</label>
+            <label htmlFor="login-username">Nombre de usuario</label>
             <input
+              id="login-username"
+              name="username"
               type="text"
               placeholder="Ej. María López"
               value={loginName}
@@ -326,15 +330,34 @@ export default function App() {
             />
           </div>
           <div className="form-group">
-            <label>Contraseña</label>
-            <input
-              type="password"
-              placeholder="••••••••••"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
+            <label htmlFor="login-password">Contraseña</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••••"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                style={{ paddingRight: 48 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{
+                  position: 'absolute', right: 14, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.5)', padding: 4,
+                  display: 'flex', alignItems: 'center',
+                }}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
           {loginError && <div className="login-error">{loginError}</div>}
           <button className="btn-primary" type="submit" disabled={loginLoading}>
