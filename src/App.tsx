@@ -3,7 +3,7 @@ import {
   LayoutGrid, ClipboardCheck, Settings, ChevronLeft, Users, Check, X,
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
   LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Search, StickyNote,
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff,
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock,
 } from 'lucide-react';
 import './index.css';
 import { CATEGORIES } from './data/menu';
@@ -884,10 +884,21 @@ export default function App() {
         <div className="pedidos-list">
           {pendingItems.map(item => {
             const category = menuItems.find(m => m.name === item.name)?.category ?? '';
+            const elapsedMinutes = Math.floor((currentTime.getTime() - new Date(item.created_at).getTime()) / 60000);
+            const isDelayed = elapsedMinutes >= 15;
+            const isWarning = elapsedMinutes >= 10 && !isDelayed;
+            const timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
+
             return (
-            <div className="qa-card" key={item.id}>
+            <div className={`qa-card ${isDelayed ? 'delayed-alert' : ''}`} key={item.id} style={isDelayed ? { borderColor: '#fecaca', background: '#fef2f2' } : {}}>
               <div className="qa-header">
-                <div className="qa-table-badge">Mesa {item.table_id}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="qa-table-badge">Mesa {item.table_id}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
+                    <Clock size={14} strokeWidth={3} />
+                    {elapsedMinutes} min
+                  </div>
+                </div>
                 <div className="qa-qty-label">x{item.qty}</div>
               </div>
               <div className="qa-body">
