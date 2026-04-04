@@ -294,7 +294,8 @@ export function useSupabaseSync() {
 
   const addExpense = useCallback(async (amount: number, concept: string, detail: string) => {
     await dbExpenses.insert(amount, concept, detail);
-  }, []);
+    await fetchTodayTotals();
+  }, [fetchTodayTotals]);
 
   const toggleMenuItem = useCallback(async (id: string, active: boolean) => {
     // Optimistic update
