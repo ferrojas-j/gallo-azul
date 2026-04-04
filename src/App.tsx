@@ -108,6 +108,12 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deliveryConfirm, setDeliveryConfirm] = useState<string | null>(null);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+
+  // Checkout extended states
+  const [discountType, setDiscountType] = useState<'none' | 'amount' | 'percentage'>('none');
+  const [discountValue, setDiscountValue] = useState<string>('');
+  const [cashReceived, setCashReceived] = useState<string>('');
+
   useEffect(() => {
 
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -237,6 +243,9 @@ export default function App() {
   const handleProceedToCheckout = async () => {
     if (!selectedTableId) return;
     await checkoutTable(selectedTableId);
+    setDiscountType('none');
+    setDiscountValue('');
+    setCashReceived('');
     setCurrentView('checkout');
     setPaymentMethod('efectivo');
   };
@@ -248,7 +257,18 @@ export default function App() {
 
   const executePayment = async () => {
     if (!tableConfirmModal.tableId) return;
-    await confirmPayment(tableConfirmModal.tableId, paymentMethod);
+    
+    // Calculate final total again here
+    const items = activeItems.filter(i => i.table_id === tableConfirmModal.tableId);
+    let finalTotal = items.reduce((s, i) => s + (i.price * i.qty), 0);
+    const dVal = parseFloat(discountValue) || 0;
+    if (discountType === 'amount') {
+      finalTotal = Math.max(0, finalTotal - dVal);
+    } else if (discountType === 'percentage') {
+      finalTotal = Math.max(0, finalTotal * (1 - dVal / 100));
+    }
+
+    await confirmPayment(tableConfirmModal.tableId, paymentMethod, finalTotal);
     setTableConfirmModal({ isOpen: false, type: 'pay', tableId: null });
     navTo('salon');
   };
@@ -609,7 +629,15 @@ export default function App() {
               <div className="empty-order">
                 <div style={{ fontSize: 56, marginBottom: 16 }}>🥐</div>
                 <h3 style={{ fontSize: 18, color: '#0f172a', marginBottom: 4 }}>Cuenta vacía</h3>
-                <p style={{ fontSize: 14 }}>Toca <strong>Menú</strong> para agregar deliciosa comida</p>
+                <p style={{ fontSize: 14, marginBottom: 20 }}>Toca <strong>Menú</strong> para agregar deliciosa comida</p>
+                <button
+                  className="btn-primary"
+                  style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}
+                  onClick={() => setMesaTab('menu')}
+                >
+                  <Plus size={18} />
+                  Agregar pedidos
+                </button>
               </div>
             ) : (
               <div className="order-items-list">
@@ -722,25 +750,104 @@ export default function App() {
     );
   };
 
-  const renderCheckout = () => (
-    <div className="fade-in">
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 8 }}>Total a pagar</div>
-        <div style={{ fontSize: 56, fontWeight: 600, color: '#0e122b', letterSpacing: -1 }}>${currentTableTotal}.00</div>
-      </div>
-      <label className="label">Método de pago</label>
-      <div className="payment-grid" style={{ marginBottom: 40 }}>
-        {(['efectivo', 'transferencia'] as const).map(m => (
-          <div key={m} className={`payment-card ${paymentMethod === m ? 'selected' : ''}`} onClick={() => setPaymentMethod(m)}>
-            {paymentMethod === m && <div className="check-badge"><Check size={12} strokeWidth={3} /></div>}
-            <div className="payment-icon-wrapper"><span style={{ fontSize: 20 }}>{m === 'efectivo' ? '💵' : '🏦'}</span></div>
-            <div className="payment-text">{m === 'efectivo' ? 'Efectivo' : 'Transferencia'}</div>
+  const renderCheckout = () => {
+    const dVal = parseFloat(discountValue) || 0;
+    let finalTotal = currentTableTotal;
+    if (discountType === 'amount') {
+      finalTotal = Math.max(0, currentTableTotal - dVal);
+    } else if (discountType === 'percentage') {
+      finalTotal = Math.max(0, currentTableTotal * (1 - dVal / 100));
+    }
+    
+    const received = parseFloat(cashReceived) || 0;
+    const change = Math.max(0, received - finalTotal);
+
+    return (
+      <div className="fade-in">
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 14, color: '#64748b', marginBottom: 8 }}>Total a pagar</div>
+          <div style={{ fontSize: 56, fontWeight: 600, color: '#0e122b', letterSpacing: -1 }}>${finalTotal.toFixed(0)}</div>
+          {discountType !== 'none' && (
+            <div style={{ fontSize: 14, color: '#10b981', fontWeight: 600 }}>
+              (Descuento aplicado: {discountType === 'amount' ? `$${dVal}` : `${dVal}%`})
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 32, background: '#fff', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
+          <label className="label" style={{ marginBottom: 12 }}>Descuento (opcional)</label>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            {[
+              { type: 'none', label: 'Ninguno' },
+              { type: 'percentage', label: '%' },
+              { type: 'amount', label: '$' }
+            ].map(d => (
+              <button 
+                key={d.type}
+                onClick={() => { setDiscountType(d.type as any); setDiscountValue(''); }}
+                style={{
+                  flex: 1, padding: 10, borderRadius: 12, fontSize: 14, fontWeight: 600,
+                  border: discountType === d.type ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                  background: discountType === d.type ? '#e0e7ff' : '#fff',
+                  color: discountType === d.type ? '#4f46e5' : '#64748b',
+                  cursor: 'pointer'
+                }}>
+                {d.label}
+              </button>
+            ))}
           </div>
-        ))}
+          {discountType !== 'none' && (
+            <input 
+              type="number"
+              placeholder={discountType === 'percentage' ? "Porcentaje ej: 10" : "Monto ej: 50"}
+              value={discountValue}
+              onChange={e => setDiscountValue(e.target.value)}
+              style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
+            />
+          )}
+        </div>
+
+        <label className="label">Método de pago</label>
+        <div className="payment-grid" style={{ marginBottom: 24 }}>
+          {(['efectivo', 'transferencia'] as const).map(m => (
+            <div key={m} className={`payment-card ${paymentMethod === m ? 'selected' : ''}`} onClick={() => setPaymentMethod(m)}>
+              {paymentMethod === m && <div className="check-badge"><Check size={12} strokeWidth={3} /></div>}
+              <div className="payment-icon-wrapper"><span style={{ fontSize: 20 }}>{m === 'efectivo' ? '💵' : '🏦'}</span></div>
+              <div className="payment-text">{m === 'efectivo' ? 'Efectivo' : 'Transferencia'}</div>
+            </div>
+          ))}
+        </div>
+
+        {paymentMethod === 'efectivo' && (
+          <div style={{ marginBottom: 32, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
+            <label className="label" style={{ marginBottom: 12 }}>Calculadora de Cambio</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Efectivo recibido:</div>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: 16 }}>$</span>
+                  <input 
+                    type="number"
+                    value={cashReceived}
+                    onChange={e => setCashReceived(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', padding: '12px 16px 12px 28px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16, fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', padding: '12px 16px', borderRadius: 12 }}>
+              <span style={{ color: '#059669', fontWeight: 600, fontSize: 14 }}>Cambio a entregar:</span>
+              <span style={{ color: '#059669', fontWeight: 800, fontSize: 20 }}>${change.toFixed(0)}</span>
+            </div>
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={handleConfirmPayment}>Registrar como pagado</button>
       </div>
-      <button className="btn-primary" onClick={handleConfirmPayment}>Registrar como pagado</button>
-    </div>
-  );
+    );
+  };
 
   const renderPedidos = () => (
     <div className="fade-in pedidos-view">

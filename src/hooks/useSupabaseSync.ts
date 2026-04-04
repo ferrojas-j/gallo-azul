@@ -244,13 +244,16 @@ export function useSupabaseSync() {
     await fetchOrdersAndItems();
   }, [tableOrders, activeItems, fetchOrdersAndItems]);
 
-  const confirmPayment = useCallback(async (tableId: number, method: string) => {
+  const confirmPayment = useCallback(async (tableId: number, method: string, customTotal?: number) => {
     const order = tableOrders[tableId];
     if (!order) return;
 
     // Last minute recalculation
     const items = activeItems.filter(i => i.table_id === tableId);
-    const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+    let total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+    if (customTotal !== undefined) {
+      total = customTotal;
+    }
     const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
 
     // Block stale realtime fetches for 5 seconds
