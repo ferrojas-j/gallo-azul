@@ -666,6 +666,29 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+
+                <button
+                  onClick={() => setMesaTab('menu')}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    marginTop: '16px',
+                    borderRadius: '16px',
+                    border: '2px dashed #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#64748b',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                  Agregar más pedidos
+                </button>
               </div>
             )}
             {selectedTableItems.length > 0 && (
