@@ -114,6 +114,27 @@ export default function App() {
   const [discountValue, setDiscountValue] = useState<string>('');
   const [cashReceived, setCashReceived] = useState<string>('');
 
+  // PWA Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   useEffect(() => {
 
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -446,6 +467,12 @@ export default function App() {
           </button>
         </form>
         <div className="login-hint">Contraseña inicial: <strong>LaMora.2026</strong></div>
+        {deferredPrompt && (
+          <button className="btn-primary" type="button" onClick={handleInstallPWA} style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', border: 'none' }}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Instalar App
+          </button>
+        )}
       </div>
     );
   }
@@ -1445,26 +1472,38 @@ export default function App() {
         ) : isSubView ? (
           <div style={{ width: 44 }} />
         ) : (
-          <div className="header-user-chip">
-            <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
-            <button
-              className="header-logout-btn"
-              title="Cerrar sesión"
-              onClick={async () => {
-                // Mark this user as offline in DB before clearing state
-                if (currentUser?.id) {
-                  await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
-                }
-                localStorage.removeItem('mora_session');
-                setCurrentUser(null);
-                setLoginName('');
-                setLoginPassword('');
-                setCurrentView('home');
-              }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallPWA}
+                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
+                title="Instalar Aplicación"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Instalar
+              </button>
+            )}
+            <div className="header-user-chip">
+              <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
+              <button
+                className="header-logout-btn"
+                title="Cerrar sesión"
+                onClick={async () => {
+                  // Mark this user as offline in DB before clearing state
+                  if (currentUser?.id) {
+                    await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
+                  }
+                  localStorage.removeItem('mora_session');
+                  setCurrentUser(null);
+                  setLoginName('');
+                  setLoginPassword('');
+                  setCurrentView('home');
+                }}
 
-            >
-              <LogOut size={15} />
-            </button>
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
           </div>
         )}
       </div>
