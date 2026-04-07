@@ -39,6 +39,7 @@ export function useSupabaseSync() {
   const [todayIncome, setTodayIncome] = useState(0);
   const [todayCashIncome, setTodayCashIncome] = useState(0);
   const [todayTransferIncome, setTodayTransferIncome] = useState(0);
+  const [todayTransferTips, setTodayTransferTips] = useState(0);
   const [todayAccountsCount, setTodayAccountsCount] = useState(0);
   const [todayExpenses, setTodayExpenses] = useState(0);
   const [todayExpensesList, setTodayExpensesList] = useState<any[]>([]);
@@ -132,8 +133,12 @@ export function useSupabaseSync() {
       const transfer = closedOrdersRes.data
         .filter(o => o.payment_method !== 'efectivo')
         .reduce((sum, o) => sum + (o.total || 0), 0);
+      const transferTips = closedOrdersRes.data
+        .filter(o => o.payment_method === 'transferencia')
+        .reduce((sum, o) => sum + (o.tip || 0), 0);
       setTodayCashIncome(cash);
       setTodayTransferIncome(transfer);
+      setTodayTransferTips(transferTips);
     }
   }, []);
 
@@ -244,7 +249,7 @@ export function useSupabaseSync() {
     await fetchOrdersAndItems();
   }, [tableOrders, activeItems, fetchOrdersAndItems]);
 
-  const confirmPayment = useCallback(async (tableId: number, method: string, customTotal?: number) => {
+  const confirmPayment = useCallback(async (tableId: number, method: string, customTotal?: number, customTip?: number, discountReason?: string) => {
     const order = tableOrders[tableId];
     if (!order) return;
 
@@ -254,7 +259,10 @@ export function useSupabaseSync() {
     if (customTotal !== undefined) {
       total = customTotal;
     }
-    const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+    let summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+    if (discountReason && discountReason.trim() !== '') {
+      summary += ` | Desc: ${discountReason.trim()}`;
+    }
 
     // Block stale realtime fetches for 5 seconds
     lastClosed.current[tableId] = Date.now();
@@ -271,7 +279,8 @@ export function useSupabaseSync() {
     const { error: orderError } = await dbOrders.closeAllActiveForTable(tableId, { 
       payment_method: method, 
       total, 
-      items_summary: summary 
+      items_summary: summary,
+      tip: customTip
     });
 
     if (orderError) {
@@ -333,6 +342,24 @@ export function useSupabaseSync() {
     await dbCategories.updateName(id, name);
   }, []);
 
+  const addCategory = useCallback(async (name: string) => {
+    const { data, error } = await dbCategories.insert(name);
+    if (!error) await fetchMenu();
+    return { data, error };
+  }, [fetchMenu]);
+
+  const addMenuItem = useCallback(async (item: { name: string; price: number; category_id: string; has_variants: boolean; active: boolean }) => {
+    const { data, error } = await dbMenu.insertItem(item);
+    if (!error) await fetchMenu();
+    return { data, error };
+  }, [fetchMenu]);
+
+  const addMenuVariant = useCallback(async (variant: { menu_item_id: string; label: string; price: number; active: boolean; sort_order: number }) => {
+    const { data, error } = await dbMenu.insertVariant(variant);
+    if (!error) await fetchMenu();
+    return { data, error };
+  }, [fetchMenu]);
+
   const addTable = useCallback(async (id: number) => {
     await dbTables.insert(id);
   }, []);
@@ -341,7 +368,7 @@ export function useSupabaseSync() {
     await dbTables.delete(id);
   }, []);
 
-  const addUser = useCallback(async (name: string, role: 'Administrador' | 'Staff', password: string) => {
+  const addUser = useCallback(async (name: string, role: 'Administrador' | 'Staff' | 'Encargado', password: string) => {
     const { error } = await dbUsers.insert(name, role, password);
     if (!error) await fetchUsers();
     return { error };
@@ -370,6 +397,7 @@ export function useSupabaseSync() {
       income: todayIncome,
       cash_income: todayCashIncome,
       transfer_income: todayTransferIncome,
+      transfer_tips: todayTransferTips,
       expenses: todayExpenses,
       accounts_count: todayAccountsCount,
       expenses_list: todayExpensesList,
@@ -392,7 +420,7 @@ export function useSupabaseSync() {
     await fetchDailySummaries();
     await fetchTodayTotals();
   }, [
-    todayIncome, todayCashIncome, todayTransferIncome, 
+    todayIncome, todayCashIncome, todayTransferIncome, todayTransferTips,
     todayExpenses, todayAccountsCount, todayExpensesList, todayClosedOrders,
     fetchDailySummaries, fetchTodayTotals
   ]);
@@ -421,6 +449,7 @@ export function useSupabaseSync() {
     todayIncome,
     todayCashIncome,
     todayTransferIncome,
+    todayTransferTips,
     todayAccountsCount,
     todayExpenses,
     todayExpensesList,
@@ -441,6 +470,9 @@ export function useSupabaseSync() {
     updateMenuItem,
     updateMenuVariant,
     updateCategory,
+    addCategory,
+    addMenuItem,
+    addMenuVariant,
     addTable,
     deleteTable,
     addUser,

@@ -14,6 +14,7 @@ export type OrderRow = {
   status: 'open' | 'paying' | 'closed' | 'cancelled' | 'archived';
   payment_method: string | null;
   total: number;
+  tip?: number;
   items_summary?: string; // Descriptive summary of items
   closed_at?: string; // ISO timestamp
 };
@@ -54,7 +55,7 @@ export type MenuItemRow = {
 export type UserRow = {
   id: string;
   name: string;
-  role: 'Administrador' | 'Staff';
+  role: 'Administrador' | 'Staff' | 'Encargado';
   password: string;
   active: boolean;
   session_active: boolean;
@@ -83,19 +84,21 @@ export const dbOrders = {
     payment_method?: string;
     total?: number;
     items_summary?: string;
+    tip?: number;
   }) =>
     supabase.from('orders').update({
       status,
       ...(params?.payment_method ? { payment_method: params.payment_method } : {}),
-      ...(params?.total ? { total: params.total } : {}),
+      ...(params?.total !== undefined ? { total: params.total } : {}),
       ...(params?.items_summary ? { items_summary: params.items_summary } : {}),
+      ...(params?.tip !== undefined ? { tip: params.tip } : {}),
       ...(status === 'closed' ? { closed_at: new Date().toISOString() } : {}),
     }).eq('id', id),
   getTodayIncome: () => {
     const today = new Date().toISOString().split('T')[0];
     return supabase
       .from('orders')
-      .select('total')
+      .select('total, tip')
       .eq('status', 'closed') // ONLY actively closed orders from this turn
       .gte('closed_at', today + 'T00:00:00');
   },
@@ -114,12 +117,14 @@ export const dbOrders = {
     payment_method: string;
     total: number;
     items_summary: string;
+    tip?: number;
   }) =>
     supabase.from('orders').update({
       status: 'closed',
       payment_method: params.payment_method,
       total: params.total,
       items_summary: params.items_summary,
+      ...(params.tip !== undefined ? { tip: params.tip } : {}),
       closed_at: new Date().toISOString()
     }).eq('table_id', tableId).in('status', ['open', 'paying']),
 };
@@ -186,11 +191,17 @@ export const dbMenu = {
     supabase.from('menu_items').update({ name, price }).eq('id', id),
   updateVariant: (id: string, label: string, price: number) =>
     supabase.from('menu_item_variants').update({ label, price }).eq('id', id),
+  insertItem: (item: { name: string; price: number; category_id: string; has_variants: boolean; active: boolean }) =>
+    supabase.from('menu_items').insert(item).select().single(),
+  insertVariant: (variant: { menu_item_id: string; label: string; price: number; active: boolean; sort_order: number }) =>
+    supabase.from('menu_item_variants').insert(variant).select().single(),
 };
 
 export const dbCategories = {
   updateName: (id: string, name: string) =>
     supabase.from('menu_categories').update({ name }).eq('id', id),
+  insert: (name: string) =>
+    supabase.from('menu_categories').insert({ name }).select().single(),
 };
 
 export const dbUsers = {
@@ -226,6 +237,7 @@ export const dbShiftSummaries = {
     income: number;
     cash_income: number;
     transfer_income: number;
+    transfer_tips: number;
     expenses: number;
     accounts_count: number;
     expenses_list: any[];

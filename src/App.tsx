@@ -17,11 +17,12 @@ export default function App() {
   // Supabase sync
   const {
     tables, tableOrders, activeItems, menuItems, users,
-    todayIncome, todayCashIncome, todayTransferIncome, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, dailySummaries, isLoading,
+    todayIncome, todayCashIncome, todayTransferIncome, todayTransferTips, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, dailySummaries, isLoading,
     createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes,
     checkoutTable, confirmPayment, addExpense,
     toggleMenuItem, toggleMenuVariant,
     updateMenuItem, updateMenuVariant, updateCategory,
+    addCategory, addMenuItem, addMenuVariant,
     addTable, deleteTable,
     addUser, deleteUser, updateUser, closeSession,
     closeDay, deleteShiftSummary,
@@ -29,7 +30,7 @@ export default function App() {
 
 
   // UI state
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' } | null>(() => {
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>(() => {
     try { const s = localStorage.getItem('mora_session'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
 
@@ -56,19 +57,19 @@ export default function App() {
   // Add User modal
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'Administrador' | 'Staff'>('Staff');
+  const [newUserRole, setNewUserRole] = useState<'Administrador' | 'Staff' | 'Encargado'>('Staff');
   const INITIAL_PASSWORD = 'LaMora.2026';
 
   // Edit User modal
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserName, setEditUserName] = useState('');
-  const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff'>('Staff');
+  const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff' | 'Encargado'>('Staff');
 
   // Unified Custom Confirm Modal for tables (opening accounts and confirming payments)
   const [tableConfirmModal, setTableConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'open' | 'pay';
+    type: 'open' | 'pay' | 'closeEmpty';
     tableId: number | null;
   }>({ isOpen: false, type: 'open', tableId: null });
 
@@ -95,6 +96,66 @@ export default function App() {
 
   const toggleExpanded = (id: string) => setExpandedItems(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
+  // Add item modal
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemType, setNewItemType] = useState<'fixed' | 'variants'>('fixed');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState(''); 
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newItemVariants, setNewItemVariants] = useState<{label: string, price: string}[]>([]);
+
+  const handleAddItemModalOpen = () => {
+    setIsAddItemModalOpen(true);
+    setNewItemName('');
+    setNewItemType('fixed');
+    setNewItemPrice('');
+    setNewItemCategory('');
+    setNewCategoryName('');
+    setNewItemVariants([{label: 'Pan Blanco', price: ''}, {label: 'Integral', price: ''}]);
+  };
+
+  const handleCreateMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemName.trim() || !newItemCategory) return;
+    
+    let catId = newItemCategory;
+    if (newItemCategory === 'NEW') {
+      if (!newCategoryName.trim()) return;
+      const { data } = await addCategory(newCategoryName.trim());
+      if (data) {
+        catId = data.id;
+      } else {
+        return;
+      }
+    }
+
+    const { data: itemData } = await addMenuItem({
+      name: newItemName.trim(),
+      price: newItemType === 'fixed' ? parseFloat(newItemPrice) || 0 : 0,
+      category_id: catId,
+      has_variants: newItemType === 'variants',
+      active: true,
+    });
+
+    if (itemData && newItemType === 'variants') {
+      let order = 0;
+      for (const v of newItemVariants) {
+        if (v.label.trim()) {
+           await addMenuVariant({
+             menu_item_id: itemData.id,
+             label: v.label.trim(),
+             price: parseFloat(v.price) || 0,
+             active: true,
+             sort_order: order++,
+           });
+        }
+      }
+    }
+
+    setIsAddItemModalOpen(false);
+  };
+
   // Notes modal
   const [notesModal, setNotesModal] = useState<{ itemId: string; current: string } | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
@@ -112,7 +173,12 @@ export default function App() {
   // Checkout extended states
   const [discountType, setDiscountType] = useState<'none' | 'amount' | 'percentage'>('none');
   const [discountValue, setDiscountValue] = useState<string>('');
+  const [discountReason, setDiscountReason] = useState<string>('');
   const [cashReceived, setCashReceived] = useState<string>('');
+  const [tipPercent, setTipPercent] = useState<'none' | '10' | '15' | '20' | 'Otro'>('none');
+  const [customTip, setCustomTip] = useState<string>('');
+
+  const [expandedPedidos, setExpandedPedidos] = useState<number[]>([]);
 
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -287,7 +353,10 @@ export default function App() {
     await checkoutTable(selectedTableId);
     setDiscountType('none');
     setDiscountValue('');
+    setDiscountReason('');
     setCashReceived('');
+    setTipPercent('none');
+    setCustomTip('');
     setCurrentView('checkout');
     setPaymentMethod('efectivo');
   };
@@ -310,8 +379,24 @@ export default function App() {
       finalTotal = Math.max(0, finalTotal * (1 - dVal / 100));
     }
 
-    await confirmPayment(tableConfirmModal.tableId, paymentMethod, finalTotal);
+    let tipAmount = 0;
+    if (paymentMethod === 'transferencia') {
+      if (tipPercent === 'Otro') {
+        tipAmount = parseFloat(customTip) || 0;
+      } else if (tipPercent !== 'none') {
+        tipAmount = finalTotal * (parseFloat(tipPercent) / 100);
+      }
+    }
+
+    await confirmPayment(tableConfirmModal.tableId, paymentMethod, finalTotal, tipAmount, discountReason);
     setTableConfirmModal({ isOpen: false, type: 'pay', tableId: null });
+    navTo('salon');
+  };
+
+  const handleCancelTable = async () => {
+    if (!tableConfirmModal.tableId) return;
+    await confirmPayment(tableConfirmModal.tableId, 'Sin pedidos', 0);
+    setTableConfirmModal({ isOpen: false, type: 'closeEmpty', tableId: null });
     navTo('salon');
   };
 
@@ -702,14 +787,25 @@ export default function App() {
                 <div style={{ fontSize: 56, marginBottom: 16 }}>🥐</div>
                 <h3 style={{ fontSize: 18, color: '#0f172a', marginBottom: 4 }}>Cuenta vacía</h3>
                 <p style={{ fontSize: 14, marginBottom: 20 }}>Toca <strong>Menú</strong> para agregar deliciosa comida</p>
-                <button
-                  className="btn-primary"
-                  style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}
-                  onClick={() => setMesaTab('menu')}
-                >
-                  <Plus size={18} />
-                  Agregar pedidos
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280, margin: '0 auto' }}>
+                  <button
+                    className="btn-primary"
+                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
+                    onClick={() => setMesaTab('menu')}
+                  >
+                    <Plus size={18} />
+                    Agregar pedidos
+                  </button>
+                  <button
+                    className="btn-outline"
+                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                    onClick={() => {
+                        setTableConfirmModal({ isOpen: true, type: 'closeEmpty', tableId: selectedTableId })
+                    }}
+                  >
+                    <X size={18} /> Liberar mesa
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="order-items-list">
@@ -792,7 +888,7 @@ export default function App() {
             </div>
             {!menuSearch && (
               <div className="category-chips-wrap">
-                {CATEGORIES.map(cat => (
+                {Array.from(new Set(menuItems.map(m => m.category))).sort().map(cat => (
                   <button
                     key={cat}
                     className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
@@ -892,13 +988,22 @@ export default function App() {
             ))}
           </div>
           {discountType !== 'none' && (
-            <input 
-              type="number"
-              placeholder={discountType === 'percentage' ? "Porcentaje ej: 10" : "Monto ej: 50"}
-              value={discountValue}
-              onChange={e => setDiscountValue(e.target.value)}
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input 
+                type="number"
+                placeholder={discountType === 'percentage' ? "Porcentaje ej: 10" : "Monto ej: 50"}
+                value={discountValue}
+                onChange={e => setDiscountValue(e.target.value)}
+                style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
+              />
+              <input 
+                type="text"
+                placeholder="Motivo (ej. Promoción, Cumpleaños...)"
+                value={discountReason}
+                onChange={e => setDiscountReason(e.target.value)}
+                style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
+              />
+            </div>
           )}
         </div>
 
@@ -939,74 +1044,190 @@ export default function App() {
           </div>
         )}
 
+        {paymentMethod === 'transferencia' && (
+          <div style={{ marginBottom: 32, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
+            <label className="label" style={{ marginBottom: 12 }}>Propina</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: tipPercent === 'Otro' ? 16 : 0, overflowX: 'auto', paddingBottom: 4 }}>
+              {(['none', '10', '15', '20', 'Otro'] as const).map(t => (
+                <button 
+                  key={t}
+                  onClick={() => { setTipPercent(t); if(t !== 'Otro') setCustomTip(''); }}
+                  style={{
+                    flex: '1 0 auto', padding: '10px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600,
+                    border: tipPercent === t ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                    background: tipPercent === t ? '#fef2f2' : '#fff',
+                    color: tipPercent === t ? '#b91c1c' : '#64748b',
+                    cursor: 'pointer',
+                    minWidth: 70
+                  }}>
+                  {t === 'none' ? 'Sin propina' : t === 'Otro' ? 'Otro' : `${t}%`}
+                </button>
+              ))}
+            </div>
+            {tipPercent === 'Otro' && (
+               <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: 16 }}>$</span>
+                  <input 
+                    type="number"
+                    value={customTip}
+                    onChange={e => setCustomTip(e.target.value)}
+                    placeholder="Ejem. 50"
+                    style={{ width: '100%', padding: '12px 16px 12px 28px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16, fontWeight: 600 }}
+                  />
+                </div>
+            )}
+            {tipPercent !== 'none' && tipPercent !== 'Otro' && (
+              <div style={{ marginTop: 12, textAlign: 'right', fontSize: 14, color: '#0f172a', fontWeight: 600 }}>
+                 +${((parseFloat(tipPercent) / 100) * finalTotal).toFixed(0)} de propina
+              </div>
+            )}
+          </div>
+        )}
+
         <button className="btn-primary" onClick={handleConfirmPayment}>Registrar como pagado</button>
       </div>
     );
   };
 
-  const renderPedidos = () => (
-    <div className="fade-in pedidos-view">
-      {pendingItems.length === 0 ? (
-        <div className="empty-pedidos">
-          <div style={{ fontSize: 64, marginBottom: 20 }}>👩‍🍳</div>
-          <h2>Tu cocina está al día</h2>
-          <p>Los nuevos pedidos aparecerán aquí automáticamente.</p>
-        </div>
-      ) : (
-        <div className="pedidos-list">
-          {pendingItems.map(item => {
-            const category = menuItems.find(m => m.name === item.name)?.category ?? '';
-            const elapsedMinutes = Math.floor((currentTime.getTime() - new Date(item.created_at).getTime()) / 60000);
-            const isDelayed = elapsedMinutes >= 15;
-            const isWarning = elapsedMinutes >= 10 && !isDelayed;
-            const timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
+  const renderPedidos = () => {
+    // Group activeItems by table
+    const itemsByTable = activeItems.reduce((acc, item) => {
+      if (!acc[item.table_id]) acc[item.table_id] = [];
+      acc[item.table_id].push(item);
+      return acc;
+    }, {} as Record<number, typeof activeItems>);
 
-            return (
-            <div className={`qa-card ${isDelayed ? 'delayed-alert' : ''}`} key={item.id} style={isDelayed ? { borderColor: '#fecaca', background: '#fef2f2' } : {}}>
-              <div className="qa-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div className="qa-table-badge">Mesa {item.table_id}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
-                    <Clock size={14} strokeWidth={3} />
-                    {elapsedMinutes} min
+    const tableIds = Object.keys(itemsByTable).map(Number).sort((a,b) => a - b);
+    
+    return (
+      <div className="fade-in pedidos-view">
+        {tableIds.length === 0 ? (
+          <div className="empty-pedidos">
+            <div style={{ fontSize: 64, marginBottom: 20 }}>👩‍🍳</div>
+            <h2>Tu cocina está al día</h2>
+            <p>Los nuevos pedidos aparecerán aquí automáticamente por mesa.</p>
+          </div>
+        ) : (
+          <div className="pedidos-list">
+            {tableIds.map(tableId => {
+              const tableItems = itemsByTable[tableId].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+              const isCollapsed = expandedPedidos.includes(tableId);
+              const toggleCollapse = () => {
+                setExpandedPedidos(prev => prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]);
+              };
+
+              // Oldest pending item to calculate time
+              const pendingTableItems = tableItems.filter(i => i.status === 'pending');
+              const oldestPending = pendingTableItems[0];
+              
+              let elapsedMinutes = 0;
+              let isDelayed = false;
+              let isWarning = false;
+              let timeColor = '#10b981';
+
+              if (oldestPending) {
+                elapsedMinutes = Math.floor((currentTime.getTime() - new Date(oldestPending.created_at).getTime()) / 60000);
+                isDelayed = elapsedMinutes >= 15;
+                isWarning = elapsedMinutes >= 10 && !isDelayed;
+                timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
+              } else if (tableItems.length > 0) {
+                timeColor = '#64748b'; // All done
+              }
+
+              return (
+                <div className={`qa-card ${isDelayed ? 'delayed-alert' : ''}`} key={`pedidos-table-${tableId}`} style={{ ...(isDelayed ? { borderColor: '#fecaca', background: '#fef2f2' } : {}), padding: 0, overflow: 'hidden' }}>
+                  <div 
+                    className="qa-header" 
+                    onClick={toggleCollapse} 
+                    style={{ padding: '16px', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9', margin: 0 }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="qa-table-badge">Mesa {tableId}</div>
+                      {oldestPending ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
+                          <Clock size={14} strokeWidth={3} />
+                          {elapsedMinutes} min
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
+                          <Check size={14} strokeWidth={3} />
+                          Completado
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{pendingTableItems.length} pendientes</span>
+                      <ChevronRight size={20} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s' }} />
+                    </div>
                   </div>
-                </div>
-                <div className="qa-qty-label">x{item.qty}</div>
-              </div>
-              <div className="qa-body">
-                <div className="qa-info">
-                  {category && (
-                    <div style={{
-                      display: 'inline-block',
-                      fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-                      textTransform: 'uppercase', color: '#6366f1',
-                      background: '#eef2ff', borderRadius: 6,
-                      padding: '2px 8px', marginBottom: 4,
-                    }}>
-                      {category}
+
+                  {!isCollapsed && (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {tableItems.map(item => {
+                        const category = menuItems.find(m => m.name === item.name)?.category ?? '';
+                        const isDone = item.status === 'done';
+
+                        return (
+                          <div 
+                            key={item.id} 
+                            style={{ 
+                              padding: '12px 16px',
+                              borderBottom: '1px solid #f1f5f9',
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              opacity: isDone ? 0.6 : 1,
+                              background: isDone ? '#f8fafc' : 'transparent'
+                            }}
+                          >
+                            <div className="qa-info" style={{ flex: 1, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? '#94a3b8' : 'inherit' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                {category && (
+                                  <div style={{
+                                    fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                                    textTransform: 'uppercase', color: '#6366f1',
+                                    background: '#eef2ff', borderRadius: 6,
+                                    padding: '2px 8px',
+                                  }}>
+                                    {category}
+                                  </div>
+                                )}
+                                <span style={{ fontWeight: 800, fontSize: 13, color: '#475569' }}>x{item.qty}</span>
+                              </div>
+                              
+                              <div className="qa-name" style={{ fontWeight: 700, fontSize: 16 }}>{item.name}</div>
+                              {item.variant_label && <div className="qa-variant" style={{ fontSize: 13, marginTop: 2, color: '#64748b' }}>{item.variant_label}</div>}
+                              {item.notes && (
+                                <div className="qa-notes-box" style={{ marginTop: 6, background: '#fef3c7', color: '#d97706', border: 'none' }}>
+                                  <StickyNote size={13} strokeWidth={2.5} />
+                                  <span>{item.notes}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {!isDone ? (
+                              <button
+                                className="qa-done-btn"
+                                onClick={(e) => { e.stopPropagation(); setDeliveryConfirm(item.id); }}
+                                style={{ marginLeft: 16 }}
+                              >
+                                <Check size={22} strokeWidth={3} />
+                              </button>
+                            ) : (
+                              <div style={{ padding: '8px', color: '#10b981' }}>
+                                <Check size={20} strokeWidth={3} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  <div className="qa-name">{item.name}</div>
-                  {item.variant_label && <div className="qa-variant">{item.variant_label}</div>}
-                  {item.notes && (
-                    <div className="qa-notes-box">
-                      <StickyNote size={13} strokeWidth={2.5} />
-                      <span>{item.notes}</span>
-                    </div>
-                  )}
                 </div>
-                <button
-                  className="qa-done-btn"
-                  onClick={() => setDeliveryConfirm(item.id)}
-                >
-                  <Check size={22} strokeWidth={3} />
-                </button>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
 
       {/* Delivery Confirmation Modal */}
       {deliveryConfirm && (
@@ -1032,7 +1253,8 @@ export default function App() {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const renderAdminMain = () => {
     const mexicoDate = currentTime.toLocaleDateString('es-MX', {
@@ -1052,33 +1274,42 @@ export default function App() {
           </div>
         </div>
 
-        <div className="admin-summary-grid">
-          <div className="admin-summary-card income">
-            <div className="as-icon"><TrendingUp size={20} /></div>
-            <div className="as-content">
-              <div className="as-label">Ingresos</div>
-              <div className="as-value">${todayIncome.toFixed(0)}</div>
-              <div className="as-sub">{todayAccountsCount} cuentas cobradas</div>
+        {currentUser?.role === 'Administrador' && (
+          <>
+            <div className="admin-summary-grid">
+              <div className="admin-summary-card income">
+                <div className="as-icon"><TrendingUp size={20} /></div>
+                <div className="as-content">
+                  <div className="as-label">Ingresos</div>
+                  <div className="as-value">${todayIncome.toFixed(0)}</div>
+                  <div className="as-sub">{todayAccountsCount} cuentas cobradas</div>
+                  {todayTransferTips > 0 && (
+                    <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>
+                      + ${todayTransferTips.toFixed(0)} en propinas (transf.)
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="admin-summary-card expenses">
+                <div className="as-icon"><TrendingDown size={20} /></div>
+                <div className="as-content">
+                  <div className="as-label">Gastos</div>
+                  <div className="as-value">${todayExpenses.toFixed(0)}</div>
+                  <div className="as-sub">{todayExpensesList.length} registros hoy</div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="admin-summary-card expenses">
-            <div className="as-icon"><TrendingDown size={20} /></div>
-            <div className="as-content">
-              <div className="as-label">Gastos</div>
-              <div className="as-value">${todayExpenses.toFixed(0)}</div>
-              <div className="as-sub">{todayExpensesList.length} registros hoy</div>
-            </div>
-          </div>
-        </div>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-          <button className="btn-primary" onClick={() => setIsExpenseModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16, background: '#fecaca', color: '#991b1b', border: 'none' }}>
-            <Plus size={18} /> Gasto
-          </button>
-          <button className="btn-outline" onClick={() => setIsCierreModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16 }}>
-            <Lock size={18} /> Cierre
-          </button>
-        </div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
+              <button className="btn-primary" onClick={() => setIsExpenseModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16, background: '#fecaca', color: '#991b1b', border: 'none' }}>
+                <Plus size={18} /> Gasto
+              </button>
+              <button className="btn-outline" onClick={() => setIsCierreModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16 }}>
+                <Lock size={18} /> Cierre
+              </button>
+            </div>
+          </>
+        )}
 
         <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Administración</div>
         <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
@@ -1087,7 +1318,14 @@ export default function App() {
             { label: 'Gestión de Mesas', view: 'tables', icon: <LayoutGrid size={20} />, bg: '#fef9c3', color: '#ca8a04' },
             { label: 'Estadísticas', view: 'stats', icon: <TrendingUp size={20} />, bg: '#dcfce7', color: '#16a34a' },
             { label: 'Usuarios Autorizados', view: 'users', icon: <Users size={20} />, bg: '#fce7f3', color: '#db2777' },
-          ].map(({ label, view, icon, bg, color }) => (
+          ]
+          .filter(item => {
+            if (currentUser?.role === 'Encargado') {
+              return item.view === 'menu' || item.view === 'tables';
+            }
+            return true;
+          })
+          .map(({ label, view, icon, bg, color }) => (
             <div key={view} className="admin-menu-item" onClick={() => setAdminSubView(view as any)}>
               <div className="admin-menu-icon" style={{ backgroundColor: bg, color }}>{icon}</div>
               <div className="admin-menu-text">{label}</div>
@@ -1159,7 +1397,8 @@ export default function App() {
   };
 
   const renderAdminMenu = () => {
-    const byCategory = CATEGORIES.map(cat => ({
+    const uniqueCategories = Array.from(new Set(menuItems.map(m => m.category))).sort();
+    const byCategory = uniqueCategories.map(cat => ({
       cat,
       items: menuItems.filter(m => m.category === cat),
       catId: menuItems.find(m => m.category === cat)?.categoryId,
@@ -1167,6 +1406,16 @@ export default function App() {
 
     return (
       <div className="fade-in" style={{ paddingBottom: 40 }}>
+        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
+          <button 
+            onClick={handleAddItemModalOpen} 
+            className="btn-primary" 
+            style={{ width: 'auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 12 }}
+          >
+            <Plus size={18} />
+            Agregar Producto
+          </button>
+        </div>
         {byCategory.map(({ cat, items, catId }) => (
           <div key={cat} style={{ marginBottom: 28 }}>
             {/* Category header with edit */}
@@ -1305,6 +1554,11 @@ export default function App() {
                     <span className="rc-value grey">{report.accounts_count}</span>
                   </div>
                 </div>
+                {(report.transfer_tips ?? 0) > 0 && (
+                  <div style={{ padding: '0 16px 12px', fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
+                     Propinas en transferencia: ${(report.transfer_tips ?? 0).toFixed(0)}
+                  </div>
+                )}
 
                 {report.expenses_list?.length > 0 && (
                   <div className="rc-expenses-detail">
@@ -1357,6 +1611,7 @@ export default function App() {
             const totalInc = filtered.reduce((sum, s) => sum + s.income, 0);
             const totalExp = filtered.reduce((sum, s) => sum + s.expenses, 0);
             const totalAcc = filtered.reduce((sum, s) => sum + s.accounts_count, 0);
+            const totalTips = filtered.reduce((sum, s) => sum + (s.transfer_tips || 0), 0);
 
             return (
               <div className="analytics-content">
@@ -1372,6 +1627,10 @@ export default function App() {
                   <div className="as-metric">
                     <div className="as-m-val">{totalAcc}</div>
                     <div className="as-m-lab">Cuentas</div>
+                  </div>
+                  <div className="as-metric">
+                    <div className="as-m-val">${totalTips.toFixed(0)}</div>
+                    <div className="as-m-lab">Propinas Tr.</div>
                   </div>
                 </div>
 
@@ -1589,7 +1848,7 @@ export default function App() {
             { view: 'home', icon: <HomeIcon className="nav-icon" />, label: 'Inicio' },
             { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Salón' },
             { view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Pedidos' },
-            ...(currentUser?.role === 'Administrador'
+            ...(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado'
               ? [{ view: 'admin', icon: <Settings className="nav-icon" />, label: 'Admin' }]
               : []),
           ].map(({ view, icon, label }) => (
@@ -1665,6 +1924,10 @@ export default function App() {
                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#3b82f6' }}>
                   <Plus size={32} />
                 </div>
+              ) : tableConfirmModal.type === 'closeEmpty' ? (
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#ef4444' }}>
+                  <X size={32} />
+                </div>
               ) : (
                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#10b981' }}>
                   <Check size={32} />
@@ -1673,12 +1936,14 @@ export default function App() {
             </div>
             
             <h3 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-              {tableConfirmModal.type === 'open' ? `Abrir Mesa ${tableConfirmModal.tableId}` : `Cuenta Pagada`}
+              {tableConfirmModal.type === 'open' ? `Abrir Mesa ${tableConfirmModal.tableId}` : tableConfirmModal.type === 'closeEmpty' ? `Liberar Mesa ${tableConfirmModal.tableId}` : `Cuenta Pagada`}
             </h3>
             
             <p style={{ fontSize: 16, color: '#64748b', marginBottom: 32, lineHeight: 1.5, padding: '0 12px' }}>
               {tableConfirmModal.type === 'open' 
                 ? '¿Confirmas que deseas iniciar el registro de una cuenta nueva en esta mesa?' 
+                : tableConfirmModal.type === 'closeEmpty'
+                ? '¿Confirmas que deseas cerrar esta cuenta vacía y dejar la mesa libre nuevamente?'
                 : '¿Confirmas que los productos han sido pagados y se liberará la mesa?'}
             </p>
             
@@ -1690,8 +1955,8 @@ export default function App() {
                 Cancelar
               </button>
               <button 
-                onClick={tableConfirmModal.type === 'open' ? handleConfirmOpenTable : executePayment}
-                style={{ flex: 1, padding: '16px', borderRadius: 16, background: tableConfirmModal.type === 'open' ? '#3b82f6' : '#10b981', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15 }}
+                onClick={tableConfirmModal.type === 'open' ? handleConfirmOpenTable : tableConfirmModal.type === 'closeEmpty' ? handleCancelTable : executePayment}
+                style={{ flex: 1, padding: '16px', borderRadius: 16, background: tableConfirmModal.type === 'open' ? '#3b82f6' : tableConfirmModal.type === 'closeEmpty' ? '#ef4444' : '#10b981', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15 }}
               >
                 Sí, Confirmar
               </button>
@@ -2009,6 +2274,160 @@ export default function App() {
             <button className="btn-primary" onClick={() => setIsIosPromptVisible(false)}>
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Item Modal */}
+      {isAddItemModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsAddItemModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Agregar Producto</h3>
+              <button className="modal-close" onClick={() => setIsAddItemModalOpen(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCreateMenuItem}>
+              <div className="form-group">
+                <label>Nombre del producto</label>
+                <input
+                  type="text"
+                  required
+                  value={newItemName}
+                  onChange={e => setNewItemName(e.target.value)}
+                  placeholder="Ej. Hamburguesa Especial"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Categoría</label>
+                <select
+                  required
+                  value={newItemCategory}
+                  onChange={e => setNewItemCategory(e.target.value)}
+                >
+                  <option value="">Selecciona una categoría...</option>
+                  {[...new Set(menuItems.map(m => JSON.stringify({ id: m.categoryId, name: m.category })))].map(c => {
+                    const cat = JSON.parse(c);
+                    if (!cat.id) return null;
+                    return <option key={cat.id} value={cat.id}>{cat.name}</option>;
+                  })}
+                  <option value="NEW">+ Crear nueva categoría</option>
+                </select>
+              </div>
+              
+              {newItemCategory === 'NEW' && (
+                <div className="form-group slide-in">
+                  <label>Nombre de nueva categoría</label>
+                  <input
+                    type="text"
+                    required
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    placeholder="Ej. Postres"
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Tipo de precio</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div
+                    onClick={() => setNewItemType('fixed')}
+                    style={{
+                      padding: '12px', borderRadius: 12,
+                      border: `2px solid ${newItemType === 'fixed' ? '#4f46e5' : '#e2e8f0'}`,
+                      background: newItemType === 'fixed' ? '#e0e7ff' : '#f8fafc',
+                      cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+                      fontWeight: 600, color: newItemType === 'fixed' ? '#4f46e5' : '#64748b'
+                    }}
+                  >
+                    Precio Fijo
+                  </div>
+                  <div
+                    onClick={() => setNewItemType('variants')}
+                    style={{
+                      padding: '12px', borderRadius: 12,
+                      border: `2px solid ${newItemType === 'variants' ? '#4f46e5' : '#e2e8f0'}`,
+                      background: newItemType === 'variants' ? '#e0e7ff' : '#f8fafc',
+                      cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+                      fontWeight: 600, color: newItemType === 'variants' ? '#4f46e5' : '#64748b'
+                    }}
+                  >
+                    Con Variantes
+                  </div>
+                </div>
+              </div>
+
+              {newItemType === 'fixed' ? (
+                <div className="form-group slide-in">
+                  <label>Precio ($)</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    value={newItemPrice}
+                    onChange={e => setNewItemPrice(e.target.value)}
+                    placeholder="Ej. 150.00"
+                  />
+                </div>
+              ) : (
+                <div className="form-group slide-in">
+                  <label>Variantes (Ej: Harina Blanca / Integral)</label>
+                  {newItemVariants.map((v, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Variante ${i+1} (ej. ${i===0?'Pan Blanco':'Integral'})`}
+                        value={v.label}
+                        onChange={e => {
+                          const arr = [...newItemVariants];
+                          arr[i].label = e.target.value;
+                          setNewItemVariants(arr);
+                        }}
+                        style={{ flex: 2 }}
+                      />
+                      <input
+                        type="number"
+                        required
+                        placeholder="$"
+                        value={v.price}
+                        onChange={e => {
+                          const arr = [...newItemVariants];
+                          arr[i].price = e.target.value;
+                          setNewItemVariants(arr);
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                      {newItemVariants.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setNewItemVariants(newItemVariants.filter((_, idx) => idx !== i))}
+                          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0 8px' }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setNewItemVariants([...newItemVariants, {label: '', price: ''}])}
+                    style={{
+                      width: '100%', background: 'transparent', border: '1px dashed #cbd5e1', color: '#64748b',
+                      padding: 10, borderRadius: 12, fontWeight: 600, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={16} /> Agregar otra variante
+                  </button>
+                </div>
+              )}
+
+              <button type="submit" className="btn-primary" style={{ marginTop: 16 }}>
+                <Plus size={18} /> Crear Producto
+              </button>
+            </form>
           </div>
         </div>
       )}
