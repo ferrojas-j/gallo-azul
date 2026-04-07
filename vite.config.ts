@@ -8,6 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifestFilename: 'manifest.json',
       includeAssets: ['logo.png'],
       manifest: {
         name: 'La Mora Resto App',
@@ -16,6 +18,8 @@ export default defineConfig({
         theme_color: '#0e122b',
         background_color: '#f8fafc',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'logo.png',
@@ -36,7 +40,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}']
       }
     })
   ],

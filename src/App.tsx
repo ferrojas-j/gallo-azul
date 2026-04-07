@@ -116,6 +116,20 @@ export default function App() {
 
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
+  // iOS manual setup (no beforeinstallprompt fired here)
+  const isIosDevice = () => {
+    return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  };
+  const [isIosPromptVisible, setIsIosPromptVisible] = useState(false);
+  const [showIosButton, setShowIosButton] = useState(false);
+
+  useEffect(() => {
+    const isStandalone = ('standalone' in window.navigator) && (window.navigator as any).standalone;
+    if (isIosDevice() && !isStandalone && !window.matchMedia('(display-mode: standalone)').matches) {
+      setShowIosButton(true);
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -471,6 +485,12 @@ export default function App() {
           <button className="btn-primary" type="button" onClick={handleInstallPWA} style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', border: 'none' }}>
             <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             Instalar App
+          </button>
+        )}
+        {!deferredPrompt && showIosButton && (
+          <button className="btn-primary" type="button" onClick={() => setIsIosPromptVisible(true)} style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', border: 'none' }}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Instalar en iPhone / iPad
           </button>
         )}
       </div>
@@ -1483,6 +1503,16 @@ export default function App() {
                 Instalar
               </button>
             )}
+            {!deferredPrompt && showIosButton && (
+              <button
+                onClick={() => setIsIosPromptVisible(true)}
+                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
+                title="Instalar en iOS"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Instalar
+              </button>
+            )}
             <div className="header-user-chip">
               <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
               <button
@@ -1936,6 +1966,24 @@ export default function App() {
                 Sí, eliminar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Install Prompt Modal */}
+      {isIosPromptVisible && (
+        <div className="modal-overlay" onClick={() => setIsIosPromptVisible(false)} style={{ zIndex: 9999 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center', padding: '32px 24px' }}>
+            <div style={{ width: 64, height: 64, background: '#eff6ff', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+              <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+            </div>
+            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar La Mora</h3>
+            <p style={{ fontSize: 15, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
+              Para instalar la aplicación en tu iPhone o iPad, pulsa el botón de <strong>Compartir</strong> en la barra inferior (el cuadrado con la flecha hacia arriba) y luego selecciona <strong>"Agregar a inicio"</strong>.
+            </p>
+            <button className="btn-primary" onClick={() => setIsIosPromptVisible(false)}>
+              Entendido
+            </button>
           </div>
         </div>
       )}
