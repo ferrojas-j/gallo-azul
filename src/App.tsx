@@ -141,11 +141,18 @@ export default function App() {
   }, []);
 
   const handleInstallPWA = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (!deferredPrompt) {
+      alert("La aplicación no está lista para instalarse. Intente recargar.");
+      return;
+    }
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } catch (err: any) {
+      alert("Error al instalar: " + err.message);
     }
   };
 
