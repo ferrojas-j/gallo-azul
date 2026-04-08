@@ -678,8 +678,8 @@ export default function App() {
                     {u.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="home-staff-name">{u.name}</div>
-                  <span className={`home-staff-role ${u.role === 'Administrador' ? 'admin' : 'staff'}`}>
-                    {u.role === 'Administrador' ? 'Admin' : 'Staff'}
+                  <span className={`home-staff-role ${u.role === 'Administrador' ? 'admin' : u.role === 'Encargado' ? 'encargado' : 'staff'}`}>
+                    {u.role === 'Administrador' ? 'Admin' : u.role === 'Encargado' ? 'Encdo' : 'Staff'}
                   </span>
                   <div className="home-online-dot" />
                 </div>
@@ -1702,15 +1702,15 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: '50%',
-                backgroundColor: user.role === 'Administrador' ? '#e0e7ff' : '#f0fdf4',
+                backgroundColor: user.role === 'Administrador' ? '#e0e7ff' : user.role === 'Encargado' ? '#fefce8' : '#f0fdf4',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <User size={20} color={user.role === 'Administrador' ? '#4f46e5' : '#16a34a'} />
+                <User size={20} color={user.role === 'Administrador' ? '#4f46e5' : user.role === 'Encargado' ? '#ca8a04' : '#16a34a'} />
               </div>
               <div>
                 <div style={{ fontWeight: 600 }}>{user.name}</div>
                 <div style={{ fontSize: 13, color: '#64748b' }}>
-                  {user.role === 'Administrador' ? '🔑 Administrador' : '👤 Staff'} — {user.active ? 'Autorizado' : 'Bloqueado'}
+                  {user.role === 'Administrador' ? '🔑 Administrador' : user.role === 'Encargado' ? '🛡️ Encargado' : '👤 Staff'} — {user.active ? 'Autorizado' : 'Bloqueado'}
                 </div>
               </div>
             </div>
