@@ -1281,7 +1281,7 @@ export default function App() {
           </div>
         </div>
 
-        {currentUser?.role === 'Administrador' && (
+        {(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado') && (
           <>
             <div className="admin-summary-grid">
               <div className="admin-summary-card income">
