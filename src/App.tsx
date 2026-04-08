@@ -2110,24 +2110,24 @@ export default function App() {
               </div>
               <div className="form-group">
                 <label>Perfil de acceso</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {(['Staff', 'Administrador'] as const).map(role => (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  {(['Staff', 'Encargado', 'Administrador'] as const).map(role => (
                     <div
                       key={role}
-                      onClick={() => setNewUserRole(role)}
+                      onClick={() => setNewUserRole(role as any)}
                       style={{
                         padding: '14px 12px', borderRadius: 14,
-                        border: `2px solid ${newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : '#16a34a') : '#e2e8f0'}`,
-                        background: newUserRole === role ? (role === 'Administrador' ? '#e0e7ff' : '#f0fdf4') : '#f8fafc',
+                        border: `2px solid ${newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : role === 'Encargado' ? '#eab308' : '#16a34a') : '#e2e8f0'}`,
+                        background: newUserRole === role ? (role === 'Administrador' ? '#e0e7ff' : role === 'Encargado' ? '#fefce8' : '#f0fdf4') : '#f8fafc',
                         cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
                       }}
                     >
-                      <div style={{ fontSize: 22, marginBottom: 4 }}>{role === 'Administrador' ? '🔑' : '👤'}</div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : '#16a34a') : '#64748b' }}>
+                      <div style={{ fontSize: 22, clipPath: 'none', marginBottom: 4 }}>{role === 'Administrador' ? '🔑' : role === 'Encargado' ? '🛡️' : '👤'}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : role === 'Encargado' ? '#ca8a04' : '#16a34a') : '#64748b' }}>
                         {role}
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                        {role === 'Administrador' ? 'Acceso total' : 'Acceso básico'}
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, lineHeight: 1.2 }}>
+                        {role === 'Administrador' ? 'Acceso total' : role === 'Encargado' ? 'Gestión limitada' : 'Acceso operativo'}
                       </div>
                     </div>
                   ))}
@@ -2162,19 +2162,20 @@ export default function App() {
               </div>
               <div className="form-group">
                 <label>Perfil</label>
-                <div className="role-selector-grid">
-                  {(['Administrador', 'Staff'] as const).map(role => (
+                <div className="role-selector-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {(['Administrador', 'Encargado', 'Staff'] as const).map(role => (
                     <div
                       key={role}
                       className={`role-option ${editUserRole === role ? 'active' : ''}`}
-                      onClick={() => setEditUserRole(role)}
+                      onClick={() => setEditUserRole(role as any)}
+                      style={{ fontSize: 13, flexDirection: 'column', padding: '12px 8px', textAlign: 'center' }}
                     >
-                      <div className="role-check">
+                      <div className="role-check" style={{ marginBottom: 4, marginRight: 0 }}>
                         {editUserRole === role && <Check size={14} strokeWidth={4} />}
                       </div>
-                      <div className="role-text">{role}</div>
-                      <div className="role-badge">
-                        {role === 'Administrador' ? 'Acceso total' : 'Acceso básico'}
+                      <div className="role-text" style={{ fontWeight: 700, fontSize: 12 }}>{role}</div>
+                      <div className="role-badge" style={{ fontSize: 10 }}>
+                        {role === 'Administrador' ? 'Total' : role === 'Encargado' ? 'Limitado' : 'Operativo'}
                       </div>
                     </div>
                   ))}
