@@ -350,6 +350,13 @@ export default function App() {
 
   const handleProceedToCheckout = async () => {
     if (!selectedTableId) return;
+
+    const pendingItems = activeItems.filter(i => i.table_id === selectedTableId && i.status === 'pending');
+    if (pendingItems.length > 0) {
+      alert('⚠️ Aún hay platillos pendientes de entrega en esta mesa. Debes entregarlos (tacharlos) para proceder al pago.');
+      return;
+    }
+
     await checkoutTable(selectedTableId);
     setDiscountType('none');
     setDiscountValue('');
