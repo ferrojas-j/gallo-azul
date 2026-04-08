@@ -2004,6 +2004,13 @@ export default function App() {
                   <span className="cb-label">Transferencia:</span>
                   <span className="cb-value">${todayTransferIncome.toFixed(0)}</span>
                 </div>
+                {todayTransferTips > 0 && (
+                  <div className="cb-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="cb-dot" style={{ backgroundColor: '#10b981' }}></span>
+                    <span className="cb-label">Propinas (Transf.):</span>
+                    <span className="cb-value">${todayTransferTips.toFixed(0)}</span>
+                  </div>
+                )}
               </div>
 
               {todayExpensesList.length > 0 && (
