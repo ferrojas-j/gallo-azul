@@ -26,6 +26,7 @@ export default function App() {
     addTable, deleteTable,
     addUser, deleteUser, updateUser, closeSession,
     closeDay, deleteShiftSummary, logPrintedTicket,
+    pendingTickets, markTicketPrinted,
   } = useSupabaseSync();
 
   // UI state
@@ -1429,6 +1430,13 @@ export default function App() {
                   <div style={{ fontSize: 12, color: '#64748b' }}>{user.role}</div>
                 </div>
               </div>
+              <button 
+                onClick={() => closeSession(user.id)} 
+                title="Cerrar sesión de este usuario remotamente"
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--danger-light)', borderRadius: 12, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--danger)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+              >
+                <LogOut size={14} /> Desconectar
+              </button>
             </div>
           ))}
         </div>
@@ -1443,7 +1451,7 @@ export default function App() {
         <div className="orders-grid">
           {pendingTickets.length === 0 ? (
              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', gridColumn: '1 / -1' }}>No hay tickets pendientes</div>
-          ) : pendingTickets.map(ticket => (
+          ) : pendingTickets.map((ticket: any) => (
              <div key={ticket.id} style={{ background: 'white', borderRadius: 16, padding: '16px', border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                    <div style={{ fontWeight: 800 }}>Mesa {ticket.table_id.toString().padStart(2, '0')}</div>
