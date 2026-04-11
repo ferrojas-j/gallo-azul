@@ -1161,6 +1161,7 @@ input:checked + .toggle-slider:before {
   max-width: 600px;
   border-radius: 24px 24px 0 0;
   padding: 24px;
+  padding-bottom: calc(24px + 85px + env(safe-area-inset-bottom, 20px)) !important;
   animation: slideUp 0.3s ease-out;
   max-height: 90vh;
   overflow-y: auto;
