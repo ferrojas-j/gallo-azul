@@ -25,9 +25,8 @@ export default function App() {
     addCategory, addMenuItem, addMenuVariant,
     addTable, deleteTable,
     addUser, deleteUser, updateUser, closeSession,
-    closeDay, deleteShiftSummary,
+    closeDay, deleteShiftSummary, logPrintedTicket,
   } = useSupabaseSync();
-
 
   // UI state
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>(() => {
@@ -75,7 +74,14 @@ export default function App() {
 
   const [printCuentaModal, setPrintCuentaModal] = useState<{isOpen: boolean, tableId: number | null}>({isOpen: false, tableId: null});
 
-  const handlePrintCuenta = () => {
+  const handlePrintCuenta = async () => {
+    if (printCuentaModal.tableId) {
+      const items = activeItems.filter(i => i.table_id === printCuentaModal.tableId);
+      const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+      const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+      await logPrintedTicket(printCuentaModal.tableId, currentUser?.name || 'Unknown', total, summary);
+    }
+    
     window.print();
     setPrintCuentaModal({isOpen: false, tableId: null});
   };

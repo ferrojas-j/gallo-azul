@@ -251,3 +251,13 @@ export const dbShiftSummaries = {
   },
   delete: (id: string) => supabase.from('shift_summaries').delete().eq('id', id),
 };
+
+export const dbPrintedTickets = {
+  insert: (tableId: number, printedBy: string, total: number, itemsSummary: string) =>
+    supabase.from('printed_tickets').insert({
+      table_id: tableId,
+      printed_by: printedBy,
+      total,
+      items_summary: itemsSummary
+    }).select().single()
+};

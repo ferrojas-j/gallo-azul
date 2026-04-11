@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbShiftSummaries,
+  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbShiftSummaries, dbPrintedTickets
 } from '../lib/supabaseService';
 import type {
   TableRow, OrderRow, OrderItemRow, MenuItemRow, UserRow,
@@ -439,6 +439,10 @@ export function useSupabaseSync() {
     }
   }, [tableOrders]);
 
+  const logPrintedTicket = useCallback(async (tableId: number, printedBy: string, total: number, itemsSummary: string) => {
+    await dbPrintedTickets.insert(tableId, printedBy, total, itemsSummary);
+  }, []);
+
   return {
     // State
     tables,
@@ -481,5 +485,6 @@ export function useSupabaseSync() {
     closeSession,
     closeDay,
     deleteShiftSummary,
+    logPrintedTicket,
   };
 }
