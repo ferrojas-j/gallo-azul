@@ -39,7 +39,7 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'admin' | 'mesa' | 'checkout'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
   const [mesaTab, setMesaTab] = useState<'orden' | 'menu'>('orden');
@@ -73,17 +73,26 @@ export default function App() {
   }>({ isOpen: false, type: 'open', tableId: null });
 
   const [printCuentaModal, setPrintCuentaModal] = useState<{isOpen: boolean, tableId: number | null}>({isOpen: false, tableId: null});
+  const [ticketToPrint, setTicketToPrint] = useState<any>(null);
 
-  const handlePrintCuenta = async () => {
+  const handleSendToPrinter = async () => {
     if (printCuentaModal.tableId) {
       const items = activeItems.filter(i => i.table_id === printCuentaModal.tableId);
       const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
       const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
       await logPrintedTicket(printCuentaModal.tableId, currentUser?.name || 'Unknown', total, summary);
+      alert('Ticket enviado a la caja para imprimir.');
     }
-    
-    window.print();
     setPrintCuentaModal({isOpen: false, tableId: null});
+  };
+
+  const dispatchPrintJob = async (ticket: any) => {
+    setTicketToPrint(ticket);
+    setTimeout(async () => {
+      window.print();
+      await markTicketPrinted(ticket.id);
+      setTicketToPrint(null);
+    }, 500);
   };
 
   // Edit menu modal
@@ -314,7 +323,7 @@ export default function App() {
 
   // ── Handlers ─────────────────────────────────────────
 
-  const navTo = (view: 'home' | 'salon' | 'pedidos' | 'admin') => {
+  const navTo = (view: 'home' | 'salon' | 'pedidos' | 'impresora' | 'admin') => {
     setCurrentView(view);
     setSelectedTableId(null);
     if (view === 'admin') setAdminSubView('main');
@@ -1409,14 +1418,43 @@ export default function App() {
                   <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, backgroundColor: '#22c55e', borderRadius: '50%', border: '2px solid #fff' }} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{user.name}</div>
-                  <div style={{ fontSize: 13, color: '#64748b' }}>{user.role}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{user.name}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>{user.role}</div>
                 </div>
               </div>
-              <button onClick={() => closeSession(user.id)} style={{ backgroundColor: 'transparent', border: '1px solid var(--danger-light)', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--danger)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                <LogOut size={14} /> Cerrar
-              </button>
             </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderImpresora = () => {
+    return (
+      <div className="fade-in">
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Cola de Impresión (Caja)</div>
+        <div className="orders-grid">
+          {pendingTickets.length === 0 ? (
+             <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', gridColumn: '1 / -1' }}>No hay tickets pendientes</div>
+          ) : pendingTickets.map(ticket => (
+             <div key={ticket.id} style={{ background: 'white', borderRadius: 16, padding: '16px', border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                   <div style={{ fontWeight: 800 }}>Mesa {ticket.table_id.toString().padStart(2, '0')}</div>
+                   <div style={{ color: '#059669', fontWeight: 800, fontSize: 18 }}>${ticket.total}</div>
+                </div>
+                <div style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', flex: 1, marginBottom: 12 }}>{ticket.items_summary}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>
+                   <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                   <span>Pedido por: {ticket.printed_by}</span>
+                </div>
+                <button 
+                  className="btn-primary" 
+                  onClick={() => dispatchPrintJob(ticket)}
+                  style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 8 }}
+                >
+                  <Printer size={18} /> Imprimir Ahora
+                </button>
+             </div>
           ))}
         </div>
       </div>
@@ -1774,6 +1812,7 @@ export default function App() {
               {currentView === 'home' && 'Inicio'}
               {currentView === 'salon' && 'Salón'}
               {currentView === 'pedidos' && 'Pedidos'}
+              {currentView === 'impresora' && 'Imprimir'}
               {currentView === 'admin' && 'Admin'}
             </span>
           </div>
@@ -1862,6 +1901,7 @@ export default function App() {
         {currentView === 'mesa' && renderMesa()}
         {currentView === 'checkout' && renderCheckout()}
         {currentView === 'pedidos' && renderPedidos()}
+        {currentView === 'impresora' && renderImpresora()}
         {currentView === 'admin' && adminSubView === 'main' && renderAdminMain()}
         {currentView === 'admin' && adminSubView === 'menu' && renderAdminMenu()}
         {currentView === 'admin' && adminSubView === 'users' && renderAdminUsers()}
@@ -1869,12 +1909,13 @@ export default function App() {
         {currentView === 'admin' && adminSubView === 'stats' && renderAdminStats()}
       </div>
 
-      {['home', 'salon', 'pedidos', 'admin'].includes(currentView) && adminSubView === 'main' && (
+      {['home', 'salon', 'pedidos', 'impresora', 'admin'].includes(currentView) && adminSubView === 'main' && (
         <div className="bottom-nav">
           {[
             { view: 'home', icon: <HomeIcon className="nav-icon" />, label: 'Inicio' },
             { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Salón' },
             { view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Pedidos' },
+            { view: 'impresora', icon: <Printer className="nav-icon" />, label: 'Cuentas' },
             ...(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado'
               ? [{ view: 'admin', icon: <Settings className="nav-icon" />, label: 'Admin' }]
               : []),
@@ -2497,10 +2538,33 @@ export default function App() {
             
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }} className="print-hide">
               <button className="btn-outline" style={{ flex: 1 }} onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>Cancelar</button>
-              <button className="btn-primary" style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'center' }} onClick={handlePrintCuenta}>
-                 <Printer size={18} /> Imprimir Ticket
+              <button className="btn-primary" style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'center' }} onClick={handleSendToPrinter}>
+                 <Printer size={18} /> Enviar a Imprimir
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket Listo para Disparar Windows.Print() desde Caja */}
+      {ticketToPrint && (
+        <div className="ticket-print-area">
+          <div style={{ textAlign: 'center', marginBottom: 16 }}>
+             <h2 style={{ margin: 0, fontSize: 20 }}>La Mora Resto</h2>
+             <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {ticketToPrint.printed_by}</div>
+             <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {ticketToPrint.table_id}</div>
+             <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
+                Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+             </div>
+          </div>
+          <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0', fontSize: 14 }}>
+             {ticketToPrint.items_summary.split(', ').map((str: string, i: number) => (
+                <div key={i} style={{ marginBottom: 4 }}>- {str}</div>
+             ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
+             <span>Total:</span>
+             <span>${Number(ticketToPrint.total).toFixed(0)}</span>
           </div>
         </div>
       )}

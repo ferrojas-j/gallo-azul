@@ -259,5 +259,9 @@ export const dbPrintedTickets = {
       printed_by: printedBy,
       total,
       items_summary: itemsSummary
-    }).select().single()
+    }).select().single(),
+  getPending: () => 
+    supabase.from('printed_tickets').select('*').eq('status', 'pending').order('created_at', { ascending: true }),
+  markPrinted: (id: number) => 
+    supabase.from('printed_tickets').update({ status: 'printed' }).eq('id', id)
 };

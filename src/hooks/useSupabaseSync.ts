@@ -45,6 +45,7 @@ export function useSupabaseSync() {
   const [todayExpensesList, setTodayExpensesList] = useState<any[]>([]);
   const [todayClosedOrders, setTodayClosedOrders] = useState<OrderRow[]>([]);
   const [dailySummaries, setDailySummaries] = useState<any[]>([]);
+  const [pendingTickets, setPendingTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Prevent duplicate fetches with a ref
@@ -147,6 +148,10 @@ export function useSupabaseSync() {
     if (data) setDailySummaries(data);
   }, []);
 
+  const fetchPendingTickets = useCallback(async () => {
+    const { data } = await dbPrintedTickets.getPending();
+    if (data) setPendingTickets(data);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (fetching.current) return;
@@ -159,13 +164,14 @@ export function useSupabaseSync() {
         fetchMenu(), 
         fetchUsers(), 
         fetchTodayTotals(),
-        fetchDailySummaries()
+        fetchDailySummaries(),
+        fetchPendingTickets()
       ]);
     } finally {
       setIsLoading(false);
       fetching.current = false;
     }
-  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries]);
+  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchPendingTickets]);
 
   // ── Realtime subscriptions ──────────────────────────
   useEffect(() => {
@@ -182,6 +188,7 @@ export function useSupabaseSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_summaries' }, fetchDailySummaries)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'printed_tickets' }, fetchPendingTickets)
       .subscribe();
 
 
@@ -443,6 +450,10 @@ export function useSupabaseSync() {
     await dbPrintedTickets.insert(tableId, printedBy, total, itemsSummary);
   }, []);
 
+  const markTicketPrinted = useCallback(async (id: number) => {
+    await dbPrintedTickets.markPrinted(id);
+  }, []);
+
   return {
     // State
     tables,
@@ -459,6 +470,7 @@ export function useSupabaseSync() {
     todayExpensesList,
     todayClosedOrders,
     dailySummaries,
+    pendingTickets,
     isLoading,
     // Operations
     createOrderForTable,
@@ -486,5 +498,6 @@ export function useSupabaseSync() {
     closeDay,
     deleteShiftSummary,
     logPrintedTicket,
+    markTicketPrinted,
   };
 }
