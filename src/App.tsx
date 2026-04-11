@@ -721,11 +721,15 @@ export default function App() {
   };
 
   const renderSalon = () => {
-    // Derive status from live data: table is occupied if there's any active order, free otherwise
-    const getEffectiveStatus = (tableId: number): 'free' | 'occupied' => {
-      return tableOrders[tableId] ? 'occupied' : 'free';
+    // Derive status from live data
+    const getEffectiveStatus = (tableId: number): 'free' | 'occupied-pending' | 'occupied-done' => {
+      const isOccupied = !!tableOrders[tableId];
+      if (!isOccupied) return 'free';
+      const items = activeItems.filter(i => i.table_id === tableId);
+      const hasPending = items.some(i => i.status === 'pending');
+      return hasPending ? 'occupied-pending' : 'occupied-done';
     };
-    const occupiedCount = tables.filter(t => getEffectiveStatus(t.id) === 'occupied').length;
+    const occupiedCount = tables.filter(t => getEffectiveStatus(t.id) !== 'free').length;
     const freeCount = tables.filter(t => getEffectiveStatus(t.id) === 'free').length;
 
     return (
@@ -745,10 +749,13 @@ export default function App() {
         {/* Legend */}
         <div className="salon-legend">
           <div className="salon-legend-item free">
-            <div className="salon-legend-pip" /> Libre
+            <div className="salon-legend-pip" style={{ background: '#22c55e', border: '1px solid #16a34a' }} /> Libre
           </div>
-          <div className="salon-legend-item occupied">
-            <div className="salon-legend-pip" /> Ocupada
+          <div className="salon-legend-item occupied-pending">
+            <div className="salon-legend-pip" style={{ background: '#ef4444', border: '1px solid #dc2626' }} /> Con Pendientes
+          </div>
+          <div className="salon-legend-item occupied-done">
+            <div className="salon-legend-pip" style={{ background: '#a855f7', border: '1px solid #9333ea' }} /> Sin Pendientes
           </div>
         </div>
 
@@ -780,10 +787,10 @@ export default function App() {
                   {effectiveStatus === 'free' && (
                     <span className="tc-status-free">Libre</span>
                   )}
-                  {effectiveStatus === 'occupied' && (
+                  {effectiveStatus !== 'free' && (
                     <>
-                      <span className="tc-items">{itemCount} ítem{itemCount !== 1 ? 's' : ''}</span>
-                      <span className="tc-total">${total.toFixed(0)}</span>
+                      <span className="tc-items" style={{ color: effectiveStatus === 'occupied-done' ? '#9333ea' : '#ef4444' }}>{itemCount} ítem{itemCount !== 1 ? 's' : ''}</span>
+                      <span className="tc-total" style={{ color: effectiveStatus === 'occupied-done' ? '#9333ea' : '#ef4444' }}>${total.toFixed(0)}</span>
                     </>
                   )}
                 </div>
