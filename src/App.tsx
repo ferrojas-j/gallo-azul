@@ -87,11 +87,10 @@ export default function App() {
     setPrintCuentaModal({isOpen: false, tableId: null});
   };
 
-  const dispatchPrintJob = async (ticket: any) => {
+  const dispatchPrintOnly = (ticket: any) => {
     setTicketToPrint(ticket);
-    setTimeout(async () => {
+    setTimeout(() => {
       window.print();
-      await markTicketPrinted(ticket.id);
       setTicketToPrint(null);
     }, 500);
   };
@@ -99,6 +98,7 @@ export default function App() {
   // Edit menu modal
   type EditTarget = { type: 'item'; id: string; name: string; price: number } | { type: 'variant'; id: string; label: string; price: number } | { type: 'category'; id: string; name: string };
   const [isCierreModalOpen, setIsCierreModalOpen] = useState(false);
+  const [previewTicket, setPreviewTicket] = useState<any>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState('');
@@ -1462,16 +1462,65 @@ export default function App() {
                    <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                    <span>Pedido por: {ticket.printed_by}</span>
                 </div>
-                <button 
-                  className="btn-primary" 
-                  onClick={() => dispatchPrintJob(ticket)}
-                  style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 8 }}
-                >
-                  <Printer size={18} /> Imprimir Ahora
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => setPreviewTicket(ticket)}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                  >
+                     <Eye size={16} /> Previa
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={() => dispatchPrintOnly(ticket)}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                  >
+                     <Printer size={16} /> Imprimir
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={() => markTicketPrinted(ticket.id)}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                  >
+                     <Check size={16} /> Entregada
+                  </button>
+                </div>
              </div>
           ))}
         </div>
+
+        {/* Modal de Vista Previa Visual */}
+        {previewTicket && (
+          <div className="modal-overlay" onClick={() => setPreviewTicket(null)} style={{zIndex: 9999}}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', padding: '16px', background: '#fff', borderRadius: 8}}>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>LA MORA</h2>
+                <div style={{ fontSize: 12 }}>Restaurante</div>
+              </div>
+              <div style={{ margin: '16px 0', borderTop: '1px dashed #ccc', borderBottom: '1px dashed #ccc', padding: '8px 0', fontSize: 13, lineHeight: 1.4 }}>
+                <div><strong>Mesa:</strong> {previewTicket.table_id}</div>
+                <div><strong>Atendió:</strong> {previewTicket.printed_by}</div>
+                <div><strong>Fecha:</strong> {new Date(previewTicket.created_at).toLocaleString('es-MX')}</div>
+              </div>
+              <div style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>Detalle:</div>
+                <div style={{ whiteSpace: 'pre-line' }}>{previewTicket.items_summary.split(', ').join('\n')}</div>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: 16, borderTop: '2px solid #000', paddingTop: 8, fontWeight: 'bold' }}>
+                TOTAL: ${previewTicket.total}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12 }}>
+                ¡Gracias por su visita!
+              </div>
+              <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
+                <button className="btn-secondary" style={{flex: 1}} onClick={() => setPreviewTicket(null)}>Cerrar</button>
+                <button className="btn-primary" style={{flex: 1, gap: 4, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => { dispatchPrintOnly(previewTicket); setPreviewTicket(null); }}>
+                  <Printer size={16}/> Imprimir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
