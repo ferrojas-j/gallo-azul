@@ -1568,7 +1568,7 @@ export default function App() {
         {/* Modal de Vista Previa Visual */}
         {previewTicket && (
           <div className="modal-overlay" onClick={() => setPreviewTicket(null)} style={{zIndex: 9999}}>
-            <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', padding: '16px', background: '#fff', borderRadius: 8}}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', background: '#fff', borderRadius: 8}}>
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>LA MORA</h2>
                 <div style={{ fontSize: 12 }}>Restaurante</div>
