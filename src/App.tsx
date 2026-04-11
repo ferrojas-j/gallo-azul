@@ -3,7 +3,7 @@ import {
   LayoutGrid, ClipboardCheck, Settings, ChevronLeft, Users, Check, X,
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
   LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Search, StickyNote,
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock,
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock, Printer
 } from 'lucide-react';
 import './index.css';
 import { CATEGORIES } from './data/menu';
@@ -72,6 +72,13 @@ export default function App() {
     type: 'open' | 'pay' | 'closeEmpty';
     tableId: number | null;
   }>({ isOpen: false, type: 'open', tableId: null });
+
+  const [printCuentaModal, setPrintCuentaModal] = useState<{isOpen: boolean, tableId: number | null}>({isOpen: false, tableId: null});
+
+  const handlePrintCuenta = () => {
+    window.print();
+    setPrintCuentaModal({isOpen: false, tableId: null});
+  };
 
   // Edit menu modal
   type EditTarget = { type: 'item'; id: string; name: string; price: number } | { type: 'variant'; id: string; label: string; price: number } | { type: 'category'; id: string; name: string };
@@ -872,6 +879,13 @@ export default function App() {
                   <span className="order-total-label">Subtotal Mesa</span>
                   <span className="order-total-amount">${currentTableTotal}</span>
                 </div>
+                <button
+                  className="btn-outline"
+                  style={{ marginBottom: '12px', width: '100%', padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, color: '#4f46e5', borderColor: '#cbd5e1' }}
+                  onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}
+                >
+                  <Printer size={20} /> Imprimir cuenta a cliente
+                </button>
                 <button className="btn-dark" onClick={handleProceedToCheckout}>
                   <Check size={20} /> Proceder al Pago
                 </button>
@@ -2443,6 +2457,44 @@ export default function App() {
                 <Plus size={18} /> Crear Producto
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Imprimir Cuenta */}
+      {printCuentaModal.isOpen && printCuentaModal.tableId && (
+        <div className="modal-overlay print-hide" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 24, maxWidth: 400 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>Cuenta - Mesa {printCuentaModal.tableId}</h3>
+            <div className="ticket-print-area">
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 20 }}>La Mora Resto</h2>
+                <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {currentUser?.name}</div>
+                <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {printCuentaModal.tableId}</div>
+                <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
+                  Fecha: {new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+              <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0' }}>
+                {activeItems.filter(i => i.table_id === printCuentaModal.tableId).map(i => (
+                  <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
+                     <div style={{ flex: 1, paddingRight: 8 }}>x{i.qty} {i.name}</div>
+                     <div style={{ fontWeight: 600 }}>${(i.price * i.qty).toFixed(0)}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
+                 <span>Total:</span>
+                 <span>${activeItems.filter(i => i.table_id === printCuentaModal.tableId).reduce((s, i) => s + (i.price * i.qty), 0).toFixed(0)}</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }} className="print-hide">
+              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>Cancelar</button>
+              <button className="btn-primary" style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'center' }} onClick={handlePrintCuenta}>
+                 <Printer size={18} /> Imprimir Ticket
+              </button>
+            </div>
           </div>
         </div>
       )}

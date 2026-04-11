@@ -2365,3 +2365,32 @@ input:checked + .toggle-slider:before {
 .ri-progress-bg { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
 .ri-progress-fill { height: 100%; background: linear-gradient(90deg, #0f172a, #334155); border-radius: 3px; transition: width 0.8s ease-out; }
 
+/* Print Styles for Tickets */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .modal-overlay {
+    background: transparent !important;
+  }
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  .ticket-print-area, .ticket-print-area * {
+    visibility: visible;
+  }
+  .ticket-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    color: #000;
+  }
+  .print-hide {
+    display: none !important;
+  }
+}
