@@ -43,6 +43,54 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
+
+  // === Routing History API Sync ===
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (!hash) {
+        setCurrentView('home');
+        setSelectedTableId(null);
+        return;
+      }
+      const parts = hash.split('-');
+      const validViews = ['home', 'salon', 'pedidos', 'impresora', 'admin', 'mesa', 'checkout'];
+      if (validViews.includes(parts[0])) {
+         setCurrentView(parts[0] as any);
+         if (parts[1] && !isNaN(parseInt(parts[1], 10)) && parseInt(parts[1], 10) !== 0) {
+           setSelectedTableId(parseInt(parts[1], 10));
+         } else {
+           setSelectedTableId(null);
+         }
+         
+         if (parts[2]) {
+           const validAdminViews = ['main', 'menu', 'users', 'tables', 'stats'];
+           if (validAdminViews.includes(parts[2])) {
+              setAdminSubView(parts[2] as any);
+           }
+         }
+      } else {
+         setCurrentView('home');
+      }
+    };
+    
+    handlePopState();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    let hash = `#${currentView}`;
+    if (selectedTableId && (currentView === 'mesa' || currentView === 'checkout')) {
+      hash += `-${selectedTableId}`;
+    } else if (currentView === 'admin') {
+      hash += `-0-${adminSubView}`;
+    }
+    
+    if (window.location.hash !== hash) {
+      window.history.pushState(null, '', window.location.pathname + window.location.search + hash);
+    }
+  }, [currentView, selectedTableId, adminSubView]);
   const [mesaTab, setMesaTab] = useState<'orden' | 'menu'>('orden');
   const [menuCategory, setMenuCategory] = useState(CATEGORIES[0]);
   const [menuSearch, setMenuSearch] = useState('');

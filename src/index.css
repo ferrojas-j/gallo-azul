@@ -1688,7 +1688,7 @@ input:checked + .toggle-slider:before {
 .confirm-sheet {
   background: white;
   border-radius: 28px 28px 0 0;
-  padding: 12px 24px 36px;
+  padding: 16px 24px calc(24px + 85px + env(safe-area-inset-bottom, 20px));
   width: 100%;
   max-width: 520px;
   display: flex;
