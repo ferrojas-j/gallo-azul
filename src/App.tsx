@@ -1466,21 +1466,21 @@ export default function App() {
                   <button 
                     className="btn-secondary" 
                     onClick={() => setPreviewTicket(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', fontWeight: 500 }}
                   >
                      <Eye size={16} /> Previa
                   </button>
                   <button 
                     className="btn-primary" 
                     onClick={() => dispatchPrintOnly(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
                   >
                      <Printer size={16} /> Imprimir
                   </button>
                   <button 
                     className="btn-primary" 
                     onClick={() => markTicketPrinted(ticket.id)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
                   >
                      <Check size={16} /> Entregada
                   </button>
@@ -1957,7 +1957,8 @@ export default function App() {
   // ── Render ───────────────────────────────────────────
 
   return (
-    <div className="app-container">
+    <>
+      <div className="app-container">
       {renderHeader()}
       <div className="content-area">
         {currentView === 'home' && renderHome()}
@@ -2610,6 +2611,8 @@ export default function App() {
         </div>
       )}
 
+      </div>
+
       {/* Ticket Listo para Disparar Windows.Print() desde Caja */}
       {ticketToPrint && (
         <div className="ticket-print-area">
@@ -2632,7 +2635,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }
