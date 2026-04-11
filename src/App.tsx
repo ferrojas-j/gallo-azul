@@ -47,6 +47,7 @@ export default function App() {
   const [menuCategory, setMenuCategory] = useState(CATEGORIES[0]);
   const [menuSearch, setMenuSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia'>('efectivo');
+  const [mesasConCuentaActivada, setMesasConCuentaActivada] = useState<Set<number>>(new Set());
 
   // Expense modal
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -82,6 +83,13 @@ export default function App() {
       const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
       const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
       await logPrintedTicket(printCuentaModal.tableId, currentUser?.name || 'Unknown', total, summary);
+      
+      setMesasConCuentaActivada(prev => {
+        const next = new Set(prev);
+        next.add(printCuentaModal.tableId!);
+        return next;
+      });
+
       alert('Ticket enviado a la caja para imprimir.');
     }
     setPrintCuentaModal({isOpen: false, tableId: null});
@@ -805,6 +813,7 @@ export default function App() {
 
   const renderMesa = () => {
     const count = selectedTableItems.length;
+    const hasPendingItems = selectedTableItems.some(i => i.status === 'pending');
     return (
       <div className="fade-in mesa-layout">
         <div className="mesa-tabs">
@@ -904,12 +913,31 @@ export default function App() {
                 </div>
                 <button
                   className="btn-outline"
-                  style={{ marginBottom: '12px', width: '100%', padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, color: '#4f46e5', borderColor: '#cbd5e1' }}
-                  onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}
+                  disabled={hasPendingItems}
+                  style={{ 
+                    marginBottom: '12px', width: '100%', padding: '12px', borderRadius: '12px', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
+                    fontWeight: 600, color: hasPendingItems ? '#94a3b8' : '#4f46e5', 
+                    borderColor: hasPendingItems ? '#e2e8f0' : '#cbd5e1',
+                    opacity: hasPendingItems ? 0.6 : 1,
+                    cursor: hasPendingItems ? 'not-allowed' : 'pointer'
+                  }}
+                  onClick={() => {
+                    if (!hasPendingItems) {
+                      setPrintCuentaModal({isOpen: true, tableId: selectedTableId})
+                    }
+                  }}
                 >
-                  <Printer size={20} /> Imprimir cuenta a cliente
+                  <Printer size={20} /> Generar cuenta de la mesa
                 </button>
-                <button className="btn-dark" onClick={handleProceedToCheckout}>
+                <button 
+                  className="btn-dark" 
+                  disabled={!mesasConCuentaActivada.has(selectedTableId!)}
+                  onClick={() => {
+                    if (mesasConCuentaActivada.has(selectedTableId!)) handleProceedToCheckout();
+                  }}
+                  style={{ opacity: mesasConCuentaActivada.has(selectedTableId!) ? 1 : 0.4, cursor: mesasConCuentaActivada.has(selectedTableId!) ? 'pointer' : 'not-allowed' }}
+                >
                   <Check size={20} /> Proceder al Pago
                 </button>
               </div>
