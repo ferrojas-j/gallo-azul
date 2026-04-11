@@ -2378,29 +2378,58 @@ input:checked + .toggle-slider:before {
 
 /* Print Styles for Tickets */
 @media print {
+  @page {
+    margin: 0;
+    size: 80mm auto; /* Formato estándar de impresora de tickets */
+  }
+  
+  body, html {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+  }
+  
   body * {
     visibility: hidden;
   }
-  .modal-overlay {
-    background: transparent !important;
+  
+  /* Ocultar elementos de la UI para que no generen huecos o páginas en blanco */
+  .app-container, .header, .bottom-nav, .content-area, .modal-overlay, .confirm-overlay {
+    display: none !important;
   }
-  .modal-content {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-  }
-  .ticket-print-area, .ticket-print-area * {
-    visibility: visible;
-  }
+
+  /* Contenedor principal de impresión de ticket */
   .ticket-print-area {
+    visibility: visible;
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    margin: 0;
-    padding: 0;
-    color: #000;
+    max-width: 78mm; /* Ajuste seguro para impresoras 80mm */
+    margin: 0 auto;
+    padding: 10px 5px;
+    color: #000 !important;
+    background: #fff;
   }
+
+  .ticket-print-area * {
+    visibility: visible;
+    font-family: 'Courier New', Courier, monospace, sans-serif !important;
+    color: #000 !important;
+  }
+  
+  .ticket-print-area h2 {
+    font-size: 16px !important;
+    margin-bottom: 4px;
+    font-weight: 800;
+  }
+  
+  .ticket-print-area div, .ticket-print-area span {
+    font-size: 12px !important;
+    line-height: 1.3;
+  }
+
   .print-hide {
     display: none !important;
   }
