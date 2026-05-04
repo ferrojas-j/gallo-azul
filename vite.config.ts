@@ -12,9 +12,9 @@ export default defineConfig({
       manifestFilename: 'manifest.json',
       includeAssets: ['logo.png'],
       manifest: {
-        name: 'La Mora Resto App',
-        short_name: 'La Mora',
-        description: 'Sistema de punto de venta La Mora',
+        name: 'Gallo Azul Resto App',
+        short_name: 'Gallo Azul',
+        description: 'Sistema de punto de venta Gallo Azul',
         theme_color: '#0e122b',
         background_color: '#f8fafc',
         display: 'standalone',

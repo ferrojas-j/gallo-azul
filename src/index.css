@@ -5,10 +5,10 @@
   --card-bg: #ffffff;
   --text-dark: #0f172a;
   --text-muted: #828b9e;
-  --primary: #fca5a5; /* Rojizo pálido */
-  --primary-dark: #ef4444; /* Rojizo fuerte */
-  --success-bg: #ffe4e6; /* Fondo rojizo claro ocupadas */
-  --success-dot: #ef4444;
+  --primary: #93c5fd; /* Azul pálido */
+  --primary-dark: #3b82f6; /* Azul fuerte */
+  --success-bg: #eff6ff; /* Fondo azul claro ocupadas */
+  --success-dot: #3b82f6;
   --warning-bg: #fff6cc;
   --warning-dot: #e6b800;
   --border-color: #f1f3f7;

@@ -607,7 +607,7 @@ export default function App() {
     return (
       <div className="app-container login-screen">
         <div className="login-logo">🍴</div>
-        <h1 className="login-title">La Mora</h1>
+        <h1 className="login-title">Gallo Azul</h1>
         <p className="login-subtitle">Sistema de punto de venta</p>
         <form className="login-form" onSubmit={handleLogin} autoComplete="on">
           <div className="form-group">
@@ -679,7 +679,7 @@ export default function App() {
               <div style={{ width: 64, height: 64, background: '#eff6ff', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
                 <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
               </div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar La Mora</h3>
+              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar Gallo Azul</h3>
               <p style={{ fontSize: 15, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
                 Para instalar la aplicación en tu iPhone o iPad, pulsa el botón de <strong>Compartir</strong> en la barra inferior (el cuadrado con la flecha hacia arriba) y luego selecciona <strong>"Agregar a inicio"</strong>.
               </p>
@@ -1570,7 +1570,7 @@ export default function App() {
           <div className="modal-overlay" onClick={() => setPreviewTicket(null)} style={{zIndex: 9999}}>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', background: '#fff', borderRadius: 8}}>
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>LA MORA</h2>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>GALLO AZUL</h2>
                 <div style={{ fontSize: 12 }}>Restaurante</div>
               </div>
               <div style={{ margin: '16px 0', borderTop: '1px dashed #ccc', borderBottom: '1px dashed #ccc', padding: '8px 0', fontSize: 13, lineHeight: 1.4 }}>
@@ -2484,7 +2484,7 @@ export default function App() {
             <div style={{ width: 64, height: 64, background: '#eff6ff', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
               <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
             </div>
-            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar La Mora</h3>
+            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar Gallo Azul</h3>
             <p style={{ fontSize: 15, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
               Para instalar la aplicación en tu iPhone o iPad, pulsa el botón de <strong>Compartir</strong> en la barra inferior (el cuadrado con la flecha hacia arriba) y luego selecciona <strong>"Agregar a inicio"</strong>.
             </p>
@@ -2656,7 +2656,7 @@ export default function App() {
             <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>Cuenta - Mesa {printCuentaModal.tableId}</h3>
             <div className="ticket-print-area">
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 20 }}>La Mora Resto</h2>
+                <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
                 <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {currentUser?.name}</div>
                 <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {printCuentaModal.tableId}</div>
                 <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
@@ -2693,7 +2693,7 @@ export default function App() {
       {ticketToPrint && (
         <div className="ticket-print-area">
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
-             <h2 style={{ margin: 0, fontSize: 20 }}>La Mora Resto</h2>
+             <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
              <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {ticketToPrint.printed_by}</div>
              <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {ticketToPrint.table_id}</div>
              <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>

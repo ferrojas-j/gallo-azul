@@ -25,5 +25,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`La Mora Resto App running on port ${PORT}`);
+  console.log(`Gallo Azul Resto App running on port ${PORT}`);
 });
