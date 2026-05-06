@@ -1180,7 +1180,9 @@ export default function App() {
 
   const renderHome = () => {
     const freeTables = tables.filter(t => t.category !== 'Pedidos para llevar' && !tableOrders[t.id]).length;
+    const pendingItems = activeItems.filter(i => i.status === 'pending');
     const activePedidos = pendingItems.length;
+
     const connectedStaff = users.filter(u => u.session_active);
 
     // BCS time
