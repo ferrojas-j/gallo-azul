@@ -1010,8 +1010,23 @@ export default function App() {
               <h1>Panel de Administración</h1>
               <p>{mexicoDate} • {mexicoTime}</p>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '14px', fontSize: '14px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '16px' }}>🇺🇸</span> 1 USD = {exchangeRate.toFixed(2)} MXN
+            <div style={{ 
+              background: 'rgba(255,255,255,0.06)', 
+              padding: '6px 14px', 
+              borderRadius: '24px', 
+              fontSize: '13px', 
+              fontWeight: 700, 
+              color: '#e2e8f0', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              border: '1px solid rgba(255,255,255,0.1)',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+              backdropFilter: 'blur(8px)'
+            }}>
+              <Globe size={14} style={{ color: '#94a3b8' }} />
+              <span>1 USD <span style={{ color: '#64748b', margin: '0 4px', fontWeight: 500 }}>=</span> <span style={{ color: '#10b981' }}>{exchangeRate.toFixed(2)}</span> MXN</span>
             </div>
           </div>
           <div className="admin-stats-summary">
