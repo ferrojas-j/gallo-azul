@@ -136,7 +136,12 @@ export function useSupabaseSync() {
     if (data) {
       const converted = (data as MenuItemRow[])
         .map(toAppMenuItem)
-        .sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category));
+        .sort((a, b) => {
+          const idxA = CATEGORIES.indexOf(a.category) === -1 ? 999 : CATEGORIES.indexOf(a.category);
+          const idxB = CATEGORIES.indexOf(b.category) === -1 ? 999 : CATEGORIES.indexOf(b.category);
+          if (idxA !== idxB) return idxA - idxB;
+          return a.name.localeCompare(b.name);
+        });
       setMenuItems(converted);
     }
   }, []);

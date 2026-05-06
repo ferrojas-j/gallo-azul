@@ -396,10 +396,54 @@ export default function App() {
         m.category.toLowerCase().includes(s)
       );
     } else {
-      list = list.filter(m => m.category === menuCategory);
+      list = list.filter(m => {
+        if (m.category === menuCategory) return true;
+        const subCats = CATEGORY_MAPPING[menuCategory];
+        if (subCats && subCats.includes(m.category)) return true;
+        return false;
+      });
     }
     return list;
   }, [menuItems, menuCategory, menuSearch]);
+
+  const adminMenuItems = useMemo(() => {
+    let list = menuItems;
+    if (menuSearch.trim()) {
+      const s = menuSearch.toLowerCase().trim();
+      list = list.filter(m => 
+        m.name.toLowerCase().includes(s) || 
+        m.category.toLowerCase().includes(s)
+      );
+    }
+    return list;
+  }, [menuItems, menuSearch]);
+
+  const dynamicCategories = useMemo(() => {
+    const set = new Set<string>();
+    menuItems.forEach(m => {
+      if (m.active && m.category) {
+        let isSub = false;
+        for (const [parent, subs] of Object.entries(CATEGORY_MAPPING)) {
+          if (subs.includes(m.category)) {
+            set.add(parent);
+            isSub = true;
+            break;
+          }
+        }
+        if (!isSub) {
+          set.add(m.category);
+        }
+      }
+    });
+    const list = Array.from(set);
+    list.sort((a, b) => {
+      const idxA = CATEGORIES.indexOf(a) === -1 ? 999 : CATEGORIES.indexOf(a);
+      const idxB = CATEGORIES.indexOf(b) === -1 ? 999 : CATEGORIES.indexOf(b);
+      if (idxA !== idxB) return idxA - idxB;
+      return a.localeCompare(b);
+    });
+    return list.length > 0 ? list : CATEGORIES;
+  }, [menuItems]);
 
   const ranking = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -1210,7 +1254,7 @@ export default function App() {
         </div>
         
         <div className="menu-items-list">
-          {filteredMenuItems.map(item => {
+          {adminMenuItems.map(item => {
             const isExpanded = expandedItems.has(item.id);
             return (
               <div key={item.id} className={`admin-menu-card ${!item.active ? 'inactive' : ''}`}>
@@ -2792,7 +2836,7 @@ export default function App() {
               </div>
               {!menuSearch && (
                 <div className="category-chips-wrap">
-                  {CATEGORIES.map(cat => (
+                  {dynamicCategories.map(cat => (
                     <button
                       key={cat}
                       className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
