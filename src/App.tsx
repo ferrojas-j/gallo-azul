@@ -375,7 +375,15 @@ export default function App() {
     }
   };
 
+  const subTitles = {
+    menu: 'Gestión de Menú',
+    users: 'Gestión de Usuarios',
+    tables: 'Gestión de Mesas',
+    stats: 'Estadísticas y Reportes'
+  };
+
   // === Routing History API Sync ===
+
 
   useEffect(() => {
     const handlePopState = () => {
