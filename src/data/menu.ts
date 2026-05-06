@@ -17,158 +17,143 @@ export type MenuItem = {
   variants?: MenuVariant[];
 };
 
-const v = (label: string, price: number): MenuVariant => ({
-  id: `${label}-${price}`,
-  label,
-  price,
-  active: true,
-});
-
-const breadVariants = (p1: number, p2: number): MenuVariant[] => [
-  v('Pan Blanco', p1),
-  v('Integral', p2),
-];
-
-const flourVariants = (p1: number, p2: number): MenuVariant[] => [
-  v('Harina Blanca', p1),
-  v('Integral', p2),
-];
-
 export const CATEGORIES = [
-  'Sandwiches', 'Waffles Dulces', 'Waffles Salados', 'Bocado Integral',
-  'Bebidas Frías', 'Bebidas Calientes', 'Fruta', 'Huevos',
-  'Pan', 'Tortilla', 'Orden Extra', 'Opciones y Adicionales',
+  'ENSALADAS', 'PASTAS', 'PIZZAS', 'BEBIDAS'
 ];
 
-const item = (id: string, name: string, price: number, category: string, opts?: Partial<MenuItem>): MenuItem => ({
-  id, name, price, category, active: true, hasVariants: false, ...opts,
-});
+// Mapping for grouped categories
+export const CATEGORY_MAPPING: Record<string, string[]> = {
+  'INGREDIENTES EXTRA': ['EXTRAS: VEGETALES', 'EXTRAS: QUESOS', 'EXTRAS: CARNES'],
+  'BEBIDAS': ['BEBIDAS: AGUAS FRESCAS', 'BEBIDAS: CERVEZAS Y SANGRÍAS', 'BEBIDAS: MARGARITAS', 'BEBIDAS: MEZCALITAS', 'BEBIDAS: VINOS', 'BEBIDAS: MEZCALES']
+};
 
-const sandwich = (id: string, name: string, p1: number, p2: number): MenuItem => ({
-  id, name, price: p1, category: 'Sandwiches', active: true,
-  hasVariants: true, variantType: 'bread', variants: breadVariants(p1, p2),
-});
 
-const waffleDulce = (id: string, name: string, p1: number, p2: number): MenuItem => ({
-  id, name, price: p1, category: 'Waffles Dulces', active: true,
-  hasVariants: true, variantType: 'flour', variants: flourVariants(p1, p2),
-});
-
-const waffleSalado = (id: string, name: string, p1: number, p2: number): MenuItem => ({
-  id, name, price: p1, category: 'Waffles Salados', active: true,
-  hasVariants: true, variantType: 'flour', variants: flourVariants(p1, p2),
+const item = (id: string, name: string, price: number, category: string): MenuItem => ({
+  id, name, price, category, active: true, hasVariants: false,
 });
 
 export const MENU_ITEMS: MenuItem[] = [
-  // Sandwiches
-  sandwich('sw-espanol',   'Español',      135, 140),
-  sandwich('sw-ligero',    'Ligero',        135, 140),
-  sandwich('sw-mexicano',  'Mexicano',      125, 130),
-  sandwich('sw-yucateco',  'Yucateco',      115, 120),
-  sandwich('sw-marino',    'Marino',        105, 110),
-  sandwich('sw-blt',       'BLT Aguacate',  105, 110),
-  sandwich('sw-veggie',    'Vegetariano',    95, 100),
-  sandwich('sw-oaxaqueno', 'Oaxaqueño',      95, 100),
-  sandwich('sw-molletes',  'Molletes',       95, 100),
+  // ENSALADAS
+  item('en-cesar', 'César', 190, 'ENSALADAS'),
+  item('en-frescos', 'Vegetales frescos', 190, 'ENSALADAS'),
 
-  // Waffles Dulces
-  waffleDulce('wd-manzana',  'Manzana y Helado',  125, 130),
-  waffleDulce('wd-fruta',    'Fruta',             125, 130),
-  waffleDulce('wd-queso',    'Queso',             105, 110),
-  waffleDulce('wd-choco',    'Chocolate',         105, 110),
-  waffleDulce('wd-platano',  'Plátano y Crema',   105, 110),
-  waffleDulce('wd-sencillo', 'Sencillito',         90,  95),
+  // PASTAS
+  {
+    id: 'pa-putanesca',
+    name: 'Putanesca',
+    price: 260,
+    category: 'PASTAS',
+    active: true,
+    hasVariants: true,
+    variants: [
+      { id: 'pa-put-pollo', label: 'Con Pollo', price: 260, active: true },
+      { id: 'pa-put-camaron', label: 'Con Camarón', price: 260, active: true },
+      { id: 'pa-put-salchicha', label: 'Con Salchicha', price: 260, active: true },
+      { id: 'pa-put-sola', label: 'Sola', price: 260, active: true },
+    ]
+  },
+  {
+    id: 'pa-alfredo',
+    name: 'Alfredo',
+    price: 260,
+    category: 'PASTAS',
+    active: true,
+    hasVariants: true,
+    variants: [
+      { id: 'pa-alf-pollo', label: 'Con Pollo', price: 260, active: true },
+      { id: 'pa-alf-camaron', label: 'Con Camarón', price: 260, active: true },
+      { id: 'pa-alf-salchicha', label: 'Con Salchicha', price: 260, active: true },
+      { id: 'pa-alf-sola', label: 'Sola', price: 260, active: true },
+    ]
+  },
 
-  // Waffles Salados
-  waffleSalado('ws-guaca', 'Queso y Guacamole', 135, 140),
-  waffleSalado('ws-huevo', 'Huevo y Jamón',     135, 140),
+  // PIZZAS
+  item('pi-margherita', 'Margherita', 180, 'PIZZAS'),
+  item('pi-siciliana', 'Siciliana', 225, 'PIZZAS'),
+  item('pi-pescatore', 'Pescatore', 235, 'PIZZAS'),
+  item('pi-napoletana', 'Napoletana', 245, 'PIZZAS'),
+  item('pi-hawaiana', 'Hawaiana', 245, 'PIZZAS'),
+  item('pi-mexicana', 'Mexicana', 255, 'PIZZAS'),
+  item('pi-capricciosa', 'Capricciosa', 255, 'PIZZAS'),
+  item('pi-stagioni', 'Stagioni', 255, 'PIZZAS'),
+  item('pi-quattro', 'Quattro Formaggi', 260, 'PIZZAS'),
+  item('pi-italiana', 'Italiana', 260, 'PIZZAS'),
+  item('pi-gamberetta', 'Gamberetta', 260, 'PIZZAS'),
+  item('pi-putanesca-p', 'Putanesca (Pizza)', 260, 'PIZZAS'),
+  item('pi-special', 'Gallo Azul Special', 260, 'PIZZAS'),
 
-  // Bocado Integral
-  item('bi-cabra',   'Queso de Cabra y Aguacate', 75, 'Bocado Integral'),
-  item('bi-panela',  'Queso Panela y Aguacate',   75, 'Bocado Integral'),
-  item('bi-jamon',   'Jamón y Huevo',             75, 'Bocado Integral'),
-  item('bi-quesillo','Quesillo y Frijol',         70, 'Bocado Integral'),
-  item('bi-cacahuate','Crema de Cacahuate',       70, 'Bocado Integral'),
+  // EXTRAS: VEGETALES
+  item('ex-ajo', 'Ajo rostizado', 40, 'EXTRAS: VEGETALES'),
+  item('ex-champ', 'Champiñones', 40, 'EXTRAS: VEGETALES'),
+  item('ex-tom-f', 'Tomates frescos', 40, 'EXTRAS: VEGETALES'),
+  item('ex-tom-d', 'Tomates deshidratados', 40, 'EXTRAS: VEGETALES'),
+  item('ex-aceit-n', 'Aceitunas negras', 40, 'EXTRAS: VEGETALES'),
+  item('ex-aceit-c', 'Aceitunas Calmata', 40, 'EXTRAS: VEGETALES'),
+  item('ex-alca', 'Corazones de alcachofa', 40, 'EXTRAS: VEGETALES'),
+  item('ex-pimi', 'Pimientos rojos', 40, 'EXTRAS: VEGETALES'),
+  item('ex-cebolla', 'Cebollas caramelizadas', 40, 'EXTRAS: VEGETALES'),
+  item('ex-papa', 'Papas', 40, 'EXTRAS: VEGETALES'),
+  item('ex-focaccia', 'Focaccia', 40, 'EXTRAS: VEGETALES'),
 
-  // Bebidas Frías
-  item('bf-naranja',  'Jugo de Naranja',                         55, 'Bebidas Frías'),
-  item('bf-zanahoria','Jugo de Zanahoria',                        55, 'Bebidas Frías'),
-  item('bf-mixto',    'Jugo Mixto (Naranja con Zanahoria)',       55, 'Bebidas Frías'),
-  item('bf-verde',    'Jugo Verde',                              60, 'Bebidas Frías'),
-  item('bf-limonada', 'Limonada o Naranjada mineral',            45, 'Bebidas Frías'),
-  item('bf-agua',     'Agua de la casa (limón y hierbabuena)',   25, 'Bebidas Frías'),
-  item('bf-esprRocas','Espresso Doble en las Rocas',             55, 'Bebidas Frías'),
-  item('bf-esprHelado','Espresso Doble sobre Helado de Vainilla',75, 'Bebidas Frías'),
-  item('bf-capFrio',  'Capuccino Frío',                         70, 'Bebidas Frías'),
-  item('bf-frapu',    'Frapuchino',                             95, 'Bebidas Frías'),
-  item('bf-moka',     'Mokachino',                              95, 'Bebidas Frías'),
-  item('bf-leche',    'Vaso de Leche Fría',                     30, 'Bebidas Frías'),
-  item('bf-licChoco', 'Licuado Frío de Chocolate',              55, 'Bebidas Frías'),
-  item('bf-licPlata', 'Licuado de Plátano y Miel',             55, 'Bebidas Frías'),
-  item('bf-licChban', 'Licuado Choco-Banana',                  55, 'Bebidas Frías'),
-  item('bf-malteada', 'Malteada Vainilla ó Chocolate',         85, 'Bebidas Frías'),
-  item('bf-refresco', 'Refrescos',                             25, 'Bebidas Frías'),
-  item('bf-cerveza',  'Cerveza (Corona, Victoria)',            35, 'Bebidas Frías'),
-  item('bf-kombucha', 'Kombucha',                              65, 'Bebidas Frías'),
+  // EXTRAS: QUESOS
+  item('ex-mozz', 'Mozzarella', 70, 'EXTRAS: QUESOS'),
+  item('ex-cabra', 'Queso de cabra', 70, 'EXTRAS: QUESOS'),
+  item('ex-gorg', 'Gorgonzola', 70, 'EXTRAS: QUESOS'),
+  item('ex-parm', 'Parmesano reggiano', 70, 'EXTRAS: QUESOS'),
 
-  // Bebidas Calientes
-  item('bc-americano',  'Café Americano',             40, 'Bebidas Calientes'),
-  item('bc-espresso',   'Café Espresso',              40, 'Bebidas Calientes'),
-  item('bc-esprDoble',  'Café Espresso Doble',        50, 'Bebidas Calientes'),
-  item('bc-macchiato',  'Café Espresso Macchiato',    40, 'Bebidas Calientes'),
-  item('bc-panna',      'Café Espresso Panna',        50, 'Bebidas Calientes'),
-  item('bc-latte',      'Café Latte',                 50, 'Bebidas Calientes'),
-  item('bc-capTaza',    'Café Capuccino (taza alta)', 50, 'Bebidas Calientes'),
-  item('bc-capItal',    'Café Capuccino Italiano',    50, 'Bebidas Calientes'),
-  item('bc-capMoka',    'Café Capuccino Moka',        60, 'Bebidas Calientes'),
-  item('bc-flatWhite',  'Café Flat White',            60, 'Bebidas Calientes'),
-  item('bc-capViene',   'Café Capuccino Vienés',      60, 'Bebidas Calientes'),
-  item('bc-chocolate',  'Chocolate Caliente',         50, 'Bebidas Calientes'),
-  item('bc-te',         'Té orgánico en infusión',   40, 'Bebidas Calientes'),
+  // EXTRAS: CARNES
+  item('ex-salch', 'Salchicha italiana', 90, 'EXTRAS: CARNES'),
+  item('ex-salami', 'Salami', 90, 'EXTRAS: CARNES'),
+  item('ex-peppe', 'Pepperoni', 90, 'EXTRAS: CARNES'),
+  item('ex-anchoa', 'Anchoas', 90, 'EXTRAS: CARNES'),
+  item('ex-pollo-ex', 'Pollo', 90, 'EXTRAS: CARNES'),
+  item('ex-camaron-ex', 'Camarón', 90, 'EXTRAS: CARNES'),
 
-  // Fruta
-  item('fr-ensalada',  'Ensalada de Frutas',                        85, 'Fruta'),
-  item('fr-ensYogurt', 'Ensalada de Frutas con Yogurt y Granola',  100, 'Fruta'),
-  item('fr-yogurt',    'Yogurt Natural con Granola',                55, 'Fruta'),
-  item('fr-yogFruta',  'Yogurt Natural con Granola y Fruta Picada', 65, 'Fruta'),
+  // BEBIDAS: MARGARITAS
+  item('dr-mar-clas', 'Clásica (M)', 90, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-baja', 'Baja (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-tama', 'Tamarindo (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-jam', 'Jamaica (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-alb', 'Albahaca (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-pepi', 'Pepino-Chile (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-jala', 'Jalapeño spicy (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-fresa', 'Fresa (M)', 110, 'BEBIDAS: MARGARITAS'),
+  item('dr-mar-mango', 'Mango (M)', 110, 'BEBIDAS: MARGARITAS'),
 
-  // Huevos
-  item('hu-omeletteC',  'Omelette Clásico',                  95, 'Huevos'),
-  item('hu-omeletteE',  'Omelette de Espinacas',             95, 'Huevos'),
-  item('hu-frittata',   'Frittata de Calabacitas',           95, 'Huevos'),
-  item('hu-tocino',     'Estrellado con Tocino',             90, 'Huevos'),
-  item('hu-revueltos',  'Revueltos con Jamón o Chorizo',     90, 'Huevos'),
-  item('hu-rancheros',  'Rancheros o Divorciados',           85, 'Huevos'),
-  item('hu-mexicana',   'Revueltos a la mexicana o ejote',   85, 'Huevos'),
+  // BEBIDAS: MEZCALITAS
+  item('dr-mez-clas', 'Clasica (Z)', 140, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-baja', 'Baja (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-tama', 'Tamarindo (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-jam', 'Jamaica (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-alb', 'Albahaca (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-pepi', 'Pepino-Chile (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-jala', 'Jalapeño spicy (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-fresa', 'Fresa (Z)', 160, 'BEBIDAS: MEZCALITAS'),
+  item('dr-mez-mango', 'Mango (Z)', 160, 'BEBIDAS: MEZCALITAS'),
 
-  // Pan
-  item('pa-payQueso',  'Pay de Queso',              65, 'Pan'),
-  item('pa-chocolate', 'Pastel de Chocolate',        65, 'Pan'),
-  item('pa-zanahoria', 'Pastel de Zanahoria',        65, 'Pan'),
-  item('pa-tostBlanco','Pan Tostado Blanco',         65, 'Pan'),
-  item('pa-tostInteg', 'Pan Tostado Integral (75%)', 75, 'Pan'),
-  item('pa-galleta',   'Galleta Artesanal',          10, 'Pan'),
+  // BEBIDAS: VINOS
+  item('dr-vin-bla', 'Blanco de la casa', 120, 'BEBIDAS: VINOS'),
+  item('dr-vin-roj', 'Rojo de la casa', 120, 'BEBIDAS: VINOS'),
 
-  // Tortilla
-  item('to-chipoquiles','Chipoquiles',                                      100, 'Tortilla'),
-  item('to-chilaVerdes','Chilaquiles Verdes',                                90, 'Tortilla'),
-  item('to-chilaHuevo', 'Chilaquiles Verdes con 1 o 2 Huevos Estrellados', 100, 'Tortilla'),
-  item('to-quesadillas','Quesadillas Popeye',                                90, 'Tortilla'),
-  item('to-guacamole',  'Guacamole',                                         90, 'Tortilla'),
+  // BEBIDAS: AGUAS FRESCAS
+  item('dr-af-tama', 'Tamarindo', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-jam', 'Jamaica', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-hor', 'Horchata-Canela', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-fresa', 'Fresa', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-limo', 'Limonada', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-te', 'Té helado', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-limote', 'Limonada-Té helado', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-naran', 'Agua naranjita', 40, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-coca', 'Coca-Cola', 50, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-cocal', 'Coca-Cola light', 50, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-fresca', 'Fresca', 50, 'BEBIDAS: AGUAS FRESCAS'),
+  item('dr-af-topo', 'Agua mineral Topochico', 50, 'BEBIDAS: AGUAS FRESCAS'),
 
-  // Orden Extra
-  item('oe-jamonPech', 'Jamón de Pechuga de pavo',   35, 'Orden Extra'),
-  item('oe-jamonPierna','Jamón de pierna',            35, 'Orden Extra'),
-  item('oe-tocino',    'Tocino',                      35, 'Orden Extra'),
-  item('oe-aguacate',  'Aguacate',                   20, 'Orden Extra'),
-  item('oe-quesofr',   'Queso fresco',               20, 'Orden Extra'),
-  item('oe-panInteg',  '1 Rebanada de pan integral', 20, 'Orden Extra'),
-  item('oe-huevo',     '1 Huevo estrellado o revuelto',20,'Orden Extra'),
-  item('oe-frijoles',  'Frijoles',                   20, 'Orden Extra'),
-
-  // Opciones y Adicionales
-  item('op-sinGluten',  'Waffle con harina sin gluten',        25, 'Opciones y Adicionales'),
-  item('op-lecheVeg',   'Con Bebida Soya, Almendra o Coco',   10, 'Opciones y Adicionales'),
-  item('op-descaf',     'Con Café Descafeinado',               5, 'Opciones y Adicionales'),
-  item('op-vaso',       'Vaso Biodegradable para llevar',      5, 'Opciones y Adicionales'),
+  // BEBIDAS: CERVEZAS Y SANGRÍAS
+  item('dr-cv-coro', 'Corona', 60, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
+  item('dr-cv-paci', 'Pacífico', 60, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
+  item('dr-cv-negm', 'Negra Modelo', 70, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
+  item('dr-cv-mich', 'Michelada', 80, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
+  item('dr-cv-ciel', 'Cielo rojo', 90, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
+  item('dr-cv-sang', 'Garrafa de sangría 1/2L', 150, 'BEBIDAS: CERVEZAS Y SANGRÍAS'),
 ];

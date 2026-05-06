@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbShiftSummaries, dbPrintedTickets
+  dbTables, dbOrders, dbOrderItems, dbMenu, dbUsers, dbExpenses, dbCategories, dbShiftSummaries, dbPrintedTickets, dbHotelSales
 } from '../lib/supabaseService';
 import type {
   TableRow, OrderRow, OrderItemRow, MenuItemRow, UserRow,
@@ -40,12 +40,26 @@ export function useSupabaseSync() {
   const [todayCashIncome, setTodayCashIncome] = useState(0);
   const [todayTransferIncome, setTodayTransferIncome] = useState(0);
   const [todayTransferTips, setTodayTransferTips] = useState(0);
+  const [pettyCashInitial, setPettyCashInitial] = useState(5000);
+  const [hotelCardSales, setHotelCardSales] = useState(0);
+  const [hotelCashSales, setHotelCashSales] = useState(0);
+  const [hotelSalesList, setHotelSalesList] = useState<any[]>([]);
+  const [todayDebitIncome, setTodayDebitIncome] = useState(0);
+  const [todayDebitTips, setTodayDebitTips] = useState(0);
+  const [todayCreditIncome, setTodayCreditIncome] = useState(0);
+  const [todayCreditTips, setTodayCreditTips] = useState(0);
+  const [todayCardIncome, setTodayCardIncome] = useState(0);
+  const [todayCardTips, setTodayCardTips] = useState(0);
+  const [todayTotalTips, setTodayTotalTips] = useState(0);
+  const [todayCashTips, setTodayCashTips] = useState(0);
   const [todayAccountsCount, setTodayAccountsCount] = useState(0);
   const [todayExpenses, setTodayExpenses] = useState(0);
   const [todayExpensesList, setTodayExpensesList] = useState<any[]>([]);
   const [todayClosedOrders, setTodayClosedOrders] = useState<OrderRow[]>([]);
   const [dailySummaries, setDailySummaries] = useState<any[]>([]);
   const [pendingTickets, setPendingTickets] = useState<any[]>([]);
+  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [exchangeRate, setExchangeRate] = useState(17.5); // Default fallback
   const [isLoading, setIsLoading] = useState(true);
 
   // Prevent duplicate fetches with a ref
@@ -53,6 +67,29 @@ export function useSupabaseSync() {
   const lastClosed = useRef<Record<number, number>>({});
 
   // ── Loaders ─────────────────────────────────────────
+  
+  const fetchExchangeRate = useCallback(async () => {
+    try {
+      // Intentar obtener el tipo de cambio oficial de BBVA (Venta) mediante nuestra Edge Function
+      const { data, error } = await supabase.functions.invoke('get-bbva-rate');
+      
+      if (!error && data && data.rate) {
+        setExchangeRate(data.rate);
+        console.log('Exchange rate updated from BBVA:', data.rate);
+        return;
+      }
+
+      // Fallback a API genérica si la función falla
+      const resp = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      const fallbackData = await resp.json();
+      if (fallbackData && fallbackData.rates && fallbackData.rates.MXN) {
+        setExchangeRate(fallbackData.rates.MXN);
+      }
+    } catch (err) {
+      console.error('Error fetching exchange rate:', err);
+    }
+  }, []);
+
 
   const fetchTables = useCallback(async () => {
     const { data } = await dbTables.getAll();
@@ -110,47 +147,140 @@ export function useSupabaseSync() {
   }, []);
 
   const fetchTodayTotals = useCallback(async () => {
-    const [incomeRes, expensesRes, closedOrdersRes] = await Promise.all([
-      dbOrders.getTodayIncome(),
-      dbExpenses.getToday(),
-      dbOrders.getTodayClosedOrders(),
-    ]);
+    try {
+      const results = await Promise.allSettled([
 
-    if (incomeRes.data) {
-      setTodayIncome(incomeRes.data.reduce((s: number, o: any) => s + (o.total || 0), 0));
-      setTodayAccountsCount(incomeRes.data.length);
-    }
-    
-    if (expensesRes.data) {
-      setTodayExpenses(expensesRes.data.reduce((s: number, e: any) => s + (e.amount || 0), 0));
-      setTodayExpensesList(expensesRes.data);
-    }
+        dbOrders.getTodayIncome(),
+        dbExpenses.getToday(),
+        dbOrders.getTodayClosedOrders(),
+        supabase.from('hotel_sales')
+          .select('*')
+          .eq('status', 'closed')
+      ]);
 
-    if (closedOrdersRes.data) {
-      setTodayClosedOrders(closedOrdersRes.data);
-      const cash = closedOrdersRes.data
-        .filter(o => o.payment_method === 'efectivo')
-        .reduce((sum, o) => sum + (o.total || 0), 0);
-      const transfer = closedOrdersRes.data
-        .filter(o => o.payment_method !== 'efectivo')
-        .reduce((sum, o) => sum + (o.total || 0), 0);
-      const transferTips = closedOrdersRes.data
-        .filter(o => o.payment_method === 'transferencia')
-        .reduce((sum, o) => sum + (o.tip || 0), 0);
-      setTodayCashIncome(cash);
-      setTodayTransferIncome(transfer);
-      setTodayTransferTips(transferTips);
+      const [incomeRes, expensesRes, closedOrdersRes, hotelRes] = results.map(r => 
+        r.status === 'fulfilled' ? (r.value as any) : { data: null, error: (r as any).reason }
+      );
+
+      console.log('fetchTodayTotals data:', {
+        income: incomeRes.data?.length,
+        expenses: expensesRes.data?.length,
+        closedOrders: closedOrdersRes.data?.length,
+        hotel: hotelRes.data?.length
+      });
+
+      if (incomeRes.data) {
+
+
+        setTodayIncome(incomeRes.data.reduce((s: number, o: any) => s + (o.total || 0), 0));
+        setTodayAccountsCount(incomeRes.data.length);
+      } else {
+        setTodayIncome(0);
+        setTodayAccountsCount(0);
+      }
+      
+      if (expensesRes.data) {
+        setTodayExpenses(expensesRes.data.reduce((s: number, e: any) => s + (e.amount || 0), 0));
+        setTodayExpensesList(expensesRes.data);
+      } else {
+        setTodayExpenses(0);
+        setTodayExpensesList([]);
+      }
+
+      if (hotelRes.data && hotelRes.data.length > 0) {
+        setHotelSalesList(hotelRes.data);
+        let hCard = 0;
+        let hCash = 0;
+        hotelRes.data.forEach(sale => {
+          const rate = sale.exchange_rate || exchangeRate;
+          const amountInMXN = sale.currency === 'USD' ? Number(sale.amount) * rate : Number(sale.amount);
+          if (sale.payment_method === 'tarjeta') hCard += amountInMXN;
+          else hCash += amountInMXN;
+        });
+        setHotelCardSales(hCard);
+        setHotelCashSales(hCash);
+      } else {
+        setHotelSalesList([]);
+        setHotelCardSales(0);
+        setHotelCashSales(0);
+      }
+
+      if (closedOrdersRes.data) {
+        setTodayClosedOrders(closedOrdersRes.data);
+        
+        const cashBase = closedOrdersRes.data
+          .filter(o => o.payment_method === 'efectivo')
+          .reduce((sum, o) => sum + (o.total || 0), 0);
+        const cashTips = closedOrdersRes.data
+          .filter(o => o.payment_method === 'efectivo')
+          .reduce((sum, o) => sum + (o.tip || 0), 0);
+        
+        const transferBase = closedOrdersRes.data
+          .filter(o => o.payment_method === 'transferencia')
+          .reduce((sum, o) => sum + (o.total || 0), 0);
+        const transferTips = closedOrdersRes.data
+          .filter(o => o.payment_method === 'transferencia')
+          .reduce((sum, o) => sum + (o.tip || 0), 0);
+
+        const cardBase = closedOrdersRes.data
+          .filter(o => o.payment_method === 'tarjeta')
+          .reduce((sum, o) => sum + (o.total || 0), 0);
+        const cardTips = closedOrdersRes.data
+          .filter(o => o.payment_method === 'tarjeta')
+          .reduce((sum, o) => sum + (o.tip || 0), 0);
+
+        const totalTips = cashTips + transferTips + cardTips;
+
+        setTodayCashIncome(cashBase);
+        setTodayCashTips(cashTips);
+        setTodayTransferIncome(transferBase);
+        setTodayTransferTips(transferTips);
+        setTodayDebitIncome(0); // Deprecated
+        setTodayDebitTips(0);   // Deprecated
+        setTodayCreditIncome(0); // Deprecated
+        setTodayCreditTips(0);   // Deprecated
+        setTodayCardIncome(cardBase);
+        setTodayCardTips(cardTips);
+        setTodayTotalTips(totalTips);
+      } else {
+        setTodayClosedOrders([]);
+        setTodayCashIncome(0);
+        setTodayCashTips(0);
+        setTodayTransferIncome(0);
+        setTodayTransferTips(0);
+        setTodayDebitIncome(0);
+        setTodayDebitTips(0);
+        setTodayCreditIncome(0);
+        setTodayCreditTips(0);
+        setTodayCardIncome(0);
+        setTodayCardTips(0);
+        setTodayTotalTips(0);
+      }
+      const { data: tickets } = await dbPrintedTickets.getToday();
+      if (tickets) setPendingTickets(tickets);
+
+    } catch (err) {
+      console.error('Error fetching today totals:', err);
     }
-  }, []);
+  }, [exchangeRate]);
+
 
   const fetchDailySummaries = useCallback(async () => {
     const { data } = await dbShiftSummaries.getAll();
     if (data) setDailySummaries(data);
   }, []);
 
-  const fetchPendingTickets = useCallback(async () => {
-    const { data } = await dbPrintedTickets.getPending();
+  const fetchTodayTickets = useCallback(async () => {
+    const { data } = await dbPrintedTickets.getToday();
     if (data) setPendingTickets(data);
+  }, []);
+
+  const fetchRegistrations = useCallback(async () => {
+    const { data } = await supabase
+      .from('guest_registrations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setRegistrations(data);
   }, []);
 
   const fetchAll = useCallback(async () => {
@@ -165,17 +295,22 @@ export function useSupabaseSync() {
         fetchUsers(), 
         fetchTodayTotals(),
         fetchDailySummaries(),
-        fetchPendingTickets()
+        fetchTodayTickets(),
+        fetchRegistrations(),
+        fetchExchangeRate()
       ]);
     } finally {
       setIsLoading(false);
       fetching.current = false;
     }
-  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchPendingTickets]);
+  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchTodayTickets, fetchExchangeRate]);
 
   // ── Realtime subscriptions ──────────────────────────
   useEffect(() => {
     fetchAll();
+    
+    // Auto-update exchange rate every hour
+    const rateInterval = setInterval(fetchExchangeRate, 3600000);
 
     const channel = supabase
       .channel('app-realtime')
@@ -188,12 +323,16 @@ export function useSupabaseSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, fetchMenu)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_summaries' }, fetchDailySummaries)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'printed_tickets' }, fetchPendingTickets)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'printed_tickets' }, fetchTodayTickets)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_registrations' }, fetchRegistrations)
       .subscribe();
 
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { 
+      supabase.removeChannel(channel); 
+      clearInterval(rateInterval);
+    };
+  }, [fetchAll, fetchExchangeRate]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Operations ──────────────────────────────────────
 
@@ -201,7 +340,8 @@ export function useSupabaseSync() {
     tableId: number,
     item: MenuItem,
     variant?: MenuVariant,
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ) => {
     let order = tableOrders[tableId];
 
@@ -217,7 +357,7 @@ export function useSupabaseSync() {
       order_id: order.id,
       menu_item_id: item.id,
       name: item.name,
-      price: variant ? variant.price : item.price,
+      price: customPrice !== undefined ? customPrice : (variant ? variant.price : item.price),
       qty: 1,
       variant_label: variant?.label,
       notes: notes || undefined,
@@ -282,17 +422,63 @@ export function useSupabaseSync() {
     });
     setActiveItems(prev => prev.filter(i => i.table_id !== tableId));
 
-    // 1. Close ALL active orders for this table (prevents ghost orders)
-    const { error: orderError } = await dbOrders.closeAllActiveForTable(tableId, { 
+    // 1. Close the primary order
+    const { error: orderError } = await dbOrders.updateStatus(order.id, 'closed', {
       payment_method: method, 
       total, 
       items_summary: summary,
       tip: customTip
     });
+    
+    // Cancel any ghost orders for this table
+    await dbOrders.cancelAllActiveForTable(tableId);
 
     if (orderError) {
       console.error(orderError);
       alert("Error crítico al cerrar orden: " + orderError.message);
+      return;
+    }
+    
+    // 2. Free or deactivate the table
+    const table = tables.find(t => t.id === tableId);
+    if (table?.category === 'Pedidos para llevar') {
+      // Instead of deactivating, just free it so it shows as "closed" in the list until closeDay
+      const { error: tableError } = await dbTables.updateStatus(tableId, 'free');
+      if (tableError) console.error('Error freeing delivery table:', tableError);
+    } else {
+      const { error: tableError } = await dbTables.updateStatus(tableId, 'free');
+      if (tableError) {
+        console.error(tableError);
+        alert("Error crítico al liberar mesa: " + tableError.message);
+      }
+    }
+    
+    // 3. Force refresh totals safely (orders will ignore this table for 5s)
+    await Promise.all([
+      fetchTodayTotals(),
+      fetchTables(),
+      fetchOrdersAndItems(),
+    ]);
+  }, [tableOrders, activeItems, fetchTodayTotals, fetchTables, fetchOrdersAndItems]);
+
+  const cancelTable = useCallback(async (tableId: number) => {
+    // Block stale realtime fetches for 5 seconds
+    lastClosed.current[tableId] = Date.now();
+
+    // Optimistically free the table in UI immediately
+    setTableOrders(prev => {
+      const copy = { ...prev };
+      delete copy[tableId];
+      return copy;
+    });
+    setActiveItems(prev => prev.filter(i => i.table_id !== tableId));
+
+    // 1. Cancel ALL active orders for this table
+    const { error: orderError } = await dbOrders.cancelAllActiveForTable(tableId);
+
+    if (orderError) {
+      console.error(orderError);
+      alert("Error crítico al cancelar orden: " + orderError.message);
       return;
     }
     
@@ -303,13 +489,12 @@ export function useSupabaseSync() {
       alert("Error crítico al liberar mesa: " + tableError.message);
     }
     
-    // 3. Force refresh totals safely (orders will ignore this table for 5s)
+    // 3. Force refresh
     await Promise.all([
-      fetchTodayTotals(),
       fetchTables(),
       fetchOrdersAndItems(),
     ]);
-  }, [tableOrders, activeItems, fetchTodayTotals, fetchTables, fetchOrdersAndItems]);
+  }, [fetchTables, fetchOrdersAndItems]);
 
   const addExpense = useCallback(async (amount: number, concept: string, detail: string) => {
     await dbExpenses.insert(amount, concept, detail);
@@ -398,61 +583,205 @@ export function useSupabaseSync() {
   }, [fetchUsers]);
 
   const closeDay = useCallback(async (adminName: string) => {
-    // 1. Create the summary record
-    const { error } = await dbShiftSummaries.insert({
+    try {
+      console.log('Starting shift closure process...');
+      // 1. Calculate handover values exactly as shown in UI
+      const totalEfectivoPesos = todayCashIncome + hotelCashSales;
+      
+      const hotelSalesListRaw = hotelSalesList || [];
+      const dolaresEfectivoOriginal = hotelSalesListRaw
+        .filter((s: any) => s.currency === 'USD' && s.payment_method === 'efectivo')
+        .reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+      const dolaresEfectivoConvertido = dolaresEfectivoOriginal * exchangeRate;
 
-      income: todayIncome,
-      cash_income: todayCashIncome,
-      transfer_income: todayTransferIncome,
-      transfer_tips: todayTransferTips,
-      expenses: todayExpenses,
-      accounts_count: todayAccountsCount,
-      expenses_list: todayExpensesList,
-      closed_by: adminName,
-    });
+      const totalTarjeta = todayCardIncome + hotelCardSales;
+      const propinasTC = todayCardTips;
 
-    if (error) {
-      console.error('Error creating daily summary:', error);
-      return;
+      const handoverCash = (pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000 + todayCashTips;
+      const handoverDollars = dolaresEfectivoConvertido;
+      const handoverCard = totalTarjeta + propinasTC;
+      const handoverTotal = handoverCash + handoverDollars + handoverCard;
+
+      const { error } = await dbShiftSummaries.insert({
+        income: todayIncome,
+        cash_income: todayCashIncome,
+        cash_tips: todayCashTips,
+        debit_income: todayDebitIncome,
+        debit_tips: todayDebitTips,
+        credit_income: todayCreditIncome,
+        credit_tips: todayCreditTips,
+        transfer_income: todayTransferIncome,
+        transfer_tips: todayTransferTips,
+        card_income: todayCardIncome,
+        card_tips: todayCardTips,
+        expenses: todayExpenses,
+        accounts_count: todayAccountsCount,
+        expenses_list: todayExpensesList,
+        hotel_income: hotelCardSales + hotelCashSales,
+        hotel_card_income: hotelCardSales,
+        hotel_cash_income: hotelCashSales,
+        closed_by: adminName,
+        // Handover fields
+        handover_cash: handoverCash,
+        handover_dollars: handoverDollars,
+        handover_card: handoverCard,
+        handover_total: handoverTotal,
+        petty_cash_at_close: pettyCashInitial,
+      });
+
+      if (error) {
+        console.error('Error creating daily summary:', error);
+        throw error;
+      }
+
+      // 2. Refresh lists one last time before archiving to be absolutely sure
+      const { data: latestOrders } = await dbOrders.getTodayClosedOrders();
+      const { data: latestExpenses } = await dbExpenses.getToday();
+      const { data: latestHotel } = await supabase.from('hotel_sales').select('*').eq('status', 'closed');
+
+      const orderIds = (latestOrders || []).map(o => o.id);
+      const expenseIds = (latestExpenses || []).map(e => e.id);
+      const hotelSaleIds = (latestHotel || []).map(h => h.id);
+
+      console.log('Archiving turn items:', { orders: orderIds.length, expenses: expenseIds.length, hotel: hotelSaleIds.length });
+
+      const archivingTasks = [];
+      if (orderIds.length > 0) archivingTasks.push(dbOrders.archiveOrders(orderIds));
+      if (expenseIds.length > 0) archivingTasks.push(dbExpenses.archiveExpenses(expenseIds));
+      if (hotelSaleIds.length > 0) archivingTasks.push(dbHotelSales.archiveSales(hotelSaleIds));
+
+      // 2.5 Clear printed tickets
+      const { data: latestTickets } = await dbPrintedTickets.getToday();
+      const ticketIds = (latestTickets || []).map(t => t.id);
+      if (ticketIds.length > 0) {
+        archivingTasks.push(supabase.from('printed_tickets').delete().in('id', ticketIds));
+      }
+
+      if (archivingTasks.length > 0) {
+        const results = await Promise.allSettled(archivingTasks);
+        results.forEach((res, i) => {
+          if (res.status === 'rejected') console.error(`Archiving/Deletion task ${i} failed:`, res.reason);
+        });
+      }
+
+      // 3. Force Reset local states immediately for snappy UI
+      setTodayIncome(0);
+      setTodayCashIncome(0);
+      setTodayCashTips(0);
+      setTodayTransferIncome(0);
+      setTodayTransferTips(0);
+      setTodayDebitIncome(0);
+      setTodayDebitTips(0);
+      setTodayCreditIncome(0);
+      setTodayCreditTips(0);
+      setTodayCardIncome(0);
+      setTodayCardTips(0);
+      setTodayTotalTips(0);
+      setTodayAccountsCount(0);
+      setTodayExpenses(0);
+      setTodayExpensesList([]);
+      setTodayClosedOrders([]);
+      setPendingTickets([]);
+      setHotelCardSales(0);
+      setHotelCashSales(0);
+      setHotelSalesList([]);
+      // 4. Deactivate all "Pedidos para llevar" tables
+      const deliveryTables = tables.filter(t => t.category === 'Pedidos para llevar');
+      if (deliveryTables.length > 0) {
+        const deliveryIds = deliveryTables.map(t => t.id);
+        await supabase.from('tables').update({ is_active: false }).in('id', deliveryIds);
+      }
+
+      // 5. Final confirmation refresh
+      console.log('Shift closed successfully. Resetting totals...');
+      await Promise.all([
+        fetchDailySummaries(),
+        fetchTodayTotals(),
+        fetchTables()
+      ]);
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Critical error during shift closure:', err);
+      return { success: false, error: err };
     }
-
-    // 2. Archive orders and expenses from the turn
-    const orderIds = todayClosedOrders.map(o => o.id);
-    const expenseIds = todayExpensesList.map(e => e.id);
-
-    if (orderIds.length > 0) await dbOrders.archiveOrders(orderIds);
-    if (expenseIds.length > 0) await dbExpenses.archiveExpenses(expenseIds);
-
-    // 3. Refresh everything
-    await fetchDailySummaries();
-    await fetchTodayTotals();
   }, [
-    todayIncome, todayCashIncome, todayTransferIncome, todayTransferTips,
-    todayExpenses, todayAccountsCount, todayExpensesList, todayClosedOrders,
+    todayIncome, todayCashIncome, todayCashTips,
+    todayDebitIncome, todayDebitTips,
+    todayCreditIncome, todayCreditTips,
+    todayTransferIncome, todayTransferTips,
+    todayCardIncome, todayCardTips,
+    todayExpenses, todayAccountsCount, todayExpensesList, todayClosedOrders, hotelSalesList,
+    hotelCardSales, hotelCashSales,
     fetchDailySummaries, fetchTodayTotals
   ]);
+
+
 
   const deleteShiftSummary = useCallback(async (id: string) => {
     setDailySummaries(prev => prev.filter((s: any) => s.id !== id));
     await dbShiftSummaries.delete(id);
   }, []);
 
-  const createOrderForTable = useCallback(async (tableId: number) => {
+  const createOrderForTable = useCallback(async (tableId: number, customerName?: string) => {
     if (!tableOrders[tableId]) {
-      const { data } = await dbOrders.create(tableId);
+      const { data } = await dbOrders.create(tableId, customerName);
       if (data) {
         setTableOrders(prev => ({ ...prev, [tableId]: data }));
       }
     }
   }, [tableOrders]);
 
+  const createDeliveryOrder = useCallback(async (customerName: string) => {
+    // 1. Create a dynamic table for the delivery
+    const { data: table, error: tErr } = await dbTables.insertDynamic(customerName, 'Pedidos para llevar');
+    if (tErr || !table) {
+      console.error('Error creating delivery table:', tErr);
+      return;
+    }
+
+    // 2. Refresh tables and create order
+    await fetchTables();
+    await createOrderForTable(table.id, customerName);
+    return table.id;
+  }, [fetchTables, createOrderForTable]);
+
   const logPrintedTicket = useCallback(async (tableId: number, printedBy: string, total: number, itemsSummary: string) => {
     await dbPrintedTickets.insert(tableId, printedBy, total, itemsSummary);
-  }, []);
+    await fetchTodayTickets();
+  }, [fetchTodayTickets]);
 
   const markTicketPrinted = useCallback(async (id: number) => {
     await dbPrintedTickets.markPrinted(id);
-  }, []);
+    await fetchTodayTickets();
+  }, [fetchTodayTickets]);
+  const deleteTicket = useCallback(async (id: number) => {
+    await dbPrintedTickets.delete(id);
+    await fetchTodayTickets();
+  }, [fetchTodayTickets]);
+
+  const addHotelSale = async (amount: number, currency: string, paymentMethod: string) => {
+    const { error } = await supabase
+      .from('hotel_sales')
+      .insert([{
+        amount,
+        currency,
+        payment_method: paymentMethod,
+        exchange_rate: exchangeRate
+      }]);
+    if (error) console.error('Error adding hotel sale:', error);
+    else fetchTodayTotals();
+  };
+
+  const deleteHotelSale = async (id: string) => {
+    try {
+      const { error } = await supabase.from('hotel_sales').delete().eq('id', id);
+      if (error) throw error;
+      await fetchTodayTotals();
+    } catch (error) {
+      console.error('Error deleting hotel sale:', error);
+    }
+  };
 
   return {
     // State
@@ -463,16 +792,31 @@ export function useSupabaseSync() {
     users,
     todayIncome,
     todayCashIncome,
+    todayCashTips,
     todayTransferIncome,
     todayTransferTips,
+    todayDebitIncome,
+    todayDebitTips,
+    todayCreditIncome,
+    todayCreditTips,
+    todayCardIncome,
+    todayCardTips,
+    todayTotalTips,
     todayAccountsCount,
     todayExpenses,
     todayExpensesList,
     todayClosedOrders,
+    pettyCashInitial,
+    hotelCardSales,
+    hotelCashSales,
+    hotelSalesList,
     dailySummaries,
-    pendingTickets,
     isLoading,
-    // Operations
+    exchangeRate,
+    pendingTickets,
+    registrations,
+
+    // Actions
     createOrderForTable,
     addItemToOrder,
     removeItem,
@@ -480,6 +824,7 @@ export function useSupabaseSync() {
     updateItemNotes,
     checkoutTable,
     confirmPayment,
+    cancelTable,
     addExpense,
     toggleMenuItem,
     toggleMenuVariant,
@@ -499,5 +844,11 @@ export function useSupabaseSync() {
     deleteShiftSummary,
     logPrintedTicket,
     markTicketPrinted,
+    deleteTicket,
+    addHotelSale,
+    deleteHotelSale,
+    fetchTodayTotals,
+    createDeliveryOrder,
+    fetchRegistrations
   };
 }

@@ -3,14 +3,18 @@ import { supabase } from './supabase';
 // ─── Types ───────────────────────────────────────────────
 export type TableRow = {
   id: number;
+  name: string;
+  category: string;
   status: 'free' | 'occupied' | 'paying';
   capacity: number;
   notes: string | null;
+  is_active: boolean;
 };
 
 export type OrderRow = {
   id: string;
   table_id: number;
+  customer_name?: string;
   status: 'open' | 'paying' | 'closed' | 'cancelled' | 'archived';
   payment_method: string | null;
   total: number;
@@ -64,11 +68,15 @@ export type UserRow = {
 // ─── Queries ─────────────────────────────────────────────
 
 export const dbTables = {
-  getAll: () => supabase.from('tables').select('*').order('id'),
+  getAll: () => supabase.from('tables').select('*').eq('is_active', true).order('category').order('id'),
   updateStatus: (id: number, status: TableRow['status']) =>
     supabase.from('tables').update({ status }).eq('id', id),
-  insert: (id: number) =>
-    supabase.from('tables').insert({ id, status: 'free', capacity: 4 }),
+  insert: (id: number, name: string, category: string) =>
+    supabase.from('tables').insert({ id, name, category, status: 'free', capacity: 4, is_active: true }),
+  insertDynamic: (name: string, category: string) =>
+    supabase.from('tables').insert({ name, category, status: 'occupied', capacity: 1, is_active: true }).select().single(),
+  deactivate: (id: number) =>
+    supabase.from('tables').update({ is_active: false }).eq('id', id),
   delete: (id: number) =>
     supabase.from('tables').delete().eq('id', id),
 };
@@ -78,8 +86,8 @@ export const dbOrders = {
     supabase.from('orders').select('*').in('status', ['open', 'paying']),
   getForTable: (tableId: number) =>
     supabase.from('orders').select('*').eq('table_id', tableId).in('status', ['open', 'paying']).maybeSingle(),
-  create: (tableId: number) =>
-    supabase.from('orders').insert({ table_id: tableId, status: 'open' }).select().single(),
+  create: (tableId: number, customerName?: string) =>
+    supabase.from('orders').insert({ table_id: tableId, customer_name: customerName, status: 'open' }).select().single(),
   updateStatus: (id: string, status: OrderRow['status'], params?: {
     payment_method?: string;
     total?: number;
@@ -94,21 +102,20 @@ export const dbOrders = {
       ...(params?.tip !== undefined ? { tip: params.tip } : {}),
       ...(status === 'closed' ? { closed_at: new Date().toISOString() } : {}),
     }).eq('id', id),
+  getMexicoToday: () => {
+    return new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Mazatlan'}).format(new Date());
+  },
   getTodayIncome: () => {
-    const today = new Date().toISOString().split('T')[0];
     return supabase
       .from('orders')
       .select('total, tip')
-      .eq('status', 'closed') // ONLY actively closed orders from this turn
-      .gte('closed_at', today + 'T00:00:00');
+      .eq('status', 'closed'); // All closed orders that haven't been archived yet
   },
   getTodayClosedOrders: () => {
-    const today = new Date().toISOString().split('T')[0];
     return supabase
       .from('orders')
       .select('*')
       .eq('status', 'closed')
-      .gte('closed_at', today + 'T00:00:00')
       .order('closed_at', { ascending: false });
   },
   archiveOrders: (ids: string[]) =>
@@ -126,6 +133,11 @@ export const dbOrders = {
       items_summary: params.items_summary,
       ...(params.tip !== undefined ? { tip: params.tip } : {}),
       closed_at: new Date().toISOString()
+    }).eq('table_id', tableId).in('status', ['open', 'paying']),
+  cancelAllActiveForTable: (tableId: number) =>
+    supabase.from('orders').update({
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
     }).eq('table_id', tableId).in('status', ['open', 'paying']),
 };
 
@@ -220,14 +232,13 @@ export const dbUsers = {
 
 export const dbExpenses = {
   insert: (amount: number, concept: string, detail: string) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Mazatlan'}).format(new Date());
     return supabase.from('expenses').insert({ amount, concept, detail: detail || null, expense_date: today, status: 'active' });
   },
   getToday: () => {
-    const today = new Date().toISOString().split('T')[0];
-    return supabase.from('expenses').select('*').eq('expense_date', today).eq('status', 'active');
+    return supabase.from('expenses').select('*').eq('status', 'active');
   },
-  archiveExpenses: (ids: number[]) =>
+  archiveExpenses: (ids: string[]) =>
     supabase.from('expenses').update({ status: 'archived' }).in('id', ids),
 };
 
@@ -236,13 +247,26 @@ export const dbShiftSummaries = {
   insert: (summary: {
     income: number;
     cash_income: number;
+    cash_tips: number;
+    debit_income: number;
+    debit_tips: number;
+    credit_income: number;
+    credit_tips: number;
     transfer_income: number;
     transfer_tips: number;
+    card_income: number;
+    card_tips: number;
     expenses: number;
     accounts_count: number;
     expenses_list: any[];
+    hotel_income: number;
+    hotel_card_income: number;
+    hotel_cash_income: number;
     closed_by: string;
+    [key: string]: any;
   }) => supabase.from('shift_summaries').insert(summary).select().single(),
+
+
   getFiltered: ({ start, end }: { start?: string, end?: string }) => {
     let query = supabase.from('shift_summaries').select('*').order('created_at', { ascending: false });
     if (start) query = query.gte('created_at', start);
@@ -260,8 +284,18 @@ export const dbPrintedTickets = {
       total,
       items_summary: itemsSummary
     }).select().single(),
-  getPending: () => 
-    supabase.from('printed_tickets').select('*').eq('status', 'pending').order('created_at', { ascending: true }),
+  getToday: () => {
+    return supabase.from('printed_tickets')
+      .select('*')
+      .order('created_at', { ascending: true });
+  },
   markPrinted: (id: number) => 
-    supabase.from('printed_tickets').update({ status: 'printed' }).eq('id', id)
+    supabase.from('printed_tickets').update({ status: 'printed' }).eq('id', id),
+  delete: (id: number) =>
+    supabase.from('printed_tickets').delete().eq('id', id)
+};
+
+export const dbHotelSales = {
+  archiveSales: (ids: string[]) =>
+    supabase.from('hotel_sales').update({ status: 'archived' }).in('id', ids),
 };

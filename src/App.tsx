@@ -2,36 +2,305 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutGrid, ClipboardCheck, Settings, ChevronLeft, Users, Check, X,
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
-  LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Search, StickyNote,
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock, Printer
+  LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
+  UserMinus, ExternalLink, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import './index.css';
-import { CATEGORIES } from './data/menu';
+import { CATEGORIES, CATEGORY_MAPPING } from './data/menu';
 import type { MenuItem, MenuVariant } from './data/menu';
 import { supabase } from './lib/supabase';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
 import type { UserRow } from './lib/supabaseService';
+import { getUpcomingCheckins, updateReservationStatus } from './lib/hostawayService';
+import type { Reservation } from './lib/hostawayService';
+
+const COUNTRIES_BY_CONTINENT = {
+  "América": [
+    "México", "Estados Unidos", "Canadá", "Argentina", "Belice", "Bolivia", "Brasil", "Chile", "Colombia", "Costa Rica", "Cuba", 
+    "Ecuador", "El Salvador", "Guatemala", "Haití", "Honduras", "Jamaica", "Nicaragua", "Panamá", "Paraguay", "Perú", 
+    "Puerto Rico", "República Dominicana", "Uruguay", "Venezuela"
+  ].sort(),
+  "Europa": [
+    "Alemania", "Andorra", "Austria", "Bélgica", "Bulgaria", "Chipre", "Croacia", "Dinamarca", "Eslovaquia", "Eslovenia", 
+    "España", "Estonia", "Finlandia", "Francia", "Grecia", "Hungría", "Irlanda", "Islandia", "Italia", "Letonia", 
+    "Liechtenstein", "Lituania", "Luxemburgo", "Malta", "Moldavia", "Mónaco", "Montenegro", "Noruega", "Países Bajos", 
+    "Polonia", "Portugal", "Reino Unido", "República Checa", "Rumanía", "Rusia", "Serbia", "Suecia", "Suiza", "Ucrania"
+  ].sort(),
+  "Asia": [
+    "Arabia Saudita", "Baréin", "Catar", "China", "Corea del Sur", "Emiratos Árabes Unidos", "Filipinas", "India", "Indonesia", 
+    "Irak", "Irán", "Israel", "Japón", "Jordania", "Kuwait", "Líbano", "Malasia", "Pakistán", "Singapur", "Tailandia", "Taiwán", 
+    "Turquía", "Vietnam"
+  ].sort(),
+  "Oceanía": [
+    "Australia", "Fiyi", "Nueva Zelanda", "Samoa"
+  ].sort(),
+  "África": [
+    "Egipto", "Marruecos", "Nigeria", "Sudáfrica", "Túnez"
+  ].sort()
+};
+
+const COUNTRY_CODES = [
+  { code: '+52', iso: 'MX', label: '+52 MX', name: 'México' },
+  { code: '+1', iso: 'US', label: '+1 US', name: 'Estados Unidos' },
+  { code: '+34', iso: 'ES', label: '+34 ES', name: 'España' },
+  { code: '+54', iso: 'AR', label: '+54 AR', name: 'Argentina' },
+  { code: '+57', iso: 'CO', label: '+57 CO', name: 'Colombia' },
+  { code: '+56', iso: 'CL', label: '+56 CL', name: 'Chile' },
+  { code: '+51', iso: 'PE', label: '+51 PE', name: 'Perú' },
+  { code: '+55', iso: 'BR', label: '+55 BR', name: 'Brasil' },
+  { code: '+44', iso: 'GB', label: '+44 GB', name: 'Reino Unido' },
+  { code: '+33', iso: 'FR', label: '+33 FR', name: 'Francia' },
+  { code: '+49', iso: 'DE', label: '+49 DE', name: 'Alemania' },
+  { code: '+39', iso: 'IT', label: '+39 IT', name: 'Italia' },
+  { code: '+506', iso: 'CR', label: '+506 CR', name: 'Costa Rica' },
+  { code: '+507', iso: 'PA', label: '+507 PA', name: 'Panamá' },
+  { code: '+593', iso: 'EC', label: '+593 EC', name: 'Ecuador' },
+  { code: '+502', iso: 'GT', label: '+502 GT', name: 'Guatemala' },
+  { code: '+504', iso: 'HN', label: '+504 HN', name: 'Honduras' },
+  { code: '+503', iso: 'SV', label: '+503 SV', name: 'El Salvador' },
+  { code: '+505', iso: 'NI', label: '+505 NI', name: 'Nicaragua' },
+  { code: '+598', iso: 'UY', label: '+598 UY', name: 'Uruguay' },
+  { code: '+595', iso: 'PY', label: '+595 PY', name: 'Paraguay' },
+].sort((a, b) => a.label.localeCompare(b.label));
+
+const getFlagEmoji = (phone: string) => {
+  if (!phone) return '🏳️';
+  const cleanPhone = phone.toLowerCase();
+  const match = COUNTRY_CODES.find(c => 
+    cleanPhone.startsWith(c.code) || 
+    cleanPhone.startsWith(c.iso.toLowerCase()) ||
+    cleanPhone.includes(c.code)
+  );
+  return match ? match.label.split(' ')[0] : '🏳️';
+};
+
+const ISO_TO_NAME: Record<string, string> = {
+  "US": "Estados Unidos", "MX": "México", "CA": "Canadá", "ES": "España", "CO": "Colombia", "AR": "Argentina",
+  "CL": "Chile", "PE": "Perú", "GB": "Reino Unido", "FR": "Francia", "DE": "Alemania", "IT": "Italia",
+  "BR": "Brasil", "UY": "Uruguay", "CR": "Costa Rica", "PA": "Panamá", "EC": "Ecuador", "GT": "Guatemala",
+  "HN": "Honduras", "SV": "El Salvador", "NI": "Nicaragua", "PY": "Paraguay"
+};
+
+const normalizeText = (text: string) => 
+  text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const findCountryWithFlag = (name: string) => {
+  if (!name) return "";
+  const cleanName = name.trim().toUpperCase();
+  const nameFromISO = ISO_TO_NAME[cleanName] || name;
+  const searchName = normalizeText(nameFromISO);
+
+  for (const countries of Object.values(COUNTRIES_BY_CONTINENT)) {
+    const match = countries.find(c => {
+      const countryName = normalizeText(c);
+      return countryName.includes(searchName) || searchName.includes(countryName);
+    });
+    if (match) return match;
+  }
+  return name;
+};
+
+// ─── Sub-components ──────────────────────────────────────
+function HistoryReportCard({ report, formatCurrency, onDelete }: { report: any, formatCurrency: any, onDelete: any }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Fix JSON string in closed_by if it happens to be one
+  let adminName = 'Sistema';
+  if (report.closed_by) {
+    if (report.closed_by.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(report.closed_by);
+        adminName = parsed.created_by || parsed.name || 'Admin';
+      } catch {
+        adminName = report.closed_by;
+      }
+    } else {
+      adminName = report.closed_by;
+    }
+  }
+
+  const totalIncome = Number(report.income || 0);
+  const totalTips = (
+    Number(report.cash_tips || 0) + 
+    Number(report.card_tips || 0) + 
+    Number(report.transfer_tips || 0) + 
+    Number(report.debit_tips || 0) + 
+    Number(report.credit_tips || 0)
+  );
+  const hotelIncome = Number(report.hotel_income || 0);
+  const totalExpenses = Number(report.expenses || 0);
+  const netBalance = totalIncome + hotelIncome + totalTips - totalExpenses;
+  const grandTotalSales = totalIncome + hotelIncome + totalTips;
+
+  // New handover fields (fallbacks for old reports)
+  const hCash = report.handover_cash ?? (Number(report.cash_income || 0) + Number(report.cash_tips || 0) - totalExpenses);
+  const hDollars = report.handover_dollars ?? 0;
+  const hCard = report.handover_card ?? (Number(report.card_income || 0) + Number(report.card_tips || 0) + Number(report.debit_tips || 0) + Number(report.credit_tips || 0));
+  const hTotal = report.handover_total ?? (hCash + hDollars + hCard);
+
+  return (
+    <div className={`report-card-premium ${expanded ? 'expanded' : ''}`}>
+      <div className="rpc-main" onClick={() => setExpanded(!expanded)}>
+        <div className="rpc-info">
+          <div className="rpc-date-wrap">
+            <Calendar size={20} style={{ color: '#94a3b8' }} />
+            <span>{new Date(report.created_at).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            <span className="rpc-time">{new Date(report.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="rpc-user-tag">
+            <User size={12} />
+            ADMIN: {adminName}
+          </div>
+        </div>
+        
+        <div className="rpc-metrics-summary">
+          <div className="rpc-m-item">
+            <span className="rpc-m-label">Ventas Totales</span>
+            <span className="rpc-m-val">{formatCurrency(grandTotalSales)}</span>
+          </div>
+          <div className="rpc-m-item">
+            <span className="rpc-m-label">Balance Neto</span>
+            <span className="rpc-m-val net">{formatCurrency(netBalance)}</span>
+          </div>
+          <ChevronDown className={`rpc-chevron ${expanded ? 'rotated' : ''}`} size={24} />
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="rpc-details fade-in">
+          <div className="rpc-section">
+            <h5><LayoutGrid size={14} /> UNIDADES DE NEGOCIO</h5>
+            <div className="rpc-grid-premium">
+              <div className="rpc-metric-card">
+                <span className="rpc-metric-label">Restaurante</span>
+                <span className="rpc-metric-value">{formatCurrency(totalIncome)}</span>
+              </div>
+              <div className="rpc-metric-card">
+                <span className="rpc-metric-label">Hotel</span>
+                <span className="rpc-metric-value">{formatCurrency(hotelIncome)}</span>
+              </div>
+              <div className="rpc-metric-card highlight">
+                <span className="rpc-metric-label">Total Ingresos</span>
+                <span className="rpc-metric-value">{formatCurrency(totalIncome + hotelIncome)}</span>
+              </div>
+              <div className="rpc-metric-card">
+                <span className="rpc-metric-label">Total Propinas</span>
+                <span className="rpc-metric-value" style={{ color: '#10b981' }}>{formatCurrency(totalTips)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rpc-section">
+            <h5><Wallet size={14} /> MÉTODOS DE PAGO</h5>
+            <div className="rpc-methods-grid">
+               <div className="rpc-method-row">
+                 <div className="rpc-method-info">
+                   <div style={{ background: '#fef3c7', padding: 8, borderRadius: 10, display: 'flex', color: '#d97706' }}><Wallet size={16} /></div>
+                   <span>Efectivo</span>
+                 </div>
+                 <div className="rpc-method-amounts">
+                   <span className="base">{formatCurrency(report.cash_income || 0)}</span>
+                   <span className="tip">+{formatCurrency(report.cash_tips || 0)}</span>
+                 </div>
+               </div>
+               <div className="rpc-method-row">
+                  <div className="rpc-method-info">
+                    <div style={{ background: '#e0e7ff', padding: 8, borderRadius: 10, display: 'flex', color: '#4f46e5' }}><Printer size={16} /></div>
+                    <span>Tarjetas / TC</span>
+                  </div>
+                  <div className="rpc-method-amounts">
+                    <span className="base" style={{ color: '#0f172a' }}>{formatCurrency((report.card_income || 0) + (report.card_tips || 0) + (report.debit_tips || 0) + (report.credit_tips || 0))}</span>
+                  </div>
+                </div>
+                <div className="rpc-method-row">
+                  <div className="rpc-method-info">
+                    <div style={{ background: '#f1f5f9', padding: 8, borderRadius: 10, display: 'flex', color: '#64748b' }}><Building size={16} /></div>
+                    <span>Transferencia</span>
+                  </div>
+                  <div className="rpc-method-amounts">
+                    <span className="base" style={{ color: '#0f172a' }}>{formatCurrency((report.transfer_income || 0) + (report.transfer_tips || 0))}</span>
+                  </div>
+                </div>
+            </div>
+          </div>
+
+          <div className="rpc-section">
+            <h5><Check size={14} /> RESUMEN DE ENTREGA FINAL</h5>
+            <div className="rpc-handover-panel">
+              <div className="rpc-h-item">
+                <span className="rpc-h-label">Efectivo a Entregar</span>
+                <span className="rpc-h-val">{formatCurrency(hCash)}</span>
+              </div>
+              <div className="rpc-h-item">
+                <span className="rpc-h-label">Dólares (Convertidos)</span>
+                <span className="rpc-h-val">{formatCurrency(hDollars)}</span>
+              </div>
+              <div className="rpc-h-item">
+                <span className="rpc-h-label">Tarjetas (TC)</span>
+                <span className="rpc-h-val">{formatCurrency(hCard)}</span>
+              </div>
+              <div className="rpc-h-item" style={{ textAlign: 'right' }}>
+                <span className="rpc-h-label">ENTREGA TOTAL</span>
+                <span className="rpc-h-val total">{formatCurrency(hTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          {report.expenses_list?.length > 0 && (
+            <div className="rpc-section">
+              <h5><TrendingDown size={14} /> GASTOS REGISTRADOS</h5>
+              <div className="rpc-expenses-list">
+                {report.expenses_list.map((exp: any, i: number) => (
+                  <div key={i} className="rpc-expense-row">
+                    <span>{exp.concept} {exp.detail ? `(${exp.detail})` : ''}</span>
+                    <span className="exp-amt">-{formatCurrency(exp.amount)}</span>
+                  </div>
+                ))}
+                <div className="rpc-expense-total">
+                  <span>Total Deducciones</span>
+                  <span>-{formatCurrency(totalExpenses)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="rpc-actions" style={{ borderTop: '1px solid #f1f5f9', paddingTop: 20 }}>
+            <button className="rpc-delete-btn" onClick={() => onDelete(report.id)}>
+              <Trash2 size={14} /> Eliminar Reporte de Historial
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── App ─────────────────────────────────────────────────
 export default function App() {
   // Supabase sync
   const {
     tables, tableOrders, activeItems, menuItems, users,
-    todayIncome, todayCashIncome, todayTransferIncome, todayTransferTips, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, dailySummaries, isLoading,
+    todayIncome, todayCashIncome, todayCashTips, todayTransferIncome, todayTransferTips,
+    todayDebitIncome, todayDebitTips, todayCreditIncome, todayCreditTips,
+    todayCardIncome, todayCardTips, todayTotalTips, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, pettyCashInitial, hotelCardSales, hotelCashSales, hotelSalesList, dailySummaries, isLoading,
     createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes,
-    checkoutTable, confirmPayment, addExpense,
+    checkoutTable, confirmPayment, cancelTable, addExpense,
     toggleMenuItem, toggleMenuVariant,
     updateMenuItem, updateMenuVariant, updateCategory,
     addCategory, addMenuItem, addMenuVariant,
     addTable, deleteTable,
     addUser, deleteUser, updateUser, closeSession,
     closeDay, deleteShiftSummary, logPrintedTicket,
-    pendingTickets, markTicketPrinted,
+    addHotelSale, deleteHotelSale, exchangeRate,
+    pendingTickets, markTicketPrinted, deleteTicket, fetchTodayTotals,
+    createDeliveryOrder, registrations, fetchRegistrations
   } = useSupabaseSync();
 
+
   // UI state
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>(() => {
-    try { const s = localStorage.getItem('mora_session'); return s ? JSON.parse(s) : null; } catch { return null; }
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>({
+    id: 'default-admin', name: 'Administrador', role: 'Administrador'
   });
 
   const [loginName, setLoginName] = useState('');
@@ -40,9 +309,62 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
+
+  const [upcomingCheckins, setUpcomingCheckins] = useState<Reservation[]>([]);
+  const [isLoadingCheckins, setIsLoadingCheckins] = useState(false);
+  const [checkinsError, setCheckinsError] = useState('');
+  const [isProximosExpanded, setIsProximosExpanded] = useState(false);
+  const [isEnCasaExpanded, setIsEnCasaExpanded] = useState(true);
+  const [showCheckinModal, setShowCheckinModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+
+  // Estados para Nueva Reserva
+  const [showNewResModal, setShowNewResModal] = useState(false);
+  const [newResForm, setNewResForm] = useState({
+    guestFirstName: '',
+    guestLastName: '',
+    guestPhone: '',
+    guestEmail: '',
+    guestNationality: '',
+    guestCity: '',
+    arrivalDate: '',
+    departureDate: '',
+    listingId: '',
+    customPrice: '',
+    priceCurrency: 'USD',
+    useCustomPrice: false,
+    adults: 1,
+    children: 0
+  });
+  const [availableListings, setAvailableListings] = useState<any[]>([]);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [isCreatingRes, setIsCreatingRes] = useState(false);
+
+  const [checkinForm, setCheckinForm] = useState({
+    name: '', nationality: '', homeAddress: '', phone: '', city: '', country: '', email: '',
+    roomName: '', arrivalDate: '', departureDate: '', nights: 0, pax: 1, price: 0, currency: 'USD', paymentStatus: 'Por Pagar', source: '', signature: ''
+  });
+
+  // Efecto para sincronizar País/Nacionalidad con el código de área del teléfono
+  useEffect(() => {
+    if (checkinForm.phone && showCheckinModal) {
+      const normalizedPhone = checkinForm.phone.toLowerCase().replace(/\s/g, '');
+      const currentPrefix = COUNTRY_CODES.find(c => 
+        normalizedPhone.startsWith(c.code.toLowerCase()) || 
+        normalizedPhone.startsWith(c.iso.toLowerCase())
+      );
+      
+      if (currentPrefix) {
+        const countryWithFlag = findCountryWithFlag(currentPrefix.name);
+        if (countryWithFlag && (!checkinForm.country || checkinForm.country === "" || checkinForm.country === "Seleccionar país...")) {
+          setCheckinForm(prev => ({ ...prev, country: countryWithFlag, nationality: countryWithFlag }));
+        }
+      }
+    }
+  }, [checkinForm.phone, showCheckinModal]);
 
   // === Routing History API Sync ===
   useEffect(() => {
@@ -54,7 +376,7 @@ export default function App() {
         return;
       }
       const parts = hash.split('-');
-      const validViews = ['home', 'salon', 'pedidos', 'impresora', 'admin', 'mesa', 'checkout'];
+      const validViews = ['home', 'salon', 'pedidos', 'impresora', 'admin', 'mesa', 'checkout', 'checkin'];
       if (validViews.includes(parts[0])) {
          setCurrentView(parts[0] as any);
          if (parts[1] && !isNaN(parseInt(parts[1], 10)) && parseInt(parts[1], 10) !== 0) {
@@ -80,6 +402,102 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (currentView === 'checkin') {
+      setIsLoadingCheckins(true);
+      setCheckinsError('');
+      getUpcomingCheckins()
+        .then(data => {
+          // Client-side deduplication for extra safety
+          const uniqueReservations = Array.from(
+            new Map(data.map((res: any) => [res.id, res])).values()
+          );
+          setUpcomingCheckins(uniqueReservations as Reservation[]);
+        })
+        .catch(err => {
+          console.error(err);
+          setCheckinsError(err.message || 'Error al cargar reservas');
+        })
+        .finally(() => {
+          setIsLoadingCheckins(false);
+        });
+    }
+  }, [currentView]);
+
+  // Lógica para Nueva Reserva
+  const fetchAvailableListings = async (arrival: string, departure: string) => {
+    if (!arrival || !departure) return;
+    setIsLoadingAvailability(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('hostaway-proxy', {
+        body: { 
+          action: 'getAvailableListings',
+          params: { arrivalDate: arrival, departureDate: departure }
+        }
+      });
+      if (error) throw error;
+      setAvailableListings(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    if (newResForm.arrivalDate && newResForm.departureDate) {
+      fetchAvailableListings(newResForm.arrivalDate, newResForm.departureDate);
+    }
+  }, [newResForm.arrivalDate, newResForm.departureDate]);
+
+  const handleCreateReservation = async () => {
+    if (!newResForm.listingId) return;
+    setIsCreatingRes(true);
+    try {
+      const selectedListing = availableListings.find(l => String(l.id) === String(newResForm.listingId));
+      if (!selectedListing) throw new Error("Debes seleccionar una habitación.");
+
+      const totalAmount = newResForm.useCustomPrice 
+        ? parseFloat(newResForm.customPrice) 
+        : selectedListing.basePrice;
+
+      const params = {
+        listingMapId: parseInt(newResForm.listingId),
+        arrivalDate: newResForm.arrivalDate,
+        departureDate: newResForm.departureDate,
+        guestName: `${newResForm.guestFirstName} ${newResForm.guestLastName}`.trim(),
+        guestFirstName: newResForm.guestFirstName,
+        guestLastName: newResForm.guestLastName,
+        guestEmail: newResForm.guestEmail,
+        guestCity: newResForm.guestCity,
+        guestCountry: newResForm.guestNationality,
+        phone: newResForm.guestPhone,
+        totalPrice: totalAmount,
+        currency: newResForm.useCustomPrice ? newResForm.priceCurrency : selectedListing.currency,
+        numberOfGuests: 1,
+        adults: 1
+      };
+
+      const { data, error } = await supabase.functions.invoke('hostaway-proxy', {
+        body: { 
+          action: 'createReservation',
+          params
+        }
+      });
+
+      if (error) throw error;
+      
+      alert("Reserva creada con éxito en Hostaway");
+      setShowNewResModal(false);
+      // Recargar checkins
+      getUpcomingCheckins().then(setUpcomingCheckins);
+    } catch (err: any) {
+      alert("Error al crear reserva: " + err.message);
+    } finally {
+      setIsCreatingRes(false);
+    }
+  };
+
+  useEffect(() => {
     let hash = `#${currentView}`;
     if (selectedTableId && (currentView === 'mesa' || currentView === 'checkout')) {
       hash += `-${selectedTableId}`;
@@ -94,11 +512,25 @@ export default function App() {
   const [mesaTab, setMesaTab] = useState<'orden' | 'menu'>('orden');
   const [menuCategory, setMenuCategory] = useState(CATEGORIES[0]);
   const [menuSearch, setMenuSearch] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia'>('efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta'>('tarjeta');
   const [mesasConCuentaActivada, setMesasConCuentaActivada] = useState<Set<number>>(new Set());
 
   // Expense modal
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isHotelModalOpen, setIsHotelModalOpen] = useState(false);
+  const [hotelAmount, setHotelAmount] = useState('');
+  const [hotelCurrency, setHotelCurrency] = useState('MXN');
+  const [hotelPaymentMethod, setHotelPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('tarjeta');
+
+  // Currency Formatter
+  const formatCurrency = (val: number, currency: string = 'MXN') => {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-MX', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: currency === 'USD' ? 2 : 0,
+      maximumFractionDigits: 2
+    }).format(val);
+  };
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseConcept, setExpenseConcept] = useState('Pago a proveedores');
   const [expenseDetail, setExpenseDetail] = useState('');
@@ -153,6 +585,7 @@ export default function App() {
 
   // Edit menu modal
   type EditTarget = { type: 'item'; id: string; name: string; price: number } | { type: 'variant'; id: string; label: string; price: number } | { type: 'category'; id: string; name: string };
+  const [isClosingTurn, setIsClosingTurn] = useState(false);
   const [isCierreModalOpen, setIsCierreModalOpen] = useState(false);
   const [previewTicket, setPreviewTicket] = useState<any>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -183,6 +616,8 @@ export default function App() {
   const [newItemCategory, setNewItemCategory] = useState(''); 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newItemVariants, setNewItemVariants] = useState<{label: string, price: string}[]>([]);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [deliveryCustomerName, setDeliveryCustomerName] = useState('');
 
   const handleAddItemModalOpen = () => {
     setIsAddItemModalOpen(true);
@@ -242,12 +677,24 @@ export default function App() {
   // Quick-confirm modal
   type ConfirmPending = { item: MenuItem; variant?: MenuVariant };
   const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null);
+  const [showExtras, setShowExtras] = useState(false);
   const [confirmNotes, setConfirmNotes] = useState('');
+  const [selectedExtras, setSelectedExtras] = useState<Set<string>>(new Set());
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deliveryConfirm, setDeliveryConfirm] = useState<string | null>(null);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+
+  const [expandedSubCats, setExpandedSubCats] = useState<Set<string>>(new Set());
+  const toggleSubCat = (subCat: string) => {
+    setExpandedSubCats(prev => {
+      const next = new Set(prev);
+      if (next.has(subCat)) next.delete(subCat);
+      else next.add(subCat);
+      return next;
+    });
+  };
 
   // Checkout extended states
   const [discountType, setDiscountType] = useState<'none' | 'amount' | 'percentage'>('none');
@@ -351,426 +798,189 @@ export default function App() {
   }, [statsSubView, analyticsFilter, dailySummaries, todayClosedOrders]);
 
   // ── Computed ─────────────────────────────────────────
+  const activeOrder = selectedTableId ? tableOrders[selectedTableId] : null;
+  const orderItems = selectedTableId ? activeItems.filter(i => i.table_id === selectedTableId) : [];
+  const orderTotal = orderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-  const selectedTableItems = useMemo(
-    () => activeItems.filter(i => i.table_id === selectedTableId),
-    [activeItems, selectedTableId]
+  const filteredMenuItems = menuItems.filter(item => 
+    item.active && 
+    (item.category === menuCategory || 
+     (CATEGORY_MAPPING[menuCategory] && CATEGORY_MAPPING[menuCategory].includes(item.category))) &&
+    item.name.toLowerCase().includes(menuSearch.toLowerCase())
   );
 
-  const currentTableTotal = useMemo(
-    () => selectedTableItems.reduce((acc, i) => acc + i.price * i.qty, 0),
-    [selectedTableItems]
-  );
+  // Group filtered items by their sub-category if needed
+  const subCategories = Array.from(new Set(filteredMenuItems.map(m => m.category)));
 
-  const pendingItems = useMemo(
-    () => activeItems.filter(i => i.status === 'pending'),
-    [activeItems]
-  );
-
-  const filteredMenuItems = useMemo(() => {
-    const isVisible = (m: MenuItem) => {
-      if (!m.active) return false;
-      if (m.hasVariants) return (m.variants?.some(v => v.active)) ?? false;
-      return true;
-    };
-    const base = menuItems.filter(m => isVisible(m) && m.category === menuCategory);
-    if (!menuSearch.trim()) return base;
-    return menuItems.filter(m => isVisible(m) && m.name.toLowerCase().includes(menuSearch.toLowerCase()));
-  }, [menuItems, menuCategory, menuSearch]);
-
-  // ── Handlers ─────────────────────────────────────────
-
-  const navTo = (view: 'home' | 'salon' | 'pedidos' | 'impresora' | 'admin') => {
-    setCurrentView(view);
-    setSelectedTableId(null);
-    if (view === 'admin') setAdminSubView('main');
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
-  const openTable = async (id: number) => {
-    const isOccupied = !!tableOrders[id];
-    if (!isOccupied) {
-      // Free table -> Show custom UI prompt
-      setTableConfirmModal({ isOpen: true, type: 'open', tableId: id });
-      return;
-    }
-    // Already occupied -> open directly
-    setSelectedTableId(id);
-    setCurrentView('mesa');
-    setMesaTab('orden');
-    setMenuCategory(CATEGORIES[0]);
-    setMenuSearch('');
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
   };
 
-  const handleConfirmOpenTable = async () => {
-    if (tableConfirmModal.tableId) {
-      await createOrderForTable(tableConfirmModal.tableId);
-      setSelectedTableId(tableConfirmModal.tableId);
-      setCurrentView('mesa');
-      setMesaTab('orden');
-      setMenuCategory(CATEGORIES[0]);
-      setMenuSearch('');
-    }
-    setTableConfirmModal({ isOpen: false, type: 'open', tableId: null });
-  };
-
-  const handleAddItem = (item: MenuItem, variant?: MenuVariant) => {
-    if (!selectedTableId) return;
-    setConfirmNotes('');
-    setConfirmPending({ item, variant });
-  };
-
-  const confirmAddItem = async () => {
-    if (!confirmPending || !selectedTableId) return;
-    await addItemToOrder(selectedTableId, confirmPending.item, confirmPending.variant, confirmNotes.trim() || undefined);
-    setConfirmPending(null);
-    setConfirmNotes('');
-    setMesaTab('orden');
-  };
-
-  const handleProceedToCheckout = async () => {
-    if (!selectedTableId) return;
-
-    const pendingItems = activeItems.filter(i => i.table_id === selectedTableId && i.status === 'pending');
-    if (pendingItems.length > 0) {
-      alert('⚠️ Aún hay platillos pendientes de entrega en esta mesa. Debes entregarlos (tacharlos) para proceder al pago.');
-      return;
-    }
-
-    await checkoutTable(selectedTableId);
-    setDiscountType('none');
-    setDiscountValue('');
-    setDiscountReason('');
-    setCashReceived('');
-    setTipPercent('none');
-    setCustomTip('');
-    setCurrentView('checkout');
-    setPaymentMethod('efectivo');
-  };
-
-  const handleConfirmPayment = async () => {
-    if (!selectedTableId) return;
-    setTableConfirmModal({ isOpen: true, type: 'pay', tableId: selectedTableId });
-  };
-
-  const executePayment = async () => {
-    if (!tableConfirmModal.tableId) return;
-    
-    // Calculate final total again here
-    const items = activeItems.filter(i => i.table_id === tableConfirmModal.tableId);
-    let finalTotal = items.reduce((s, i) => s + (i.price * i.qty), 0);
-    const dVal = parseFloat(discountValue) || 0;
-    if (discountType === 'amount') {
-      finalTotal = Math.max(0, finalTotal - dVal);
-    } else if (discountType === 'percentage') {
-      finalTotal = Math.max(0, finalTotal * (1 - dVal / 100));
-    }
-
-    let tipAmount = 0;
-    if (paymentMethod === 'transferencia') {
-      if (tipPercent === 'Otro') {
-        tipAmount = parseFloat(customTip) || 0;
-      } else if (tipPercent !== 'none') {
-        tipAmount = finalTotal * (parseFloat(tipPercent) / 100);
-      }
-    }
-
-    await confirmPayment(tableConfirmModal.tableId, paymentMethod, finalTotal, tipAmount, discountReason);
-    setTableConfirmModal({ isOpen: false, type: 'pay', tableId: null });
-    navTo('salon');
-  };
-
-  const handleCancelTable = async () => {
-    if (!tableConfirmModal.tableId) return;
-    await confirmPayment(tableConfirmModal.tableId, 'Sin pedidos', 0);
-    setTableConfirmModal({ isOpen: false, type: 'closeEmpty', tableId: null });
-    navTo('salon');
-  };
-
-  const handleExpenseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = parseFloat(expenseAmount);
-    if (!isNaN(amount) && amount > 0) {
-      await addExpense(amount, expenseConcept, expenseDetail);
-      setIsExpenseModalOpen(false);
-      setExpenseAmount(''); setExpenseDetail(''); setExpenseConcept('Pago a proveedores');
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    if (!notesModal) return;
-    await updateItemNotes(notesModal.itemId, notesDraft);
-    setNotesModal(null);
-  };
-
-  const handleAdminAddTable = async () => {
-    const n = prompt('Número de la nueva mesa:');
-    if (!n) return;
-    const id = parseInt(n, 10);
-    if (isNaN(id)) return alert('Número inválido');
-    if (tables.find(t => t.id === id)) return alert('Esa mesa ya existe');
-    await addTable(id);
-  };
-
-  const handleAdminDeleteTable = async (id: number) => {
-    if (confirm(`¿Eliminar Mesa ${id}?`)) await deleteTable(id);
-  };
-
-  const handleAddUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserName.trim()) return;
-    const { error } = await addUser(newUserName.trim(), newUserRole, INITIAL_PASSWORD);
-    if (error) {
-      alert(`Error al crear usuario: ${error.message}`);
-      return;
-    }
-    setIsAddUserModalOpen(false);
-    setNewUserName('');
-    setNewUserRole('Staff');
-  };
-
-  const openEditUser = (user: UserRow) => {
-    setEditingUserId(user.id);
-    setEditUserName(user.name);
-    setEditUserRole(user.role);
-    setIsEditUserModalOpen(true);
-  };
-
-  const handleEditUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUserId || !editUserName.trim()) return;
-    await updateUser(editingUserId, editUserName.trim(), editUserRole);
-    setIsEditUserModalOpen(false);
-  };
-
-  // ── Loading screen ───────────────────────────────────
-
-  // ── Login screen ─────────────────────────────────────
+  // Login handler
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setLoginLoading(true);
-    await new Promise(r => setTimeout(r, 400)); // small UX delay
-    const found = users.find(
-      u => u.name.toLowerCase() === loginName.trim().toLowerCase() && u.password === loginPassword && u.active
-    );
-    setLoginLoading(false);
-    if (!found) {
-      setLoginError('Usuario o contraseña incorrectos');
-      return;
+
+    try {
+      const normalizedInput = loginName.trim().toLowerCase();
+      const user = users.find(u => u.name.toLowerCase() === normalizedInput);
+      
+      if (!user) {
+        setLoginError('Usuario no encontrado');
+        return;
+      }
+
+      if (user.password !== loginPassword) {
+        setLoginError('Contraseña incorrecta');
+        return;
+      }
+
+      // Mark session as active in Supabase
+      await supabase.from('users').update({ session_active: true }).eq('id', user.id);
+      
+      const sessionUser = { id: user.id, name: user.name, role: user.role };
+      localStorage.setItem('mora_session', JSON.stringify(sessionUser));
+      setCurrentUser(sessionUser);
+    } catch (err) {
+      setLoginError('Error de conexión');
+    } finally {
+      setLoginLoading(false);
     }
-    // Mark session active in DB so 'connected users' list updates for everyone
-    await supabase.from('users').update({ session_active: true }).eq('id', found.id);
-    const session = { id: found.id, name: found.name, role: found.role };
-    localStorage.setItem('mora_session', JSON.stringify(session));
-    setCurrentUser(session);
   };
 
-  // Mark session active when restoring from localStorage (page refresh)
+  // Auto-login from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('mora_session');
-    if (stored) {
+    const saved = localStorage.getItem('mora_session');
+    if (saved) {
       try {
-        const s = JSON.parse(stored);
-        supabase.from('users').update({ session_active: true }).eq('id', s.id);
-      } catch {}
-    }
-    // Clean up on tab close
-    const handleUnload = () => {
-      const stored2 = localStorage.getItem('mora_session');
-      if (stored2) {
-        try {
-          const s = JSON.parse(stored2);
-          navigator.sendBeacon(
-            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/users?id=eq.${s.id}`,
-            JSON.stringify({ session_active: false })
-          );
-        } catch {}
+        const user = JSON.parse(saved);
+        // Verify if user still exists and is active
+        const exists = users.find(u => u.id === user.id);
+        if (exists) setCurrentUser(user);
+        else localStorage.removeItem('mora_session');
+      } catch {
+        localStorage.removeItem('mora_session');
       }
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, []);
+    }
+  }, [users]);
 
-
-  if (isLoading) {
-    return (
-      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, color: '#64748b' }}>
-        <div className="loading-spinner" />
-        <div style={{ fontSize: 15, fontWeight: 600 }}>Conectando con el servidor…</div>
-        <div style={{ fontSize: 13 }}>Sincronizando datos en tiempo real</div>
-      </div>
-    );
-  }
-
-  // ── Login screen ─────────────────────────────────────
-  if (!currentUser) {
-    return (
-      <div className="app-container login-screen">
-        <div className="login-logo">🍴</div>
-        <h1 className="login-title">Gallo Azul</h1>
-        <p className="login-subtitle">Sistema de punto de venta</p>
-        <form className="login-form" onSubmit={handleLogin} autoComplete="on">
-          <div className="form-group">
-            <label htmlFor="login-username">Nombre de usuario</label>
-            <input
-              id="login-username"
-              name="username"
-              type="text"
-              placeholder="Ej. María López"
-              value={loginName}
-              onChange={e => setLoginName(e.target.value)}
-              autoComplete="username"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="login-password">Contraseña</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                id="login-password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••"
-                value={loginPassword}
-                onChange={e => setLoginPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                style={{ paddingRight: 48 }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(p => !p)}
-                style={{
-                  position: 'absolute', right: 14, top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'rgba(255,255,255,0.5)', padding: 4,
-                  display: 'flex', alignItems: 'center',
-                }}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-          {loginError && <div className="login-error">{loginError}</div>}
-          <button className="btn-primary" type="submit" disabled={loginLoading}>
-            {loginLoading ? 'Verificando…' : 'Ingresar'}
-          </button>
-        </form>
-        <div className="login-hint">Contraseña inicial: <strong>LaMora.2026</strong></div>
-        {deferredPrompt && (
-          <button className="btn-primary" type="button" onClick={handleInstallPWA} style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', border: 'none' }}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            Instalar App
-          </button>
-        )}
-        {!deferredPrompt && showIosButton && (
-          <button className="btn-primary" type="button" onClick={() => setIsIosPromptVisible(true)} style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', border: 'none' }}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            Instalar en iPhone / iPad
-          </button>
-        )}
-
-        {/* iOS Install Prompt Modal (Login View) */}
-        {isIosPromptVisible && (
-          <div className="modal-overlay" onClick={() => setIsIosPromptVisible(false)} style={{ zIndex: 9999 }}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center', padding: '32px 24px' }}>
-              <div style={{ width: 64, height: 64, background: '#eff6ff', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
-              </div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar Gallo Azul</h3>
-              <p style={{ fontSize: 15, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
-                Para instalar la aplicación en tu iPhone o iPad, pulsa el botón de <strong>Compartir</strong> en la barra inferior (el cuadrado con la flecha hacia arriba) y luego selecciona <strong>"Agregar a inicio"</strong>.
-              </p>
-              <button className="btn-primary" onClick={() => setIsIosPromptVisible(false)}>
-                Entendido
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ── Renders ──────────────────────────────────────────
+  // ── Views ────────────────────────────────────────────
 
   const renderHome = () => {
-    const freeTables = tables.filter(t => !tableOrders[t.id]).length;
-    const activePedidos = pendingItems.length;
-    const connectedStaff = users.filter(u => u.session_active);
-
-    // Mexico City time
-    const formatter = new Intl.DateTimeFormat('es-MX', {
-      timeZone: 'America/Mexico_City',
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
+    const todayStr = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Mazatlan'}).format(new Date());
+    const isShiftClosed = dailySummaries.some(s => {
+      const d = new Date(s.created_at);
+      const sStr = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Mazatlan'}).format(d);
+      return sStr === todayStr;
     });
-    const timeFormatter = new Intl.DateTimeFormat('es-MX', {
-      timeZone: 'America/Mexico_City',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    const dayFormatter = new Intl.DateTimeFormat('es-MX', {
-      timeZone: 'America/Mexico_City',
-      weekday: 'long',
-    });
-
-    const timeStr = timeFormatter.format(currentTime);
-    const dateStr = formatter.format(currentTime);
-    const dayStr = dayFormatter.format(currentTime);
 
     return (
-      <div className="fade-in">
-        {/* Clock hero card */}
-        <div className="home-clock-card">
-          <div className="home-clock-badge">México · CDT</div>
-          <div className="home-clock-day">{dayStr}</div>
-          <div className="home-clock-date">{dateStr.replace(dayStr, '').trim().replace(/^,\s*/, '')}</div>
-          <div className="home-clock-time">{timeStr}</div>
-        </div>
-
-        {/* Stat cards */}
-        <div className="home-stats-grid">
-          <div className="home-stat-card tables">
-            <div className="home-stat-icon">🪑</div>
-            <div className="home-stat-value">{freeTables}</div>
-            <div className="home-stat-label">Mesas disponibles</div>
+      <div className="home-view fade-in">
+        <div className="home-hero">
+          <div className="hero-content">
+            <h1 className="hero-title">¡Hola, {currentUser?.name.split(' ')[0]}!</h1>
+            <p className="hero-subtitle">{formatDate(currentTime)}</p>
           </div>
-          <div className="home-stat-card orders">
-            <div className="home-stat-icon">🛎️</div>
-            <div className="home-stat-value">{activePedidos}</div>
-            <div className="home-stat-label">Pedidos activos</div>
+          <div className="hero-time-card">
+            <Clock size={16} />
+            <span>{formatTime(currentTime)}</span>
           </div>
         </div>
 
-        {/* Connected staff */}
-        <div className="home-staff-card">
-          <div className="home-staff-header">
-            <span className="home-staff-title">Staff activo</span>
-            {connectedStaff.length > 0 && (
-              <span className="home-staff-count">{connectedStaff.length} en línea</span>
-            )}
-          </div>
-          {connectedStaff.length === 0 ? (
-            <div className="home-staff-empty">Ningún usuario conectado aún</div>
-          ) : (
-            <div className="home-staff-list">
-              {connectedStaff.map(u => (
-                <div key={u.id} className="home-staff-item">
-                  <div className="home-staff-avatar">
-                    {u.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="home-staff-name">{u.name}</div>
-                  <span className={`home-staff-role ${u.role === 'Administrador' ? 'admin' : u.role === 'Encargado' ? 'encargado' : 'staff'}`}>
-                    {u.role === 'Administrador' ? 'Admin' : u.role === 'Encargado' ? 'Encdo' : 'Staff'}
-                  </span>
-                  <div className="home-online-dot" />
-                </div>
-              ))}
+        <div className="kpi-grid">
+          <div className="kpi-card premium">
+            <div className="kpi-icon-wrap" style={{ background: '#ecfdf5', color: '#10b981' }}>
+              <TrendingUp size={24} />
             </div>
+            <div className="kpi-info">
+              <span className="kpi-label">Ingresos Hoy</span>
+              <span className="kpi-value">{formatCurrency(todayIncome + hotelCardSales + hotelCashSales)}</span>
+            </div>
+          </div>
+
+          <div className="kpi-card premium">
+            <div className="kpi-icon-wrap" style={{ background: '#fef2f2', color: '#ef4444' }}>
+              <TrendingDown size={24} />
+            </div>
+            <div className="kpi-info">
+              <span className="kpi-label">Gastos</span>
+              <span className="kpi-value">{formatCurrency(todayExpenses)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="action-grid-premium">
+          <button className="action-card-premium" onClick={() => setCurrentView('salon')}>
+            <div className="ac-icon-bg" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}>
+              <LayoutGrid size={28} color="white" />
+            </div>
+            <div className="ac-text">
+              <span className="ac-title">Salón</span>
+              <span className="ac-desc">{tables.filter(t => t.status !== 'free').length} mesas activas</span>
+            </div>
+          </button>
+
+          <button className="action-card-premium" onClick={() => setCurrentView('pedidos')}>
+            <div className="ac-icon-bg" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' }}>
+              <ClipboardCheck size={28} color="white" />
+            </div>
+            <div className="ac-text">
+              <span className="ac-title">Comandera</span>
+              <span className="ac-desc">{activeItems.filter(i => i.status === 'pending').length} pendientes</span>
+            </div>
+          </button>
+
+          <button className="action-card-premium" onClick={() => setCurrentView('checkin')}>
+            <div className="ac-icon-bg" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+              <Building size={28} color="white" />
+            </div>
+            <div className="ac-text">
+              <span className="ac-title">Hotel</span>
+              <span className="ac-desc">Check-in Online</span>
+            </div>
+          </button>
+
+          <button className="action-card-premium" onClick={() => setCurrentView('impresora')}>
+            <div className="ac-icon-bg" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
+              <Printer size={28} color="white" />
+            </div>
+            <div className="ac-text">
+              <span className="ac-title">Caja</span>
+              <span className="ac-desc">{pendingTickets.length} tickets</span>
+            </div>
+          </button>
+        </div>
+
+        <div className="bottom-actions-row">
+           <button className="quick-action-btn" onClick={() => setIsHotelModalOpen(true)}>
+             <Building size={18} />
+             Venta Hotel
+           </button>
+           <button className="quick-action-btn danger" onClick={() => setIsExpenseModalOpen(true)}>
+             <TrendingDown size={18} />
+             Gasto
+           </button>
+        </div>
+
+        <div style={{ padding: '0 24px', marginTop: 12 }}>
+          {isShiftClosed ? (
+            <div className="shift-closed-notice">
+              <CheckCircle2 size={20} />
+              <span>Turno Cerrado Correctamente</span>
+            </div>
+          ) : (
+            <button 
+              className="btn-premium-action" 
+              onClick={() => setIsCierreModalOpen(true)}
+              disabled={isClosingTurn}
+            >
+              {isClosingTurn ? 'Procesando...' : 'Cerrar Turno'}
+            </button>
           )}
         </div>
       </div>
@@ -778,79 +988,126 @@ export default function App() {
   };
 
   const renderSalon = () => {
-    // Derive status from live data
-    const getEffectiveStatus = (tableId: number): 'free' | 'occupied-pending' | 'occupied-done' => {
-      const isOccupied = !!tableOrders[tableId];
-      if (!isOccupied) return 'free';
-      const items = activeItems.filter(i => i.table_id === tableId);
-      const hasPending = items.some(i => i.status === 'pending');
-      return hasPending ? 'occupied-pending' : 'occupied-done';
-    };
-    const occupiedCount = tables.filter(t => getEffectiveStatus(t.id) !== 'free').length;
-    const freeCount = tables.filter(t => getEffectiveStatus(t.id) === 'free').length;
+    // Categorize tables
+    const tableCats = Array.from(new Set(tables.map(t => t.category)));
+    const occupied = tables.filter(t => t.status === 'occupied').length;
+    const paying = tables.filter(t => t.status === 'paying').length;
+    const free = tables.filter(t => t.status === 'free').length;
 
     return (
-      <div className="fade-in">
-        {/* Summary stats */}
+      <div className="salon-view fade-in">
         <div className="salon-summary-bar">
           <div className="salon-stat ocp">
-            <div className="salon-stat-count">{occupiedCount}</div>
-            <div className="salon-stat-label">Ocupadas</div>
+            <span className="salon-stat-count">{occupied}</span>
+            <span className="salon-stat-label">Ocupadas</span>
+          </div>
+          <div className="salon-stat pay">
+            <span className="salon-stat-count">{paying}</span>
+            <span className="salon-stat-label">Pagando</span>
           </div>
           <div className="salon-stat free">
-            <div className="salon-stat-count">{freeCount}</div>
-            <div className="salon-stat-label">Libres</div>
+            <span className="salon-stat-count">{free}</span>
+            <span className="salon-stat-label">Libres</span>
           </div>
         </div>
 
-        {/* Legend */}
         <div className="salon-legend">
-          <div className="salon-legend-item free">
-            <div className="salon-legend-pip" style={{ background: '#22c55e', border: '1px solid #16a34a' }} /> Libre
-          </div>
-          <div className="salon-legend-item occupied-pending">
-            <div className="salon-legend-pip" style={{ background: '#ef4444', border: '1px solid #dc2626' }} /> Con Pendientes
-          </div>
-          <div className="salon-legend-item occupied-done">
-            <div className="salon-legend-pip" style={{ background: '#a855f7', border: '1px solid #9333ea' }} /> Sin Pendientes
-          </div>
+           <div className="salon-legend-item free"><div className="salon-legend-pip"></div> LIBRE</div>
+           <div className="salon-legend-item occupied"><div className="salon-legend-pip"></div> OCUPADA</div>
+           <div className="salon-legend-item paying"><div className="salon-legend-pip"></div> CUENTA</div>
         </div>
 
-        {/* Table grid */}
-        <div className="card-grid">
-          {tables.map(table => {
-            const effectiveStatus = getEffectiveStatus(table.id);
-            const tableItems = activeItems.filter(i => i.table_id === table.id);
-            const total = tableItems.reduce((s, i) => s + i.price * i.qty, 0);
-            const itemCount = tableItems.length;
-
+        <div className="salon-sections">
+          {tableCats.map(cat => {
+            const catTables = tables.filter(t => t.category === cat);
+            const isDelivery = cat === 'Pedidos para llevar';
+            
             return (
-              <div
-                key={table.id}
-                className={`table-card ${effectiveStatus}`}
-                onClick={() => openTable(table.id)}
-              >
-                {/* Header */}
-                <div className="tc-header">
-                  <span className="tc-label">Mesa</span>
-                  <div className="tc-dot" />
-                </div>
+              <div key={cat} className="salon-cat-section" style={{ marginBottom: 32 }}>
+                <h3 className="section-title-premium">{cat}</h3>
+                
+                {isDelivery ? (
+                   <div className="delivery-list">
+                     <button className="add-delivery-btn" onClick={() => setIsDeliveryModalOpen(true)}>
+                       <Plus size={20} /> Nuevo pedido para llevar
+                     </button>
+                     {catTables.map(table => {
+                        const order = tableOrders[table.id];
+                        const items = activeItems.filter(i => i.table_id === table.id);
+                        const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+                        const hasPending = items.some(i => i.status === 'pending');
+                        const statusClass = table.status === 'paying' ? 'paying' : (hasPending ? 'occupied-pending' : 'occupied-done');
 
-                {/* Big number */}
-                <div className="tc-number">{table.id.toString().padStart(2, '0')}</div>
+                        return (
+                          <div 
+                            key={table.id} 
+                            className={`delivery-item ${statusClass}`}
+                            onClick={() => {
+                              setSelectedTableId(table.id);
+                              setCurrentView('mesa');
+                            }}
+                          >
+                            <div className="delivery-item-left">
+                              <div className="delivery-item-icon">
+                                {table.status === 'paying' ? <Printer size={20} /> : <ShoppingBag size={20} />}
+                              </div>
+                              <div className="delivery-item-details">
+                                <span className="delivery-item-name">{table.name}</span>
+                                <span className="delivery-item-count">{items.length} productos</span>
+                              </div>
+                            </div>
+                            <div className="delivery-item-right">
+                               <div className="delivery-item-total">{formatCurrency(total)}</div>
+                               {table.status === 'paying' && <span className="tc-paying-badge">Ticket</span>}
+                            </div>
+                          </div>
+                        );
+                     })}
+                   </div>
+                ) : (
+                  <div className="card-grid">
+                    {catTables.map(table => {
+                      const order = tableOrders[table.id];
+                      const items = activeItems.filter(i => i.table_id === table.id);
+                      const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+                      const hasPending = items.some(i => i.status === 'pending');
+                      const statusClass = table.status === 'paying' ? 'paying' : (table.status === 'free' ? 'free' : (hasPending ? 'occupied-pending' : 'occupied-done'));
 
-                {/* Footer info by status */}
-                <div className="tc-footer">
-                  {effectiveStatus === 'free' && (
-                    <span className="tc-status-free">Libre</span>
-                  )}
-                  {effectiveStatus !== 'free' && (
-                    <>
-                      <span className="tc-items" style={{ color: effectiveStatus === 'occupied-done' ? '#9333ea' : '#ef4444' }}>{itemCount} ítem{itemCount !== 1 ? 's' : ''}</span>
-                      <span className="tc-total" style={{ color: effectiveStatus === 'occupied-done' ? '#9333ea' : '#ef4444' }}>${total.toFixed(0)}</span>
-                    </>
-                  )}
-                </div>
+                      return (
+                        <div 
+                          key={table.id} 
+                          className={`table-card ${statusClass}`}
+                          onClick={() => {
+                            if (table.status === 'free') {
+                               setTableConfirmModal({ isOpen: true, type: 'open', tableId: table.id });
+                            } else {
+                              setSelectedTableId(table.id);
+                              setCurrentView('mesa');
+                            }
+                          }}
+                        >
+                          <div className="tc-header">
+                            <span className="tc-label">{table.status === 'paying' ? 'PAGANDO' : (table.status === 'free' ? 'LIBRE' : 'MESA')}</span>
+                            <div className="tc-dot"></div>
+                          </div>
+                          
+                          <div className="tc-number">{table.id}</div>
+                          
+                          <div className="tc-footer">
+                            {table.status === 'free' ? (
+                              <span className="tc-status-free">Abrir</span>
+                            ) : (
+                              <>
+                                <span className="tc-total">{formatCurrency(total)}</span>
+                                {table.status === 'paying' && <span className="tc-paying-badge"><Printer size={10} /> Ticket</span>}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -860,1144 +1117,881 @@ export default function App() {
   };
 
   const renderMesa = () => {
-    const count = selectedTableItems.length;
-    const hasPendingItems = selectedTableItems.some(i => i.status === 'pending');
+    if (!selectedTableId) return null;
+    const table = tables.find(t => t.id === selectedTableId);
+    
     return (
-      <div className="fade-in mesa-layout">
-        <div className="mesa-tabs">
-          <button className={`mesa-tab ${mesaTab === 'orden' ? 'active' : ''}`} onClick={() => setMesaTab('orden')}>
-            📋 Orden {count > 0 && <span className="mesa-tab-badge">{count}</span>}
+      <div className="mesa-view fade-in">
+        <div className="mesa-header-premium">
+          <button className="back-btn-pill" onClick={() => setCurrentView('salon')}>
+            <ChevronLeft size={20} />
+            <span>Salón</span>
           </button>
-          <button className={`mesa-tab ${mesaTab === 'menu' ? 'active' : ''}`} onClick={() => setMesaTab('menu')}>
-            🍰 Ver Menú
+          <div className="mesa-title-wrap">
+             <h2>{table?.name}</h2>
+             <span className={`mesa-status-tag ${table?.status}`}>{table?.status === 'paying' ? 'Impreso' : 'Ocupada'}</span>
+          </div>
+          <button className="action-btn-circle danger" onClick={() => setTableConfirmModal({isOpen: true, type: 'closeEmpty', tableId: selectedTableId})}>
+             <Trash2 size={20} />
           </button>
         </div>
 
-        {/* ORDEN tab */}
-        {mesaTab === 'orden' && (
-          <div className="mesa-orden-panel">
-            {selectedTableItems.length === 0 ? (
-              <div className="empty-order">
-                <div style={{ fontSize: 56, marginBottom: 16 }}>🥐</div>
-                <h3 style={{ fontSize: 18, color: '#0f172a', marginBottom: 4 }}>Cuenta vacía</h3>
-                <p style={{ fontSize: 14, marginBottom: 20 }}>Toca <strong>Menú</strong> para agregar deliciosa comida</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280, margin: '0 auto' }}>
-                  <button
-                    className="btn-primary"
-                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
-                    onClick={() => setMesaTab('menu')}
-                  >
-                    <Plus size={18} />
-                    Agregar pedidos
-                  </button>
-                  <button
-                    className="btn-outline"
-                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
-                    onClick={() => {
-                        setTableConfirmModal({ isOpen: true, type: 'closeEmpty', tableId: selectedTableId })
-                    }}
-                  >
-                    <X size={18} /> Liberar mesa
+        <div className="tab-control-premium">
+          <button className={`tab-btn-p ${mesaTab === 'orden' ? 'active' : ''}`} onClick={() => setMesaTab('orden')}>
+            <ClipboardList size={18} />
+            Orden ({orderItems.length})
+          </button>
+          <button className={`tab-btn-p ${mesaTab === 'menu' ? 'active' : ''}`} onClick={() => setMesaTab('menu')}>
+            <Plus size={18} />
+            Añadir
+          </button>
+        </div>
+
+        <div className="tab-content-premium">
+          {mesaTab === 'orden' ? (
+            <div className="order-details-p fade-in">
+              {orderItems.length === 0 ? (
+                <div className="empty-order-state">
+                  <div className="empty-order-icon"><Zap size={32} /></div>
+                  <h3>Sin productos aún</h3>
+                  <p>Añade platillos desde el menú</p>
+                  <button className="btn-premium" onClick={() => setMesaTab('menu')} style={{ width: 'auto', padding: '12px 24px', marginTop: 12 }}>
+                    Ver Menú
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="order-items-list">
-                {selectedTableItems.map(item => (
-                  <div className="order-item-row" key={item.id}>
-                    <button className="order-item-remove" onClick={async () => await removeItem(item.id)}>
-                      <X size={14} />
-                    </button>
-                    <div className="order-item-info">
-                      <div className={`order-item-name ${item.status === 'done' ? 'item-done' : ''}`}>{item.name}</div>
-                      {item.variant_label && (
-                        <span className={`variant-chip ${item.variant_label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}>
-                          {item.variant_label}
-                        </span>
-                      )}
-                      {item.notes && <div className="order-item-notes">“{item.notes}”</div>}
+              ) : (
+                <>
+                  <div className="order-items-list-p">
+                    {orderItems.map(item => (
+                      <div key={item.id} className={`order-item-card-p ${item.status}`}>
+                        <div className="oi-qty">{item.qty}x</div>
+                        <div className="oi-main">
+                          <div className="oi-name-row">
+                            <span className="oi-name">{item.name}</span>
+                            <span className="oi-price">{formatCurrency(item.price * item.qty)}</span>
+                          </div>
+                          {item.variant_label && <span className="oi-variant">{item.variant_label}</span>}
+                          {item.notes && (
+                            <div className="oi-notes" onClick={() => { setNotesDraft(item.notes || ''); setNotesModal({ itemId: item.id, current: item.notes || '' }); }}>
+                              <StickyNote size={12} />
+                              <span>{item.notes}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="oi-actions">
+                           {item.status === 'pending' ? (
+                             <button className="oi-done-btn" onClick={() => markItemDone(item.id)}>Listo</button>
+                           ) : (
+                             <div className="oi-done-badge"><Check size={14} /></div>
+                           )}
+                           <button className="oi-del-btn" onClick={() => removeItem(item.id)}><X size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="order-footer-p">
+                    <div className="order-total-row">
+                      <span>Total de la Orden</span>
+                      <span className="total-val">{formatCurrency(orderTotal)}</span>
                     </div>
-                    <div className="order-item-right">
-                      <div className="order-item-price">${item.price}</div>
-                      <button className="notes-btn" onClick={() => {
-                        setNotesDraft(item.notes ?? '');
-                        setNotesModal({ itemId: item.id, current: item.notes ?? '' });
-                      }}>
-                        <StickyNote size={13} strokeWidth={2.5} />
-                      </button>
+                    <div className="order-actions-grid">
+                       <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}>
+                         <Printer size={18} />
+                         Imprimir
+                       </button>
+                       <button className="order-btn-pri" onClick={() => setCurrentView('checkout')}>
+                         Cobrar Mesa
+                       </button>
                     </div>
                   </div>
-                ))}
-
-                <button
-                  onClick={() => setMesaTab('menu')}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    marginTop: '16px',
-                    borderRadius: '16px',
-                    border: '2px dashed #cbd5e1',
-                    background: '#f8fafc',
-                    color: '#64748b',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                  Agregar más pedidos
-                </button>
-              </div>
-            )}
-            {selectedTableItems.length > 0 && (
-              <div className="order-footer">
-                <div className="order-total-row">
-                  <span className="order-total-label">Subtotal Mesa</span>
-                  <span className="order-total-amount">${currentTableTotal}</span>
-                </div>
-                <button
-                  className="btn-outline"
-                  disabled={hasPendingItems}
-                  style={{ 
-                    marginBottom: '12px', width: '100%', padding: '12px', borderRadius: '12px', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
-                    fontWeight: 600, color: hasPendingItems ? '#94a3b8' : '#4f46e5', 
-                    borderColor: hasPendingItems ? '#e2e8f0' : '#cbd5e1',
-                    opacity: hasPendingItems ? 0.6 : 1,
-                    cursor: hasPendingItems ? 'not-allowed' : 'pointer'
-                  }}
-                  onClick={() => {
-                    if (!hasPendingItems) {
-                      setPrintCuentaModal({isOpen: true, tableId: selectedTableId})
-                    }
-                  }}
-                >
-                  <Printer size={20} /> Generar cuenta de la mesa
-                </button>
-                <button 
-                  className="btn-dark" 
-                  disabled={!mesasConCuentaActivada.has(selectedTableId!)}
-                  onClick={() => {
-                    if (mesasConCuentaActivada.has(selectedTableId!)) handleProceedToCheckout();
-                  }}
-                  style={{ opacity: mesasConCuentaActivada.has(selectedTableId!) ? 1 : 0.4, cursor: mesasConCuentaActivada.has(selectedTableId!) ? 'pointer' : 'not-allowed' }}
-                >
-                  <Check size={20} /> Proceder al Pago
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* MENÚ tab */}
-        {mesaTab === 'menu' && (
-          <div className="mesa-menu-panel">
-            <div className="menu-search-wrap">
-              <Search size={16} className="menu-search-icon" />
-              <input
-                className="menu-search-input"
-                placeholder="Buscar platillo..."
-                value={menuSearch}
-                onChange={e => setMenuSearch(e.target.value)}
-              />
-              {menuSearch && <button className="menu-search-clear" onClick={() => setMenuSearch('')}><X size={14} /></button>}
+                </>
+              )}
             </div>
-            {!menuSearch && (
-              <div className="category-chips-wrap">
-                {Array.from(new Set(menuItems.map(m => m.category))).sort().map(cat => (
-                  <button
-                    key={cat}
-                    className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
+          ) : (
+            <div className="menu-selection-p fade-in">
+              <div className="menu-search-wrap">
+                <Search size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar producto..." 
+                  value={menuSearch} 
+                  onChange={(e) => setMenuSearch(e.target.value)} 
+                />
+              </div>
+
+              <div className="menu-cats-scroll">
+                {CATEGORIES.map(cat => (
+                  <button 
+                    key={cat} 
+                    className={`cat-pill ${menuCategory === cat ? 'active' : ''}`}
                     onClick={() => setMenuCategory(cat)}
                   >
                     {cat}
                   </button>
                 ))}
               </div>
-            )}
-            <div className="menu-items-list">
-              {filteredMenuItems.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#94a3b8', padding: 48 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                  No se encontraron resultados
-                </div>
-              )}
-              {filteredMenuItems.map(item => (
-                <div key={item.id} className="menu-order-item">
-                  <div className="menu-order-item-header">
-                    <div className="menu-order-item-name">{item.name}</div>
-                    {!item.hasVariants && (
-                      <button className="single-add-btn" onClick={() => handleAddItem(item)}>
-                        <span>${item.price}</span>
-                        <Plus size={15} />
-                      </button>
-                    )}
-                  </div>
-                  {item.hasVariants && (
-                    <div className="variant-btns">
-                      {item.variants?.filter(v => v.active).map(v => (
-                        <button
-                          key={v.id}
-                          className={`variant-add-btn ${v.label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}
-                          onClick={() => handleAddItem(item, v)}
-                        >
-                          <span className="variant-label">{v.label}</span>
-                          <span className="variant-price">${v.price}</span>
-                          <span className="variant-tap">Agregar</span>
-                        </button>
-                      ))}
+
+              <div className="menu-items-grid">
+                {subCategories.map(subCat => {
+                  const items = filteredMenuItems.filter(m => m.category === subCat);
+                  const isExpanded = expandedSubCats.has(subCat);
+
+                  return (
+                    <div key={subCat} className="menu-subcat-section">
+                       <div className="menu-subcat-header" onClick={() => toggleSubCat(subCat)}>
+                         <h4>{subCat}</h4>
+                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                       </div>
+                       
+                       {isExpanded && (
+                         <div className="menu-items-list fade-in">
+                           {items.map(item => (
+                             <button 
+                               key={item.id} 
+                               className="menu-item-card-compact"
+                               onClick={() => setConfirmPending({ item })}
+                             >
+                               <div className="mic-info">
+                                 <span className="mic-name">{item.name}</span>
+                                 <span className="mic-price">{formatCurrency(item.price)}</span>
+                               </div>
+                               <div className="mic-add"><Plus size={16} /></div>
+                             </button>
+                           ))}
+                         </div>
+                       )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
 
   const renderCheckout = () => {
-    const dVal = parseFloat(discountValue) || 0;
-    let finalTotal = currentTableTotal;
-    if (discountType === 'amount') {
-      finalTotal = Math.max(0, currentTableTotal - dVal);
-    } else if (discountType === 'percentage') {
-      finalTotal = Math.max(0, currentTableTotal * (1 - dVal / 100));
-    }
+    if (!selectedTableId) return null;
     
+    // Calculate values
+    const subtotal = orderTotal;
+    let discount = 0;
+    if (discountType === 'amount') discount = parseFloat(discountValue) || 0;
+    else if (discountType === 'percentage') discount = subtotal * ((parseFloat(discountValue) || 0) / 100);
+    
+    const afterDiscount = Math.max(0, subtotal - discount);
+    
+    let tip = 0;
+    if (tipPercent === '10') tip = afterDiscount * 0.1;
+    else if (tipPercent === '15') tip = afterDiscount * 0.15;
+    else if (tipPercent === '20') tip = afterDiscount * 0.2;
+    else if (tipPercent === 'Otro') tip = parseFloat(customTip) || 0;
+    
+    const grandTotal = afterDiscount + tip;
     const received = parseFloat(cashReceived) || 0;
-    const change = Math.max(0, received - finalTotal);
+    const change = Math.max(0, received - grandTotal);
 
     return (
-      <div className="fade-in">
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 14, color: '#64748b', marginBottom: 8 }}>Total a pagar</div>
-          <div style={{ fontSize: 56, fontWeight: 600, color: '#0e122b', letterSpacing: -1 }}>${finalTotal.toFixed(0)}</div>
-          {discountType !== 'none' && (
-            <div style={{ fontSize: 14, color: '#10b981', fontWeight: 600 }}>
-              (Descuento aplicado: {discountType === 'amount' ? `$${dVal}` : `${dVal}%`})
-            </div>
-          )}
-        </div>
+      <div className="checkout-view fade-in">
+         <div className="checkout-header">
+           <button className="back-btn-pill" onClick={() => setCurrentView('mesa')}>
+             <ChevronLeft size={20} />
+             <span>Mesa {selectedTableId}</span>
+           </button>
+           <h2>Resumen de Pago</h2>
+         </div>
 
-        <div style={{ marginBottom: 32, background: '#fff', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-          <label className="label" style={{ marginBottom: 12 }}>Descuento (opcional)</label>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            {[
-              { type: 'none', label: 'Ninguno' },
-              { type: 'percentage', label: '%' },
-              { type: 'amount', label: '$' }
-            ].map(d => (
-              <button 
-                key={d.type}
-                onClick={() => { setDiscountType(d.type as any); setDiscountValue(''); }}
-                style={{
-                  flex: 1, padding: 10, borderRadius: 12, fontSize: 14, fontWeight: 600,
-                  border: discountType === d.type ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                  background: discountType === d.type ? '#e0e7ff' : '#fff',
-                  color: discountType === d.type ? '#4f46e5' : '#64748b',
-                  cursor: 'pointer'
-                }}>
-                {d.label}
-              </button>
-            ))}
-          </div>
-          {discountType !== 'none' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input 
-                type="number"
-                placeholder={discountType === 'percentage' ? "Porcentaje ej: 10" : "Monto ej: 50"}
-                value={discountValue}
-                onChange={e => setDiscountValue(e.target.value)}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
-              />
-              <input 
-                type="text"
-                placeholder="Motivo (ej. Promoción, Cumpleaños...)"
-                value={discountReason}
-                onChange={e => setDiscountReason(e.target.value)}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16 }}
-              />
-            </div>
-          )}
-        </div>
-
-        <label className="label">Método de pago</label>
-        <div className="payment-grid" style={{ marginBottom: 24 }}>
-          {(['efectivo', 'transferencia'] as const).map(m => (
-            <div key={m} className={`payment-card ${paymentMethod === m ? 'selected' : ''}`} onClick={() => setPaymentMethod(m)}>
-              {paymentMethod === m && <div className="check-badge"><Check size={12} strokeWidth={3} /></div>}
-              <div className="payment-icon-wrapper"><span style={{ fontSize: 20 }}>{m === 'efectivo' ? '💵' : '🏦'}</span></div>
-              <div className="payment-text">{m === 'efectivo' ? 'Efectivo' : 'Transferencia'}</div>
-            </div>
-          ))}
-        </div>
-
-        {paymentMethod === 'efectivo' && (
-          <div style={{ marginBottom: 32, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-            <label className="label" style={{ marginBottom: 12 }}>Calculadora de Cambio</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Efectivo recibido:</div>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: 16 }}>$</span>
-                  <input 
-                    type="number"
-                    value={cashReceived}
-                    onChange={e => setCashReceived(e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: '100%', padding: '12px 16px 12px 28px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16, fontWeight: 600 }}
-                  />
-                </div>
-              </div>
+         <div className="checkout-card">
+            <div className="check-summary-line">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', padding: '12px 16px', borderRadius: 12 }}>
-              <span style={{ color: '#059669', fontWeight: 600, fontSize: 14 }}>Cambio a entregar:</span>
-              <span style={{ color: '#059669', fontWeight: 800, fontSize: 20 }}>${change.toFixed(0)}</span>
-            </div>
-          </div>
-        )}
-
-        {paymentMethod === 'transferencia' && (
-          <div style={{ marginBottom: 32, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-            <label className="label" style={{ marginBottom: 12 }}>Propina</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: tipPercent === 'Otro' ? 16 : 0, overflowX: 'auto', paddingBottom: 4 }}>
-              {(['none', '10', '15', '20', 'Otro'] as const).map(t => (
-                <button 
-                  key={t}
-                  onClick={() => { setTipPercent(t); if(t !== 'Otro') setCustomTip(''); }}
-                  style={{
-                    flex: '1 0 auto', padding: '10px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600,
-                    border: tipPercent === t ? '2px solid #ef4444' : '1px solid #cbd5e1',
-                    background: tipPercent === t ? '#fef2f2' : '#fff',
-                    color: tipPercent === t ? '#b91c1c' : '#64748b',
-                    cursor: 'pointer',
-                    minWidth: 70
-                  }}>
-                  {t === 'none' ? 'Sin propina' : t === 'Otro' ? 'Otro' : `${t}%`}
-                </button>
-              ))}
-            </div>
-            {tipPercent === 'Otro' && (
-               <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8', fontSize: 16 }}>$</span>
-                  <input 
-                    type="number"
-                    value={customTip}
-                    onChange={e => setCustomTip(e.target.value)}
-                    placeholder="Ejem. 50"
-                    style={{ width: '100%', padding: '12px 16px 12px 28px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: 16, fontWeight: 600 }}
-                  />
-                </div>
-            )}
-            {tipPercent !== 'none' && tipPercent !== 'Otro' && (
-              <div style={{ marginTop: 12, textAlign: 'right', fontSize: 14, color: '#0f172a', fontWeight: 600 }}>
-                 +${((parseFloat(tipPercent) / 100) * finalTotal).toFixed(0)} de propina
+            <div className="checkout-config-section">
+              <label>Descuento Especial</label>
+              <div className="config-row">
+                 <button className={`config-opt ${discountType === 'none' ? 'active' : ''}`} onClick={() => setDiscountType('none')}>Ninguno</button>
+                 <button className={`config-opt ${discountType === 'amount' ? 'active' : ''}`} onClick={() => setDiscountType('amount')}>$ Fijo</button>
+                 <button className={`config-opt ${discountType === 'percentage' ? 'active' : ''}`} onClick={() => setDiscountType('percentage')}>% Porc</button>
               </div>
-            )}
-          </div>
-        )}
-
-        <button className="btn-primary" onClick={handleConfirmPayment}>Registrar como pagado</button>
-      </div>
-    );
-  };
-
-  const renderPedidos = () => {
-    // Group activeItems by table
-    const itemsByTable = activeItems.reduce((acc, item) => {
-      if (!acc[item.table_id]) acc[item.table_id] = [];
-      acc[item.table_id].push(item);
-      return acc;
-    }, {} as Record<number, typeof activeItems>);
-
-    const tableIds = Object.keys(itemsByTable).map(Number).sort((a,b) => a - b);
-    
-    return (
-      <div className="fade-in pedidos-view">
-        {tableIds.length === 0 ? (
-          <div className="empty-pedidos">
-            <div style={{ fontSize: 64, marginBottom: 20 }}>👩‍🍳</div>
-            <h2>Tu cocina está al día</h2>
-            <p>Los nuevos pedidos aparecerán aquí automáticamente por mesa.</p>
-          </div>
-        ) : (
-          <div className="pedidos-list">
-            {tableIds.map(tableId => {
-              const tableItems = itemsByTable[tableId].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-              const isCollapsed = expandedPedidos.includes(tableId);
-              const toggleCollapse = () => {
-                setExpandedPedidos(prev => prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]);
-              };
-
-              // Oldest pending item to calculate time
-              const pendingTableItems = tableItems.filter(i => i.status === 'pending');
-              const oldestPending = pendingTableItems[0];
-              
-              let elapsedMinutes = 0;
-              let isDelayed = false;
-              let isWarning = false;
-              let timeColor = '#10b981';
-
-              if (oldestPending) {
-                elapsedMinutes = Math.floor((currentTime.getTime() - new Date(oldestPending.created_at).getTime()) / 60000);
-                isDelayed = elapsedMinutes >= 15;
-                isWarning = elapsedMinutes >= 10 && !isDelayed;
-                timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
-              } else if (tableItems.length > 0) {
-                timeColor = '#64748b'; // All done
-              }
-
-              return (
-                <div className={`qa-card ${isDelayed ? 'delayed-alert' : ''}`} key={`pedidos-table-${tableId}`} style={{ ...(isDelayed ? { borderColor: '#fecaca', background: '#fef2f2' } : {}), padding: 0, overflow: 'hidden' }}>
-                  <div 
-                    className="qa-header" 
-                    onClick={toggleCollapse} 
-                    style={{ padding: '16px', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9', margin: 0 }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div className="qa-table-badge">Mesa {tableId}</div>
-                      {oldestPending ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
-                          <Clock size={14} strokeWidth={3} />
-                          {elapsedMinutes} min
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: timeColor }}>
-                          <Check size={14} strokeWidth={3} />
-                          Completado
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{pendingTableItems.length} pendientes</span>
-                      <ChevronRight size={20} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s' }} />
-                    </div>
-                  </div>
-
-                  {!isCollapsed && (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {tableItems.map(item => {
-                        const category = menuItems.find(m => m.name === item.name)?.category ?? '';
-                        const isDone = item.status === 'done';
-
-                        return (
-                          <div 
-                            key={item.id} 
-                            style={{ 
-                              padding: '12px 16px',
-                              borderBottom: '1px solid #f1f5f9',
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center',
-                              opacity: isDone ? 0.6 : 1,
-                              background: isDone ? '#f8fafc' : 'transparent'
-                            }}
-                          >
-                            <div className="qa-info" style={{ flex: 1, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? '#94a3b8' : 'inherit' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                {category && (
-                                  <div style={{
-                                    fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-                                    textTransform: 'uppercase', color: '#6366f1',
-                                    background: '#eef2ff', borderRadius: 6,
-                                    padding: '2px 8px',
-                                  }}>
-                                    {category}
-                                  </div>
-                                )}
-                                <span style={{ fontWeight: 800, fontSize: 13, color: '#475569' }}>x{item.qty}</span>
-                              </div>
-                              
-                              <div className="qa-name" style={{ fontWeight: 700, fontSize: 16 }}>{item.name}</div>
-                              {item.variant_label && <div className="qa-variant" style={{ fontSize: 13, marginTop: 2, color: '#64748b' }}>{item.variant_label}</div>}
-                              {item.notes && (
-                                <div className="qa-notes-box" style={{ marginTop: 6, background: '#fef3c7', color: '#d97706', border: 'none' }}>
-                                  <StickyNote size={13} strokeWidth={2.5} />
-                                  <span>{item.notes}</span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {!isDone ? (
-                              <button
-                                className="qa-done-btn"
-                                onClick={(e) => { e.stopPropagation(); setDeliveryConfirm(item.id); }}
-                                style={{ marginLeft: 16 }}
-                              >
-                                <Check size={22} strokeWidth={3} />
-                              </button>
-                            ) : (
-                              <div style={{ padding: '8px', color: '#10b981' }}>
-                                <Check size={20} strokeWidth={3} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+              {discountType !== 'none' && (
+                <div className="config-inputs fade-in">
+                  <input type="number" placeholder="Valor" value={discountValue} onChange={e => setDiscountValue(e.target.value)} />
+                  <input type="text" placeholder="Motivo (obligatorio)" value={discountReason} onChange={e => setDiscountReason(e.target.value)} />
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-      {/* Delivery Confirmation Modal */}
-      {deliveryConfirm && (
-        <div className="confirm-overlay" onClick={() => setDeliveryConfirm(null)}>
-          <div className="confirm-sheet" onClick={e => e.stopPropagation()}>
-            <div className="confirm-sheet-pill" />
-            <div className="confirm-sheet-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-              <Check size={32} />
+              )}
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 12 }}>
-              ¿Confirmas que este pedido fue entregado?
-            </h3>
-            <div className="confirm-actions">
-              <button className="confirm-cancel" onClick={() => setDeliveryConfirm(null)}>No, aún no</button>
-              <button className="confirm-ok" onClick={async () => {
-                await markItemDone(deliveryConfirm);
-                setDeliveryConfirm(null);
-              }}>
-                Sí, entregado
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-    );
-  };
 
-  const renderAdminMain = () => {
-    const mexicoDate = currentTime.toLocaleDateString('es-MX', {
-      timeZone: 'America/Mexico_City', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-    const mexicoTime = currentTime.toLocaleTimeString('es-MX', {
-      timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit',
-    });
-    return (
-      <div className="fade-in">
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CalendarDays size={14} /> {mexicoDate}
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#0f172a' }}>
-            {mexicoTime} <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}>CDMX</span>
-          </div>
-        </div>
-
-        {(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado') && (
-          <>
-            <div className="admin-summary-grid">
-              <div className="admin-summary-card income">
-                <div className="as-icon"><TrendingUp size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Ingresos</div>
-                  <div className="as-value">${todayIncome.toFixed(0)}</div>
-                  <div className="as-sub">{todayAccountsCount} cuentas cobradas</div>
-                  {todayTransferTips > 0 && (
-                    <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>
-                      + ${todayTransferTips.toFixed(0)} en propinas (transf.)
-                    </div>
-                  )}
-                </div>
+            <div className="checkout-config-section">
+              <label>Sugerir Propina</label>
+              <div className="config-row">
+                 {['none', '10', '15', '20', 'Otro'].map(opt => (
+                   <button key={opt} className={`config-opt ${tipPercent === opt ? 'active' : ''}`} onClick={() => setTipPercent(opt as any)}>
+                     {opt === 'none' ? '0%' : (opt === 'Otro' ? '...' : opt + '%')}
+                   </button>
+                 ))}
               </div>
-              <div className="admin-summary-card expenses">
-                <div className="as-icon"><TrendingDown size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Gastos</div>
-                  <div className="as-value">${todayExpenses.toFixed(0)}</div>
-                  <div className="as-sub">{todayExpensesList.length} registros hoy</div>
+              {tipPercent === 'Otro' && (
+                <div className="config-inputs fade-in">
+                   <input type="number" placeholder="Monto de propina $" value={customTip} onChange={e => setCustomTip(e.target.value)} />
                 </div>
-              </div>
+              )}
             </div>
 
-            <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-              <button className="btn-primary" onClick={() => setIsExpenseModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16, background: '#fecaca', color: '#991b1b', border: 'none' }}>
-                <Plus size={18} /> Gasto
-              </button>
-              <button className="btn-outline" onClick={() => setIsCierreModalOpen(true)} style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16 }}>
-                <Lock size={18} /> Cierre
-              </button>
+            <div className="total-breakdown">
+               {discount > 0 && (
+                 <div className="break-line discount">
+                   <span>Descuento</span>
+                   <span>-{formatCurrency(discount)}</span>
+                 </div>
+               )}
+               {tip > 0 && (
+                 <div className="break-line tip">
+                   <span>Propina Sugerida</span>
+                   <span>{formatCurrency(tip)}</span>
+                 </div>
+               )}
+               <div className="break-line grand">
+                 <span>TOTAL A PAGAR</span>
+                 <span>{formatCurrency(grandTotal)}</span>
+               </div>
             </div>
-          </>
-        )}
+         </div>
 
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Administración</div>
-        <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
-          {[
-            { label: 'Gestión de Menú', view: 'menu', icon: <FileEdit size={20} />, bg: '#e0e7ff', color: '#4f46e5' },
-            { label: 'Gestión de Mesas', view: 'tables', icon: <LayoutGrid size={20} />, bg: '#fef9c3', color: '#ca8a04' },
-            { label: 'Estadísticas', view: 'stats', icon: <TrendingUp size={20} />, bg: '#dcfce7', color: '#16a34a' },
-            { label: 'Usuarios Autorizados', view: 'users', icon: <Users size={20} />, bg: '#fce7f3', color: '#db2777' },
-          ]
-          .filter(item => {
-            if (currentUser?.role === 'Encargado') {
-              return item.view === 'menu' || item.view === 'tables';
-            }
-            return true;
-          })
-          .map(({ label, view, icon, bg, color }) => (
-            <div key={view} className="admin-menu-item" onClick={() => setAdminSubView(view as any)}>
-              <div className="admin-menu-icon" style={{ backgroundColor: bg, color }}>{icon}</div>
-              <div className="admin-menu-text">{label}</div>
-              <ChevronRight size={20} color="#94a3b8" />
-            </div>
-          ))}
-        </div>
+         <div className="checkout-methods-section">
+           <label>Método de Pago</label>
+           <div className="methods-grid-p">
+             <button className={`method-btn-p ${paymentMethod === 'efectivo' ? 'active' : ''}`} onClick={() => setPaymentMethod('efectivo')}>
+               <Wallet size={24} />
+               <span>Efectivo</span>
+             </button>
+             <button className={`method-btn-p ${paymentMethod === 'tarjeta' ? 'active' : ''}`} onClick={() => setPaymentMethod('tarjeta')}>
+               <CreditCard size={24} />
+               <span>Tarjeta</span>
+             </button>
+             <button className={`method-btn-p ${paymentMethod === 'transferencia' ? 'active' : ''}`} onClick={() => setPaymentMethod('transferencia')}>
+               <Building size={24} />
+               <span>Transf.</span>
+             </button>
+           </div>
+         </div>
 
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ClipboardCheck size={20} color="#6366f1" />
-          Cuentas del Turno
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
-          {todayClosedOrders.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', background: '#fff', borderRadius: 16, border: '1px solid var(--border-strong)' }}>
-              Aún no hay cuentas pagadas en este turno.
-            </div>
-          ) : todayClosedOrders.map(order => (
-            <div key={order.id} style={{ backgroundColor: '#fff', padding: '14px 16px', borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>Mesa {order.table_id.toString().padStart(2, '0')}</div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#059669' }}>${order.total?.toFixed(0)}</div>
-              </div>
-              <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
-                {order.items_summary || 'Sin detalle'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, borderTop: '1px solid #f1f5f9', paddingTop: 6 }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <CalendarDays size={12} />
-                  {new Date(order.closed_at || '').toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div style={{ 
-                  fontSize: 10, padding: '2px 8px', borderRadius: 8, 
-                  background: order.payment_method === 'efectivo' ? '#ecfdf5' : '#eff6ff', 
-                  color: order.payment_method === 'efectivo' ? '#059669' : '#2563eb', 
-                  fontWeight: 700, textTransform: 'capitalize' 
-                }}>
-                  {order.payment_method || 'Sin método'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+         {paymentMethod === 'efectivo' && (
+           <div className="cash-input-card fade-in">
+             <label>Recibido del Cliente</label>
+             <input type="number" placeholder="$ 0.00" value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
+             {received > 0 && (
+               <div className="change-display">
+                 <span>Cambio:</span>
+                 <span className="change-val">{formatCurrency(change)}</span>
+               </div>
+             )}
+           </div>
+         )}
 
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Usuarios Conectados</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 40 }}>
-          {users.filter(u => u.session_active).length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>Ningún usuario conectado.</div>
-          ) : users.filter(u => u.session_active).map(user => (
-            <div key={user.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={20} color="var(--primary-dark)" />
-                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, backgroundColor: '#22c55e', borderRadius: '50%', border: '2px solid #fff' }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{user.name}</div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>{user.role}</div>
-                </div>
-              </div>
-              <button 
-                onClick={() => closeSession(user.id)} 
-                title="Cerrar sesión de este usuario remotamente"
-                style={{ backgroundColor: 'transparent', border: '1px solid var(--danger-light)', borderRadius: 12, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--danger)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-              >
-                <LogOut size={14} /> Desconectar
-              </button>
-            </div>
-          ))}
-        </div>
+         <div className="checkout-actions">
+            <button 
+              className="confirm-pay-btn" 
+              disabled={(discountType !== 'none' && !discountReason.trim())}
+              onClick={() => {
+                confirmPayment(selectedTableId, paymentMethod, afterDiscount, tip, discountReason);
+                setCurrentView('salon');
+                setSelectedTableId(null);
+                // Reset checkout states
+                setDiscountType('none'); setDiscountValue(''); setDiscountReason('');
+                setTipPercent('none'); setCustomTip(''); setCashReceived('');
+              }}
+            >
+              Confirmar y Cerrar Mesa
+            </button>
+         </div>
       </div>
     );
   };
 
   const renderImpresora = () => {
     return (
-      <div className="fade-in">
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Cola de Impresión (Caja)</div>
-        <div className="orders-grid">
-          {pendingTickets.length === 0 ? (
-             <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', gridColumn: '1 / -1' }}>No hay tickets pendientes</div>
-          ) : pendingTickets.map((ticket: any) => (
-             <div key={ticket.id} style={{ background: 'white', borderRadius: 16, padding: '16px', border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                   <div style={{ fontWeight: 800 }}>Mesa {ticket.table_id.toString().padStart(2, '0')}</div>
-                   <div style={{ color: '#059669', fontWeight: 800, fontSize: 18 }}>${ticket.total}</div>
-                </div>
-                <div style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', flex: 1, marginBottom: 12 }}>{ticket.items_summary}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>
-                   <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
-                   <span>Pedido por: {ticket.printed_by}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    className="btn-secondary" 
-                    onClick={() => setPreviewTicket(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', fontWeight: 500 }}
-                  >
-                     <Eye size={16} /> Previa
-                  </button>
-                  <button 
-                    className="btn-primary" 
-                    onClick={() => dispatchPrintOnly(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
-                  >
-                     <Printer size={16} /> Imprimir
-                  </button>
-                  <button 
-                    className="btn-primary" 
-                    onClick={() => markTicketPrinted(ticket.id)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
-                  >
-                     <Check size={16} /> Entregada
-                  </button>
-                </div>
-             </div>
-          ))}
+      <div className="impresora-view fade-in">
+        <div className="view-header">
+           <h2 className="view-title-premium">Caja / Impresora</h2>
+           <p className="view-subtitle-premium">Tickets pendientes de impresión física</p>
         </div>
 
-        {/* Modal de Vista Previa Visual */}
-        {previewTicket && (
-          <div className="modal-overlay" onClick={() => setPreviewTicket(null)} style={{zIndex: 9999}}>
-            <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', background: '#fff', borderRadius: 8}}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>GALLO AZUL</h2>
-                <div style={{ fontSize: 12 }}>Restaurante</div>
-              </div>
-              <div style={{ margin: '16px 0', borderTop: '1px dashed #ccc', borderBottom: '1px dashed #ccc', padding: '8px 0', fontSize: 13, lineHeight: 1.4 }}>
-                <div><strong>Mesa:</strong> {previewTicket.table_id}</div>
-                <div><strong>Atendió:</strong> {previewTicket.printed_by}</div>
-                <div><strong>Fecha:</strong> {new Date(previewTicket.created_at).toLocaleString('es-MX')}</div>
-              </div>
-              <div style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Detalle:</div>
-                <div style={{ whiteSpace: 'pre-line' }}>{previewTicket.items_summary.split(', ').join('\n')}</div>
-              </div>
-              <div style={{ textAlign: 'right', fontSize: 16, borderTop: '2px solid #000', paddingTop: 8, fontWeight: 'bold' }}>
-                TOTAL: ${previewTicket.total}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12 }}>
-                ¡Gracias por su visita!
-              </div>
-              <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
-                <button className="btn-secondary" style={{flex: 1}} onClick={() => setPreviewTicket(null)}>Cerrar</button>
-                <button className="btn-primary" style={{flex: 1, gap: 4, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => { dispatchPrintOnly(previewTicket); setPreviewTicket(null); }}>
-                  <Printer size={16}/> Imprimir
-                </button>
-              </div>
-            </div>
+        {pendingTickets.length === 0 ? (
+          <div className="empty-state-p">
+            <Printer size={48} color="#94a3b8" />
+            <h3>No hay tickets en cola</h3>
+            <p>Los tickets enviados desde las mesas aparecerán aquí</p>
           </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderAdminMenu = () => {
-    const uniqueCategories = Array.from(new Set(menuItems.map(m => m.category))).sort();
-    const byCategory = uniqueCategories.map(cat => ({
-      cat,
-      items: menuItems.filter(m => m.category === cat),
-      catId: menuItems.find(m => m.category === cat)?.categoryId,
-    })).filter(g => g.items.length > 0);
-
-    return (
-      <div className="fade-in" style={{ paddingBottom: 40 }}>
-        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
-          <button 
-            onClick={handleAddItemModalOpen} 
-            className="btn-primary" 
-            style={{ width: 'auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 12 }}
-          >
-            <Plus size={18} />
-            Agregar Producto
-          </button>
-        </div>
-        {byCategory.map(({ cat, items, catId }) => (
-          <div key={cat} style={{ marginBottom: 28 }}>
-            {/* Category header with edit */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, margin: 0 }}>{cat}</h3>
-              {catId && (
-                <button onClick={() => openEditCategory(catId, cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
-                  <Pencil size={13} />
-                </button>
-              )}
-            </div>
-
-            <div style={{ backgroundColor: '#fff', borderRadius: 16, border: '1px solid var(--border-strong)', overflow: 'hidden' }}>
-              {items.map((item, idx) => {
-                const isExpanded = expandedItems.has(item.id);
-                return (
-                  <div key={item.id} style={{ borderBottom: idx < items.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                    {/* Item row */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 8 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: item.active ? '#0f172a' : '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {item.name}
-                          {!item.active && <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>INACTIVO</span>}
-                        </div>
-                        {!item.hasVariants && (
-                          <div style={{ fontSize: 12, color: '#64748b' }}>${item.price}</div>
-                        )}
-                        {item.hasVariants && (
-                          <div style={{ fontSize: 12, color: '#64748b' }}>
-                            {item.variants?.map(v => `${v.label}: $${v.price}`).join(' / ')}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Edit item (non-variant only) */}
-                      {!item.hasVariants && (
-                        <button onClick={() => openEditItem(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                          <Pencil size={15} />
-                        </button>
-                      )}
-
-                      {/* Expand for variant items */}
-                      {item.hasVariants && (
-                        <button onClick={() => toggleExpanded(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      )}
-
-                      {/* Toggle for non-variant items */}
-                      {!item.hasVariants && (
-                        <label className="toggle-switch" style={{ transform: 'scale(0.8)', flexShrink: 0 }}>
-                          <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                          <span className="toggle-slider" />
-                        </label>
-                      )}
-
-                      {/* Toggle all for variant items */}
-                      {item.hasVariants && (
-                        <label className="toggle-switch" style={{ transform: 'scale(0.8)', flexShrink: 0 }}>
-                          <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                          <span className="toggle-slider" />
-                        </label>
-                      )}
-                    </div>
-
-                    {/* Variant rows (expanded) */}
-                    {item.hasVariants && isExpanded && (
-                      <div style={{ background: '#fafafa', borderTop: '1px solid #f1f5f9', padding: '8px 16px 12px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Variantes</div>
-                        {item.variants?.map(v => (
-                          <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: v.active ? '#0f172a' : '#94a3b8' }}>{v.label}</div>
-                              <div style={{ fontSize: 12, color: '#64748b' }}>${v.price}</div>
-                            </div>
-                            <button onClick={() => openEditVariant(v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                              <Pencil size={14} />
-                            </button>
-                            <label className="toggle-switch" style={{ transform: 'scale(0.75)', flexShrink: 0 }}>
-                              <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
-                              <span className="toggle-slider" />
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-
-  const renderAdminStats = () => (
-    <div className="fade-in admin-stats-view">
-      <div className="stats-header-tabs">
-        <button className={`stats-tab ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
-        <button className={`stats-tab ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Análisis</button>
-      </div>
-
-      {statsSubView === 'history' ? (
-        <>
-          <div className="stats-header">
-            <h3>Historial de Cierres</h3>
-            <span className="stats-count">{dailySummaries.length} reportes registrados</span>
-          </div>
-          
-          <div className="reports-list">
-            {dailySummaries.map(report => (
-              <div key={report.id} className="report-card">
-                <div className="report-card-header">
-                  <div className="rc-date">
-                    <CalendarDays size={14} />
-                    {new Date(report.created_at).toLocaleDateString('es-MX', { 
-                      weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-                    })}
-                  </div>
-                  <div className="rc-user">Admin: {report.closed_by}</div>
+        ) : (
+          <div className="tickets-grid-p">
+            {pendingTickets.map(ticket => (
+              <div key={ticket.id} className={`ticket-card-p ${ticket.status}`}>
+                <div className="ticket-header-p">
+                  <span className="ticket-id-p">MESA {ticket.table_id}</span>
+                  <span className="ticket-time-p">{new Date(ticket.created_at).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</span>
                 </div>
-                
-                <div className="report-card-stats">
-                  <div className="rc-stat">
-                    <span className="rc-label">Ingresos</span>
-                    <span className="rc-value income">${report.income.toFixed(0)}</span>
-                  </div>
-                  <div className="rc-stat">
-                    <span className="rc-label">Gastos</span>
-                    <span className="rc-value expense">${report.expenses.toFixed(0)}</span>
-                  </div>
-                  <div className="rc-stat">
-                    <span className="rc-label">Cuentas</span>
-                    <span className="rc-value grey">{report.accounts_count}</span>
-                  </div>
+                <div className="ticket-body-p">
+                   <div className="ticket-summary-p">{ticket.items_summary}</div>
+                   <div className="ticket-total-p">{formatCurrency(ticket.total)}</div>
                 </div>
-                {(report.transfer_tips ?? 0) > 0 && (
-                  <div style={{ padding: '0 16px 12px', fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
-                     Propinas en transferencia: ${(report.transfer_tips ?? 0).toFixed(0)}
-                  </div>
-                )}
-
-                {report.expenses_list?.length > 0 && (
-                  <div className="rc-expenses-detail">
-                    <div className="rc-exp-title">Gastos del día</div>
-                    {report.expenses_list.map((exp: any, i: number) => (
-                      <div key={i} className="rc-exp-row">
-                        <span>{exp.concept}</span>
-                        <strong>${exp.amount}</strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="report-card-footer">
-                  <span>Balance Neto:</span>
-                  <strong>${(report.income - report.expenses).toFixed(0)}</strong>
-                  <button
-                    onClick={() => setDeleteReportId(report.id)}
-                    style={{
-                      marginLeft: 'auto', background: 'none', border: 'none',
-                      cursor: 'pointer', color: '#ef4444', padding: '4px 8px',
-                      borderRadius: 8, display: 'flex', alignItems: 'center', gap: 4,
-                      fontSize: 12, fontWeight: 500,
-                    }}
-                  >
-                    <Trash2 size={14} /> Eliminar
+                <div className="ticket-footer-p">
+                  <button className="ticket-print-btn" onClick={() => dispatchPrintOnly(ticket)}>
+                    <Printer size={16} /> Imprimir
+                  </button>
+                  <button className="ticket-del-btn" onClick={() => deleteTicket(ticket.id)}>
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
             ))}
           </div>
-        </>
-      ) : (
-        <div className="analytics-view">
-          <div className="analytics-filters">
-            <button className={`filter-btn ${analyticsFilter === 'day' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('day')}>Hoy</button>
-            <button className={`filter-btn ${analyticsFilter === 'month' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('month')}>Este Mes</button>
-            <button className={`filter-btn ${analyticsFilter === 'total' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('total')}>Acumulado</button>
+        )}
+      </div>
+    );
+  };
+
+  const renderCheckin = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const enCasa = upcomingCheckins.filter(res => {
+      const arr = new Date(res.arrivalDate + 'T12:00:00');
+      const dep = new Date(res.departureDate + 'T12:00:00');
+      return today >= arr && today <= dep && res.status !== 'cancelled' && res.status !== 'declined';
+    });
+
+    const proximas = upcomingCheckins.filter(res => {
+      const arr = new Date(res.arrivalDate + 'T12:00:00');
+      return arr > today && res.status !== 'cancelled' && res.status !== 'declined';
+    });
+
+    return (
+      <div className="checkin-view fade-in">
+        <div className="view-header">
+          <h2 className="view-title-premium">Hotel / Check-in</h2>
+          <p className="view-subtitle-premium">Gestión de huéspedes y registros online</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+          <button className="action-btn-premium" onClick={() => setCurrentView('registros')}>
+            <ClipboardList size={20} />
+            Ver registros
+          </button>
+          <button className="action-btn-premium highlight" onClick={() => setShowNewResModal(true)}>
+            <PlusCircle size={20} />
+            Crear nueva reserva
+          </button>
+        </div>
+
+        {checkinsError && (
+          <div className="error-notice">
+            <AlertCircle size={20} />
+            <span>{checkinsError}</span>
           </div>
+        )}
 
-          {(() => {
-            const now = new Date();
-            const filtered = dailySummaries.filter(s => {
-              const d = new Date(s.created_at);
-              if (analyticsFilter === 'day') return d.toDateString() === now.toDateString();
-              if (analyticsFilter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-              return true;
-            });
-
-            const totalInc = filtered.reduce((sum, s) => sum + s.income, 0);
-            const totalExp = filtered.reduce((sum, s) => sum + s.expenses, 0);
-            const totalAcc = filtered.reduce((sum, s) => sum + s.accounts_count, 0);
-            const totalTips = filtered.reduce((sum, s) => sum + (s.transfer_tips || 0), 0);
-
-            return (
-              <div className="analytics-content">
-                <div className="analytics-summary">
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalInc.toFixed(0)}</div>
-                    <div className="as-m-lab">Ingresos</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalExp.toFixed(0)}</div>
-                    <div className="as-m-lab">Gastos</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">{totalAcc}</div>
-                    <div className="as-m-lab">Cuentas</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalTips.toFixed(0)}</div>
-                    <div className="as-m-lab">Propinas Tr.</div>
-                  </div>
-                </div>
-
-                <div className="analytics-ranking-box">
-                  <h4><Zap size={16} /> Ranking de Pedidos (Top 10)</h4>
-                  <div className="ranking-list">
-                    {ranking.length === 0 ? (
-                      <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
-                        No hay datos suficientes para generar el ranking.
-                      </p>
-                    ) : (
-                      ranking.map((item, idx) => (
-                        <div key={idx} className="ranking-item">
-                          <div className="ri-idx">#{idx + 1}</div>
-                          <div className="ri-content">
-                            <div className="ri-top">
-                              <span className="ri-name">{item.name}</span>
-                              <span className="ri-count">{item.count} vendidos</span>
-                            </div>
-                            <div className="ri-progress-bg">
-                              <div className="ri-progress-fill" style={{ width: `${(item.count / ranking[0].count) * 100}%` }} />
-                            </div>
-                          </div>
+        <div className="checkin-section">
+          <div className="section-header-p" onClick={() => setIsEnCasaExpanded(!isEnCasaExpanded)}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+               <HomeIcon size={20} />
+               <h3>En casa ({enCasa.length})</h3>
+             </div>
+             {isEnCasaExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </div>
+          
+          {isEnCasaExpanded && (
+            <div className="res-list-p">
+              {isLoadingCheckins ? (
+                <div className="loading-spinner-p">Cargando huéspedes...</div>
+              ) : enCasa.length === 0 ? (
+                <p className="empty-msg">No hay huéspedes actualmente en el hotel.</p>
+              ) : (
+                enCasa.map(res => (
+                  <div key={res.id} className="res-card-p">
+                    <div className="res-main">
+                      <div className="res-guest">
+                        <div className="res-avatar">{res.guestName?.[0]}</div>
+                        <div className="res-name-wrap">
+                          <span className="res-name">{res.guestName}</span>
+                          <span className="res-phone">{res.guestPhone || 'Sin teléfono'}</span>
                         </div>
-                      ))
+                      </div>
+                      <div className="res-room">
+                        <span className="room-label">HABITACIÓN</span>
+                        <span className="room-val">{res.roomName}</span>
+                      </div>
+                    </div>
+                    <div className="res-dates">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {res.arrivalDate === todayStr && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <button 
+                            onClick={() => handleNoShow(res)}
+                            style={{ 
+                              background: '#fff1f2',
+                              color: '#e11d48',
+                              border: '1.5px solid #fecdd3',
+                              padding: '10px',
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <UserMinus size={16} />
+                            No-show
+                          </button>
+                          <button 
+                            onClick={() => handleCancelRes(res)}
+                            style={{ 
+                              background: 'white',
+                              color: '#64748b',
+                              border: '1.5px solid #e2e8f0',
+                              padding: '10px',
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={16} />
+                            Eliminar
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setSelectedReservation(res);
+                            const cleanResPhone = (res.guestPhone || "").replace(/\D/g, "");
+                            const phonePrefix = COUNTRY_CODES.find(c => {
+                              const cleanCode = c.code.replace(/\D/g, "");
+                              return cleanResPhone.length > 0 && cleanResPhone.startsWith(cleanCode);
+                            });
+                            const initialCountry = findCountryWithFlag(res.guestCountry || phonePrefix?.name || "");
+                            
+                            setCheckinForm({
+                              name: res.guestName || '',
+                              nationality: initialCountry,
+                              homeAddress: res.guestAddress || '',
+                              phone: res.guestPhone || (phonePrefix ? `${phonePrefix.code} ` : ''),
+                              city: res.guestCity || '',
+                              country: initialCountry,
+                              email: res.guestEmail || '',
+                              roomName: res.roomName || '',
+                              arrivalDate: res.arrivalDate || '',
+                              departureDate: res.departureDate || '',
+                              nights: res.nights || 0,
+                              pax: (res.adults || 0) + (res.children || 0) || 1,
+                              price: res.totalAmount || 0,
+                              currency: res.currency || 'USD',
+                              paymentStatus: res.paymentStatus || 'Por Pagar',
+                              source: res.sourceName || '',
+                              signature: ''
+                            });
+                            setShowCheckinModal(true);
+                          }}
+                          className="btn-premium"
+                          style={{ 
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: 12, 
+                            padding: '12px', 
+                            fontWeight: 700, 
+                            fontSize: 14, 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            width: '100%',
+                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                          }}
+                        >
+                          <UserPlus size={18} />
+                          Registrar ingreso
+                        </button>
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
-            );
-          })()}
+                ))
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
 
-  const renderAdminTables = () => (
-    <div className="fade-in" style={{ paddingBottom: 40 }}>
-      <button className="btn-primary" onClick={handleAdminAddTable} style={{ marginBottom: 24 }}>
-        <PlusCircle size={18} /> Agregar Mesa
-      </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {tables.map(table => (
-          <div key={table.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 18 }}>🪑</span>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>Mesa {table.id.toString().padStart(2, '0')}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>{table.status === 'free' ? 'Libre' : table.status === 'occupied' ? 'Ocupada' : 'Pagando'}</div>
-              </div>
-            </div>
-            <Trash2 size={18} color="var(--danger)" style={{ cursor: 'pointer' }} onClick={() => handleAdminDeleteTable(table.id)} />
+        <div className="checkin-section" style={{ marginTop: 24 }}>
+          <div className="section-header-p" onClick={() => setIsProximosExpanded(!isProximosExpanded)}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+               <Calendar size={20} />
+               <h3>Próximas llegadas ({proximas.length})</h3>
+             </div>
+             {isProximosExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </div>
-        ))}
+          
+          {isProximosExpanded && (
+            <div className="res-list-p">
+              {proximas.length === 0 ? (
+                <p className="empty-msg">No hay reservas próximas registradas.</p>
+              ) : (
+                proximas.map(res => (
+                  <div key={res.id} className="res-card-p secondary">
+                    <div className="res-main">
+                      <div className="res-guest">
+                        <div className="res-avatar">{res.guestName?.[0]}</div>
+                        <div className="res-name-wrap">
+                          <span className="res-name">{res.guestName}</span>
+                          <span className="res-phone">{res.guestPhone || 'Sin teléfono'}</span>
+                        </div>
+                      </div>
+                      <div className="res-room">
+                        <span className="room-label">HABITACIÓN</span>
+                        <span className="room-val">{res.roomName}</span>
+                      </div>
+                    </div>
+                    <div className="res-dates">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderAdminUsers = () => (
-    <div className="fade-in" style={{ paddingBottom: 40 }}>
-      <button className="btn-primary" onClick={() => setIsAddUserModalOpen(true)} style={{ marginBottom: 24 }}>
-        <UserPlus size={18} /> Agregar Usuario
-      </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {users.map(user => (
-          <div key={user.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: '50%',
-                backgroundColor: user.role === 'Administrador' ? '#e0e7ff' : user.role === 'Encargado' ? '#fefce8' : '#f0fdf4',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <User size={20} color={user.role === 'Administrador' ? '#4f46e5' : user.role === 'Encargado' ? '#ca8a04' : '#16a34a'} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>{user.name}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  {user.role === 'Administrador' ? '🔑 Administrador' : user.role === 'Encargado' ? '🛡️ Encargado' : '👤 Staff'} — {user.active ? 'Autorizado' : 'Bloqueado'}
+  const renderRegistros = () => {
+    return (
+      <div className="registros-view fade-in">
+        <div className="view-header" style={{ marginBottom: 24 }}>
+          <button className="back-btn-pill" onClick={() => setCurrentView('checkin')} style={{ marginBottom: 12 }}>
+            <ChevronLeft size={20} />
+            <span>Volver</span>
+          </button>
+          <h2 className="view-title-premium">Historial de Registros</h2>
+          <p className="view-subtitle-premium">Base de datos de huéspedes que han completado el check-in online</p>
+        </div>
+
+        {registrations.length === 0 ? (
+          <div className="empty-state-p">
+            <ClipboardList size={48} color="#94a3b8" />
+            <h3>No hay registros</h3>
+            <p>Los datos de huéspedes registrados aparecerán aquí</p>
+          </div>
+        ) : (
+          <div className="registros-list-p">
+            {registrations.map(reg => (
+              <div key={reg.id} className="reg-card-p">
+                <div className="reg-header-p">
+                   <div className="reg-guest-p">
+                     <div className="reg-avatar-p">{reg.name?.[0]}</div>
+                     <div className="reg-info-p">
+                       <span className="reg-name-p">{reg.name}</span>
+                       <span className="reg-meta-p">{reg.email} • {reg.phone}</span>
+                     </div>
+                   </div>
+                   <div className="reg-date-badge-p">
+                     {new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                   </div>
                 </div>
+                <div className="reg-body-p">
+                   <div className="reg-detail-grid-p">
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">NACIONALIDAD</span>
+                        <span className="reg-d-val">{reg.nationality}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">HABITACIÓN</span>
+                        <span className="reg-d-val">{reg.room_name}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">CIUDAD</span>
+                        <span className="reg-d-val">{reg.city}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">ESTANCIA</span>
+                        <span className="reg-d-val">{new Date(reg.arrival_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric'})} - {new Date(reg.departure_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'})}</span>
+                      </div>
+                   </div>
+                </div>
+                {reg.signature && (
+                  <div className="reg-sig-p">
+                    <span className="reg-d-label">FIRMA</span>
+                    <img src={reg.signature} alt="Firma del huésped" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderAdmin = () => {
+    return (
+      <div className="admin-view fade-in">
+        <div className="view-header">
+           <h2 className="view-title-premium">Panel de Control</h2>
+           <p className="view-subtitle-premium">Configuración de sistema y analíticas</p>
+        </div>
+
+        <div className="admin-nav-grid">
+           <button className={`admin-nav-btn ${adminSubView === 'stats' ? 'active' : ''}`} onClick={() => setAdminSubView('stats')}>
+             <TrendingUp size={24} />
+             <span>Finanzas</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'menu' ? 'active' : ''}`} onClick={() => setAdminSubView('menu')}>
+             <Pencil size={24} />
+             <span>Menú</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'users' ? 'active' : ''}`} onClick={() => setAdminSubView('users')}>
+             <Users size={24} />
+             <span>Personal</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'tables' ? 'active' : ''}`} onClick={() => setAdminSubView('tables')}>
+             <LayoutGrid size={24} />
+             <span>Mesas</span>
+           </button>
+        </div>
+
+        <div className="admin-content-box">
+          {adminSubView === 'menu' && (
+            <div className="admin-menu-section fade-in">
+              <div className="section-title-row">
+                <h3>Gestión de Menú</h3>
+                <button className="btn-small" onClick={handleAddItemModalOpen}>
+                  <Plus size={14} /> Nuevo Producto
+                </button>
+              </div>
+
+              <div className="admin-menu-list">
+                {CATEGORIES.map(cat => {
+                  const items = menuItems.filter(m => m.category === cat);
+                  const isExpanded = expandedItems.has(cat);
+                  
+                  return (
+                    <div key={cat} className="admin-cat-block">
+                      <div className="admin-cat-header" onClick={() => toggleExpanded(cat)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                          <span className="cat-name">{cat}</span>
+                          <span className="cat-count">{items.length} items</span>
+                        </div>
+                        <button className="cat-edit-btn" onClick={(e) => { e.stopPropagation(); openEditCategory(items[0]?.categoryId || '', cat); }}>
+                           <Pencil size={14} />
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="admin-items-grid fade-in">
+                          {items.map(item => (
+                            <div key={item.id} className={`admin-item-row ${!item.active ? 'inactive' : ''}`}>
+                              <div className="ai-info">
+                                <span className="ai-name">{item.name}</span>
+                                <span className="ai-price">{formatCurrency(item.price)}</span>
+                              </div>
+                              <div className="ai-actions">
+                                <button className="ai-btn edit" onClick={() => openEditItem(item)}><Pencil size={14} /></button>
+                                <button className={`ai-btn toggle ${item.active ? 'on' : 'off'}`} onClick={() => toggleMenuItem(item.id, !item.active)}>
+                                  {item.active ? 'Visible' : 'Oculto'}
+                                </button>
+                              </div>
+                              {item.hasVariants && item.variants && (
+                                <div className="ai-variants-list">
+                                  {item.variants.map(v => (
+                                    <div key={v.id} className="ai-variant-row">
+                                      <span className="av-label">{v.label}</span>
+                                      <span className="av-price">{formatCurrency(v.price)}</span>
+                                      <div className="av-actions">
+                                        <button className="av-btn edit" onClick={() => openEditVariant(v)}><Pencil size={12} /></button>
+                                        <button className={`av-btn toggle ${v.active ? 'on' : 'off'}`} onClick={() => toggleMenuVariant(v.id, !v.active)}>
+                                          {v.active ? <Check size={12} /> : <X size={12} />}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <Pencil size={18} color="#94a3b8" style={{ cursor: 'pointer' }} onClick={() => openEditUser(user)} />
-              <Trash2 size={18} color="var(--danger)" style={{ cursor: 'pointer' }} onClick={() => {
-                if (confirm(`¿Eliminar al usuario ${user.name}?`)) deleteUser(user.id);
-              }} />
+          )}
+
+          {adminSubView === 'stats' && (
+            <div className="admin-stats-section fade-in">
+              <div className="stats-nav-p">
+                <button className={`stats-nav-btn-p ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
+                <button className={`stats-nav-btn-p ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Analíticas</button>
+              </div>
+
+              {statsSubView === 'history' ? (
+                <div className="history-list-p">
+                  {dailySummaries.length === 0 ? (
+                    <div className="empty-state-p">No hay cierres registrados aún</div>
+                  ) : (
+                    dailySummaries.map(s => (
+                      <HistoryReportCard 
+                        key={s.id} 
+                        report={s} 
+                        formatCurrency={formatCurrency} 
+                        onDelete={(id: string) => setDeleteReportId(id)}
+                      />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="analytics-content-p">
+                   <div className="analytics-filter-p">
+                      {['day', 'month', 'total'].map(f => (
+                        <button key={f} className={`filter-btn-p ${analyticsFilter === f ? 'active' : ''}`} onClick={() => setAnalyticsFilter(f as any)}>
+                          {f === 'day' ? 'Hoy' : (f === 'month' ? 'Mes' : 'Histórico')}
+                        </button>
+                      ))}
+                   </div>
+
+                   <div className="ranking-card-p">
+                     <h4>Top 10 Productos</h4>
+                     <div className="ranking-list-p">
+                        {ranking.map((item, i) => (
+                          <div key={item.name} className="ranking-row-p">
+                            <span className="rank-num">#{i+1}</span>
+                            <span className="rank-name">{item.name}</span>
+                            <span className="rank-qty">{item.count} vendidos</span>
+                          </div>
+                        ))}
+                     </div>
+                   </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )}
+
+          {adminSubView === 'users' && (
+            <div className="admin-users-section fade-in">
+              <div className="section-title-row">
+                <h3>Personal</h3>
+                <button className="btn-small" onClick={() => setIsAddUserModalOpen(true)}>
+                  <Plus size={14} /> Nuevo Usuario
+                </button>
+              </div>
+              <div className="users-list-p">
+                {users.map(user => (
+                  <div key={user.id} className="user-card-p">
+                    <div className="user-avatar-p">{user.name[0].toUpperCase()}</div>
+                    <div className="user-info-p">
+                      <span className="user-name-p">{user.name}</span>
+                      <span className="user-role-p">{user.role}</span>
+                    </div>
+                    <div className="user-actions-p">
+                      <div className={`user-session-p ${user.session_active ? 'active' : ''}`}>
+                         {user.session_active ? 'Online' : 'Offline'}
+                      </div>
+                      <button className="user-edit-btn-p" onClick={() => {
+                        setEditingUserId(user.id);
+                        setEditUserName(user.name);
+                        setEditUserRole(user.role);
+                        setIsEditUserModalOpen(true);
+                      }}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="user-del-btn-p" onClick={() => deleteUser(user.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminSubView === 'tables' && (
+            <div className="admin-tables-section fade-in">
+              <div className="section-title-row">
+                <h3>Mesas</h3>
+              </div>
+              <div className="tables-admin-grid">
+                {tables.filter(t => t.category !== 'Pedidos para llevar').map(table => (
+                   <div key={table.id} className="table-admin-card">
+                     <span className="tac-number">{table.id}</span>
+                     <span className="tac-cat">{table.category}</span>
+                     <button className="tac-del-btn" onClick={() => deleteTable(table.id)}>Eliminar</button>
+                   </div>
+                ))}
+                <button className="table-admin-add" onClick={() => {
+                  const id = prompt('Número de la nueva mesa:');
+                  if (id && !isNaN(parseInt(id))) addTable(parseInt(id));
+                }}>
+                  <Plus size={24} />
+                  <span>Añadir Mesa</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderHeader = () => {
-    const isSubView = ['mesa', 'checkout'].includes(currentView) || (currentView === 'admin' && adminSubView !== 'main');
-    const subTitles: Record<string, string> = {
-      menu: 'Menú', users: 'Autorizados', tables: 'Mesas', stats: 'Estadísticas',
-    };
+    if (!currentUser) return null;
+    
     return (
       <div className="header">
-        {isSubView ? (
-          <button className="icon-button" onClick={() => {
-            if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
-            else if (currentView === 'checkout') setCurrentView('mesa');
-            else setCurrentView('salon');
-          }}>
-            <ChevronLeft size={24} />
-          </button>
-        ) : (
-          <div className="header-title-container">
-            <span className="header-title">
-              {currentView === 'home' && 'Inicio'}
-              {currentView === 'salon' && 'Salón'}
-              {currentView === 'pedidos' && 'Pedidos'}
-              {currentView === 'impresora' && 'Imprimir'}
-              {currentView === 'admin' && 'Admin'}
-            </span>
-          </div>
-        )}
-        {currentView === 'mesa' && (
-          <div className="header-title-container" style={{ alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -4 }}>Atendiendo</span>
-            <span className="header-title" style={{ fontSize: 26, fontWeight: 800 }}>
-              Mesa {selectedTableId?.toString().padStart(2, '0')}
-            </span>
-          </div>
-        )}
-        {currentView === 'checkout' && (
-          <div className="header-title-container" style={{ alignItems: 'center' }}>
-            <span className="header-title" style={{ fontSize: 22, fontWeight: 600 }}>Cobrar</span>
-          </div>
-        )}
-        {currentView === 'admin' && adminSubView !== 'main' && (
-          <div className="header-title-container" style={{ alignItems: 'center' }}>
-            <span className="header-title" style={{ fontSize: 20, fontWeight: 600 }}>{subTitles[adminSubView] || ''}</span>
-          </div>
-        )}
-        {currentView === 'mesa' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 800 }}>
-            <Users size={15} color="#64748b" /> {tables.find(t => t.id === selectedTableId)?.capacity ?? 4}
-          </div>
-        ) : isSubView ? (
-          <div style={{ width: 44 }} />
-        ) : (
+        <div className="header-title-container">
+          <span className="header-subtitle">RESTAURANTE & HOTEL</span>
+          <h1 className="header-title">Gallo Azul</h1>
+        </div>
+        {currentUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {deferredPrompt && (
-              <button
-                onClick={handleInstallPWA}
-                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
-                title="Instalar Aplicación"
-              >
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                Instalar
-              </button>
-            )}
-            {!deferredPrompt && showIosButton && (
-              <button
+            {showIosButton && (
+              <button 
+                className="btn-premium" 
+                style={{ width: 'auto', padding: '10px 16px', background: '#3b82f6', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: 'none' }}
                 onClick={() => setIsIosPromptVisible(true)}
-                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
-                title="Instalar en iOS"
               >
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                 Instalar
@@ -2009,7 +2003,6 @@ export default function App() {
                 className="header-logout-btn"
                 title="Cerrar sesión"
                 onClick={async () => {
-                  // Mark this user as offline in DB before clearing state
                   if (currentUser?.id) {
                     await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
                   }
@@ -2019,7 +2012,6 @@ export default function App() {
                   setLoginPassword('');
                   setCurrentView('home');
                 }}
-
               >
                 <LogOut size={15} />
               </button>
@@ -2030,6 +2022,38 @@ export default function App() {
     );
   };
 
+  const handleNoShow = async (res: Reservation) => {
+    if (!window.confirm(`¿Marcar la reserva de ${res.guestName} como No-show?`)) return;
+    
+    try {
+      setIsLoadingCheckins(true);
+      await updateReservationStatus(res.id, undefined, true);
+      alert('Reserva marcada como No-show correctamente');
+      const updated = await getUpcomingCheckins();
+      setUpcomingCheckins(updated);
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsLoadingCheckins(false);
+    }
+  };
+
+  const handleCancelRes = async (res: Reservation) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar/cancelar la reserva de ${res.guestName}?`)) return;
+    
+    try {
+      setIsLoadingCheckins(true);
+      await updateReservationStatus(res.id, 'cancelled');
+      alert('Reserva eliminada/cancelada correctamente');
+      const updated = await getUpcomingCheckins();
+      setUpcomingCheckins(updated);
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsLoadingCheckins(false);
+    }
+  };
+
   // ── Render ───────────────────────────────────────────
 
   return (
@@ -2038,679 +2062,938 @@ export default function App() {
       {renderHeader()}
       <div className="content-area">
         {currentView === 'home' && renderHome()}
+        {currentView === 'checkin' && renderCheckin()}
+        {currentView === 'registros' && renderRegistros()}
         {currentView === 'salon' && renderSalon()}
-        {currentView === 'mesa' && renderMesa()}
-        {currentView === 'checkout' && renderCheckout()}
-        {currentView === 'pedidos' && renderPedidos()}
-        {currentView === 'impresora' && renderImpresora()}
-        {currentView === 'admin' && adminSubView === 'main' && renderAdminMain()}
-        {currentView === 'admin' && adminSubView === 'menu' && renderAdminMenu()}
-        {currentView === 'admin' && adminSubView === 'users' && renderAdminUsers()}
-        {currentView === 'admin' && adminSubView === 'tables' && renderAdminTables()}
-        {currentView === 'admin' && adminSubView === 'stats' && renderAdminStats()}
-      </div>
-
-      {['home', 'salon', 'pedidos', 'impresora', 'admin'].includes(currentView) && adminSubView === 'main' && (
-        <div className="bottom-nav">
-          {[
-            { view: 'home', icon: <HomeIcon className="nav-icon" />, label: 'Inicio' },
-            { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Salón' },
-            { view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Pedidos' },
-            { view: 'impresora', icon: <Printer className="nav-icon" />, label: 'Cuentas' },
-            ...(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado'
-              ? [{ view: 'admin', icon: <Settings className="nav-icon" />, label: 'Admin' }]
-              : []),
-          ].map(({ view, icon, label }) => (
-            <div key={view} className={`nav-item ${currentView === view ? 'active' : ''}`} onClick={() => navTo(view as any)}>
-              {icon}{label}
+        {currentView === 'pedidos' && (
+          <div className="pedidos-view fade-in">
+            <div className="view-header">
+               <h2 className="view-title-premium">Comandera / Cocina</h2>
+               <p className="view-subtitle-premium">Productos pendientes de entrega</p>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Notes Modal */}
-      {notesModal && (
-        <div className="modal-overlay" onClick={() => setNotesModal(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Notas del item</h3>
-              <button className="modal-close" onClick={() => setNotesModal(null)}><X size={20} /></button>
-            </div>
-            <div className="form-group">
-              <label>Indicaciones especiales</label>
-              <textarea rows={3} value={notesDraft} onChange={e => setNotesDraft(e.target.value)} placeholder="Sin cebolla, extra picante..." />
-            </div>
-            <button className="btn-primary" onClick={handleSaveNotes}>Guardar nota</button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Confirm Modal */}
-      {confirmPending && (
-        <div className="confirm-overlay" onClick={() => setConfirmPending(null)}>
-          <div className="confirm-sheet" onClick={e => e.stopPropagation()}>
-            <div className="confirm-sheet-pill" />
-            <div className="confirm-sheet-label">Confirmar pedido</div>
-            <div className="confirm-item-name">{confirmPending.item.name}</div>
-            {confirmPending.variant && (
-              <div className={`confirm-variant-badge ${confirmPending.variant.label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}>
-                {confirmPending.variant.label}
+            
+            {activeItems.filter(i => i.status === 'pending').length === 0 ? (
+              <div className="empty-pedidos">
+                <h2>¡Cocina al día!</h2>
+                <p>No hay pedidos pendientes en este momento.</p>
+              </div>
+            ) : (
+              <div className="pedidos-list">
+                {activeItems
+                  .filter(i => i.status === 'pending')
+                  .sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                  .map(item => (
+                    <div key={item.id} className="qa-card">
+                      <div className="qa-header">
+                        <span className="qa-table-badge">MESA {item.table_id}</span>
+                        <span className="qa-qty-label">{item.qty} UNIDADES</span>
+                      </div>
+                      <div className="qa-body">
+                         <div className="qa-info">
+                            <div className="qa-name">{item.name}</div>
+                            {item.variant_label && <div className="qa-variant">{item.variant_label}</div>}
+                            {item.notes && (
+                              <div className="qa-notes-box">
+                                <StickyNote size={14} />
+                                <span>{item.notes}</span>
+                              </div>
+                            )}
+                         </div>
+                         <button className="qa-done-btn" onClick={() => markItemDone(item.id)}>
+                            <Check size={28} />
+                         </button>
+                      </div>
+                    </div>
+                  ))
+                }
               </div>
             )}
-            <div className="confirm-price">
-              {confirmPending.variant ? confirmPending.variant.price : confirmPending.item.price}
-            </div>
-            {/* Notes input */}
-            <div className="confirm-notes-wrap">
-              <label className="confirm-notes-label">
-                📝 Notas especiales <span>(opcional)</span>
-              </label>
-              <textarea
-                className="confirm-notes-input"
-                placeholder="Ej: sin cebolla, extra picante, leche vegana..."
-                value={confirmNotes}
-                onChange={e => setConfirmNotes(e.target.value)}
-                rows={2}
-                maxLength={150}
-              />
-            </div>
-            <div className="confirm-actions">
-              <button className="confirm-cancel" onClick={() => setConfirmPending(null)}>Cancelar</button>
-              <button className="confirm-ok" onClick={confirmAddItem}>
-                <Plus size={16} /> Agregar a la orden
-              </button>
-            </div>
           </div>
-        </div>
-      )}
-
-      {/* Table Actions Confirm Modal (Open / Pay) */}
-      {tableConfirmModal.isOpen && (
-        <div className="confirm-overlay" onClick={() => setTableConfirmModal({ ...tableConfirmModal, isOpen: false })}>
-          <div className="confirm-sheet" style={{ padding: 32, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <div style={{ marginBottom: 16 }}>
-              {tableConfirmModal.type === 'open' ? (
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#3b82f6' }}>
-                  <Plus size={32} />
-                </div>
-              ) : tableConfirmModal.type === 'closeEmpty' ? (
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#ef4444' }}>
-                  <X size={32} />
-                </div>
-              ) : (
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#10b981' }}>
-                  <Check size={32} />
-                </div>
-              )}
-            </div>
-            
-            <h3 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-              {tableConfirmModal.type === 'open' ? `Abrir Mesa ${tableConfirmModal.tableId}` : tableConfirmModal.type === 'closeEmpty' ? `Liberar Mesa ${tableConfirmModal.tableId}` : `Cuenta Pagada`}
-            </h3>
-            
-            <p style={{ fontSize: 16, color: '#64748b', marginBottom: 32, lineHeight: 1.5, padding: '0 12px' }}>
-              {tableConfirmModal.type === 'open' 
-                ? '¿Confirmas que deseas iniciar el registro de una cuenta nueva en esta mesa?' 
-                : tableConfirmModal.type === 'closeEmpty'
-                ? '¿Confirmas que deseas cerrar esta cuenta vacía y dejar la mesa libre nuevamente?'
-                : '¿Confirmas que los productos han sido pagados y se liberará la mesa?'}
-            </p>
-            
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button 
-                onClick={() => setTableConfirmModal({ ...tableConfirmModal, isOpen: false })}
-                style={{ flex: 1, padding: '16px', borderRadius: 16, border: '1px solid var(--border-color)', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 15 }}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={tableConfirmModal.type === 'open' ? handleConfirmOpenTable : tableConfirmModal.type === 'closeEmpty' ? handleCancelTable : executePayment}
-                style={{ flex: 1, padding: '16px', borderRadius: 16, background: tableConfirmModal.type === 'open' ? '#3b82f6' : tableConfirmModal.type === 'closeEmpty' ? '#ef4444' : '#10b981', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15 }}
-              >
-                Sí, Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cierre Modal */}
-      {isCierreModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsCierreModalOpen(false)}>
-          <div className="modal-content cierre-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Confirmar Cierre Diario</h3>
-              <button className="modal-close" onClick={() => setIsCierreModalOpen(false)}><X size={20} /></button>
-            </div>
-            
-            <div className="cierre-body">
-              <div className="cierre-summary-box">
-                <div className="csb-stat">
-                  <div className="csb-val income">${todayIncome.toFixed(0)}</div>
-                  <div className="csb-lab">Ingresos ({todayAccountsCount} cuentas)</div>
-                </div>
-                <div className="csb-stat">
-                  <div className="csb-val expense">${todayExpenses.toFixed(0)}</div>
-                  <div className="csb-lab">Gastos ({todayExpensesList.length} registros)</div>
-                </div>
-              </div>
-
-              <div className="cierre-breakdown">
-                <div className="cb-item">
-                  <span className="cb-dot cash"></span>
-                  <span className="cb-label">Efectivo:</span>
-                  <span className="cb-value">${todayCashIncome.toFixed(0)}</span>
-                </div>
-                <div className="cb-item">
-                  <span className="cb-dot transfer"></span>
-                  <span className="cb-label">Transferencia:</span>
-                  <span className="cb-value">${todayTransferIncome.toFixed(0)}</span>
-                </div>
-                {todayTransferTips > 0 && (
-                  <div className="cb-item" style={{ gridColumn: '1 / -1' }}>
-                    <span className="cb-dot" style={{ backgroundColor: '#10b981' }}></span>
-                    <span className="cb-label">Propinas (Transf.):</span>
-                    <span className="cb-value">${todayTransferTips.toFixed(0)}</span>
-                  </div>
-                )}
-              </div>
-
-              {todayExpensesList.length > 0 && (
-                <div className="cierre-list-wrap">
-                  <h4>Lista de Gastos</h4>
-                  <div className="cierre-list">
-                    {todayExpensesList.map((exp, idx) => (
-                      <div key={idx} className="cierre-list-item">
-                        <div className="cli-info">
-                          <div className="cli-concept">{exp.concept}</div>
-                          {exp.detail && <div className="cli-detail">{exp.detail}</div>}
-                        </div>
-                        <div className="cli-price">${exp.amount}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="cierre-total-box">
-                <span>Resultado del Balance:</span>
-                <strong>${(todayIncome - todayExpenses).toFixed(0)}</strong>
-              </div>
-
-              <div className="cierre-warning-box">
-                <AlertTriangle size={20} />
-                <p>Al confirmar, se generará un reporte permanente en estadísticas y se reiniciarán los valores para el próximo turno.</p>
-              </div>
-
-              <button 
-                className="btn-primary cierre-submit"
-                onClick={async () => {
-                  if (currentUser) {
-                    await closeDay(currentUser.name);
-                    setIsCierreModalOpen(false);
-                    setAdminSubView('stats');
-                  }
-                }}
-              >
-                Ejecutar Cierre General
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expense Modal */}
-      {isExpenseModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsExpenseModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Registrar Gasto</h3>
-              <button className="modal-close" onClick={() => setIsExpenseModalOpen(false)}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleExpenseSubmit}>
-              <div className="form-group">
-                <label>Monto Pagado ($)</label>
-                <input type="number" step="0.01" required value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              <div className="form-group">
-                <label>Concepto</label>
-                <select value={expenseConcept} onChange={e => setExpenseConcept(e.target.value)}>
-                  <option>Pago a proveedores</option>
-                  <option>Compra de insumos</option>
-                  <option>Otro</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Detalle / Notas</label>
-                <textarea rows={3} value={expenseDetail} onChange={e => setExpenseDetail(e.target.value)} placeholder="Descripción del gasto..." />
-              </div>
-              <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>Guardar Gasto</button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add User Modal */}
-      {isAddUserModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAddUserModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Agregar Usuario</h3>
-              <button className="modal-close" onClick={() => setIsAddUserModalOpen(false)}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleAddUserSubmit}>
-              <div className="form-group">
-                <label>Nombre de usuario</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={newUserName}
-                  onChange={e => setNewUserName(e.target.value)}
-                  placeholder="Ej. María López"
-                />
-              </div>
-              <div className="form-group">
-                <label>Contraseña inicial</label>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: '#f8fafc', border: '1px solid #e2e8f0',
-                  borderRadius: 12, padding: '11px 14px',
-                }}>
-                  <Lock size={16} color="#94a3b8" />
-                  <span style={{ fontSize: 15, fontWeight: 600, fontFamily: 'monospace', color: '#475569', letterSpacing: 1 }}>
-                    {INITIAL_PASSWORD}
-                  </span>
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>predeterminada</span>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Perfil de acceso</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  {(['Staff', 'Encargado', 'Administrador'] as const).map(role => (
-                    <div
-                      key={role}
-                      onClick={() => setNewUserRole(role as any)}
-                      style={{
-                        padding: '14px 12px', borderRadius: 14,
-                        border: `2px solid ${newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : role === 'Encargado' ? '#eab308' : '#16a34a') : '#e2e8f0'}`,
-                        background: newUserRole === role ? (role === 'Administrador' ? '#e0e7ff' : role === 'Encargado' ? '#fefce8' : '#f0fdf4') : '#f8fafc',
-                        cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                      }}
-                    >
-                      <div style={{ fontSize: 22, clipPath: 'none', marginBottom: 4 }}>{role === 'Administrador' ? '🔑' : role === 'Encargado' ? '🛡️' : '👤'}</div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: newUserRole === role ? (role === 'Administrador' ? '#4f46e5' : role === 'Encargado' ? '#ca8a04' : '#16a34a') : '#64748b' }}>
-                        {role}
-                      </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, lineHeight: 1.2 }}>
-                        {role === 'Administrador' ? 'Acceso total' : role === 'Encargado' ? 'Gestión limitada' : 'Acceso operativo'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
-                <UserPlus size={18} /> Crear Usuario
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit User Modal */}
-      {isEditUserModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsEditUserModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Editar Usuario</h3>
-              <button className="modal-close" onClick={() => setIsEditUserModalOpen(false)}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleEditUserSubmit}>
-              <div className="form-group">
-                <label>Nombre</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={editUserName}
-                  onChange={e => setEditUserName(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Perfil</label>
-                <div className="role-selector-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                  {(['Administrador', 'Encargado', 'Staff'] as const).map(role => (
-                    <div
-                      key={role}
-                      className={`role-option ${editUserRole === role ? 'active' : ''}`}
-                      onClick={() => setEditUserRole(role as any)}
-                      style={{ fontSize: 13, flexDirection: 'column', padding: '12px 8px', textAlign: 'center' }}
-                    >
-                      <div className="role-check" style={{ marginBottom: 4, marginRight: 0 }}>
-                        {editUserRole === role && <Check size={14} strokeWidth={4} />}
-                      </div>
-                      <div className="role-text" style={{ fontWeight: 700, fontSize: 12 }}>{role}</div>
-                      <div className="role-badge" style={{ fontSize: 10 }}>
-                        {role === 'Administrador' ? 'Total' : role === 'Encargado' ? 'Limitado' : 'Operativo'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
-                <Check size={18} /> Guardar cambios
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Menu Modal (items, variants, categories) */}
-      {editTarget && (
-        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {editTarget.type === 'category' ? 'Editar Categoría' : editTarget.type === 'variant' ? 'Editar Variante' : 'Editar Producto'}
-              </h3>
-              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleEditSave}>
-              <div className="form-group">
-                <label>{editTarget.type === 'variant' ? 'Nombre de la variante' : 'Nombre'}</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                />
-              </div>
-              {editTarget.type !== 'category' && (
-                <div className="form-group">
-                  <label>Precio ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editPrice}
-                    onChange={e => setEditPrice(e.target.value)}
-                  />
-                </div>
-              )}
-              <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
-                <Check size={18} /> Guardar cambios
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Delete Report Confirmation Modal */}
-      {deleteReportId && (
-        <div className="modal-overlay" onClick={() => setDeleteReportId(null)}>
-          <div className="modal-content" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ color: '#ef4444' }}>Eliminar Reporte</h3>
-              <button className="modal-close" onClick={() => setDeleteReportId(null)}><X size={20} /></button>
-            </div>
-            <div style={{ padding: '16px 0 8px', color: '#475569', fontSize: 14, lineHeight: 1.6 }}>
-              ¿Confirmas que deseas eliminar este reporte de cierre? Esta acción <strong>no se puede deshacer</strong>.
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button
-                onClick={() => setDeleteReportId(null)}
-                style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  await deleteShiftSummary(deleteReportId);
-                  setDeleteReportId(null);
-                }}
-                style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}
-              >
-                Sí, eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* iOS Install Prompt Modal */}
-      {isIosPromptVisible && (
-        <div className="modal-overlay" onClick={() => setIsIosPromptVisible(false)} style={{ zIndex: 9999 }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center', padding: '32px 24px' }}>
-            <div style={{ width: 64, height: 64, background: '#eff6ff', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-              <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
-            </div>
-            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Instalar Gallo Azul</h3>
-            <p style={{ fontSize: 15, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
-              Para instalar la aplicación en tu iPhone o iPad, pulsa el botón de <strong>Compartir</strong> en la barra inferior (el cuadrado con la flecha hacia arriba) y luego selecciona <strong>"Agregar a inicio"</strong>.
-            </p>
-            <button className="btn-primary" onClick={() => setIsIosPromptVisible(false)}>
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Item Modal */}
-      {isAddItemModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAddItemModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Agregar Producto</h3>
-              <button className="modal-close" onClick={() => setIsAddItemModalOpen(false)}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleCreateMenuItem}>
-              <div className="form-group">
-                <label>Nombre del producto</label>
-                <input
-                  type="text"
-                  required
-                  value={newItemName}
-                  onChange={e => setNewItemName(e.target.value)}
-                  placeholder="Ej. Hamburguesa Especial"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>Categoría</label>
-                <select
-                  required
-                  value={newItemCategory}
-                  onChange={e => setNewItemCategory(e.target.value)}
-                >
-                  <option value="">Selecciona una categoría...</option>
-                  {[...new Set(menuItems.map(m => JSON.stringify({ id: m.categoryId, name: m.category })))].map(c => {
-                    const cat = JSON.parse(c);
-                    if (!cat.id) return null;
-                    return <option key={cat.id} value={cat.id}>{cat.name}</option>;
-                  })}
-                  <option value="NEW">+ Crear nueva categoría</option>
-                </select>
-              </div>
-              
-              {newItemCategory === 'NEW' && (
-                <div className="form-group slide-in">
-                  <label>Nombre de nueva categoría</label>
-                  <input
-                    type="text"
-                    required
-                    value={newCategoryName}
-                    onChange={e => setNewCategoryName(e.target.value)}
-                    placeholder="Ej. Postres"
-                  />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>Tipo de precio</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div
-                    onClick={() => setNewItemType('fixed')}
-                    style={{
-                      padding: '12px', borderRadius: 12,
-                      border: `2px solid ${newItemType === 'fixed' ? '#4f46e5' : '#e2e8f0'}`,
-                      background: newItemType === 'fixed' ? '#e0e7ff' : '#f8fafc',
-                      cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                      fontWeight: 600, color: newItemType === 'fixed' ? '#4f46e5' : '#64748b'
-                    }}
-                  >
-                    Precio Fijo
-                  </div>
-                  <div
-                    onClick={() => setNewItemType('variants')}
-                    style={{
-                      padding: '12px', borderRadius: 12,
-                      border: `2px solid ${newItemType === 'variants' ? '#4f46e5' : '#e2e8f0'}`,
-                      background: newItemType === 'variants' ? '#e0e7ff' : '#f8fafc',
-                      cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                      fontWeight: 600, color: newItemType === 'variants' ? '#4f46e5' : '#64748b'
-                    }}
-                  >
-                    Con Variantes
-                  </div>
-                </div>
-              </div>
-
-              {newItemType === 'fixed' ? (
-                <div className="form-group slide-in">
-                  <label>Precio ($)</label>
-                  <input
-                    type="number"
-                    required
-                    step="0.01"
-                    value={newItemPrice}
-                    onChange={e => setNewItemPrice(e.target.value)}
-                    placeholder="Ej. 150.00"
-                  />
-                </div>
-              ) : (
-                <div className="form-group slide-in">
-                  <label>Variantes (Ej: Harina Blanca / Integral)</label>
-                  {newItemVariants.map((v, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                      <input
-                        type="text"
-                        required
-                        placeholder={`Variante ${i+1} (ej. ${i===0?'Pan Blanco':'Integral'})`}
-                        value={v.label}
-                        onChange={e => {
-                          const arr = [...newItemVariants];
-                          arr[i].label = e.target.value;
-                          setNewItemVariants(arr);
-                        }}
-                        style={{ flex: 2 }}
-                      />
-                      <input
-                        type="number"
-                        required
-                        placeholder="$"
-                        value={v.price}
-                        onChange={e => {
-                          const arr = [...newItemVariants];
-                          arr[i].price = e.target.value;
-                          setNewItemVariants(arr);
-                        }}
-                        style={{ flex: 1 }}
-                      />
-                      {newItemVariants.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => setNewItemVariants(newItemVariants.filter((_, idx) => idx !== i))}
-                          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0 8px' }}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setNewItemVariants([...newItemVariants, {label: '', price: ''}])}
-                    style={{
-                      width: '100%', background: 'transparent', border: '1px dashed #cbd5e1', color: '#64748b',
-                      padding: 10, borderRadius: 12, fontWeight: 600, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Plus size={16} /> Agregar otra variante
-                  </button>
-                </div>
-              )}
-
-              <button type="submit" className="btn-primary" style={{ marginTop: 16 }}>
-                <Plus size={18} /> Crear Producto
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Imprimir Cuenta */}
-      {printCuentaModal.isOpen && printCuentaModal.tableId && (
-        <div className="modal-overlay print-hide" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 24, maxWidth: 400 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>Cuenta - Mesa {printCuentaModal.tableId}</h3>
-            <div className="ticket-print-area">
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
-                <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {currentUser?.name}</div>
-                <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {printCuentaModal.tableId}</div>
-                <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
-                  Fecha: {new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-              <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0' }}>
-                {activeItems.filter(i => i.table_id === printCuentaModal.tableId).map(i => (
-                  <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-                     <div style={{ flex: 1, paddingRight: 8 }}>x{i.qty} {i.name}</div>
-                     <div style={{ fontWeight: 600 }}>${(i.price * i.qty).toFixed(0)}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
-                 <span>Total:</span>
-                 <span>${activeItems.filter(i => i.table_id === printCuentaModal.tableId).reduce((s, i) => s + (i.price * i.qty), 0).toFixed(0)}</span>
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: 12, marginTop: 24 }} className="print-hide">
-              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>Cancelar</button>
-              <button className="btn-primary" style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'center' }} onClick={handleSendToPrinter}>
-                 <Printer size={18} /> Enviar a Imprimir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+        )}
+        {currentView === 'impresora' && renderImpresora()}
+        {currentView === 'admin' && renderAdmin()}
+        {currentView === 'mesa' && renderMesa()}
+        {currentView === 'checkout' && renderCheckout()}
       </div>
 
-      {/* Ticket Listo para Disparar Windows.Print() desde Caja */}
-      {ticketToPrint && (
-        <div className="ticket-print-area">
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-             <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
-             <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {ticketToPrint.printed_by}</div>
-             <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {ticketToPrint.table_id}</div>
-             <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
-                Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      {currentUser && (
+        <div className="bottom-nav">
+          <button className={`nav-item ${currentView === 'home' ? 'active' : ''}`} onClick={() => setCurrentView('home')}>
+            <HomeIcon className="nav-icon" />
+            <span>Inicio</span>
+          </button>
+          <button className={`nav-item ${currentView === 'checkin' || currentView === 'registros' ? 'active' : ''}`} onClick={() => setCurrentView('checkin')}>
+            <Building className="nav-icon" />
+            <span>Hotel</span>
+          </button>
+          <button className={`nav-item ${currentView === 'salon' || currentView === 'mesa' || currentView === 'checkout' ? 'active' : ''}`} onClick={() => setCurrentView('salon')}>
+            <LayoutGrid className="nav-icon" />
+            <span>Salón</span>
+          </button>
+          <button className={`nav-item ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')}>
+            <Settings className="nav-icon" />
+            <span>Admin</span>
+          </button>
+        </div>
+      )}
+
+      {/* --- Modales --- */}
+
+      {!currentUser && (
+        <div className="login-overlay">
+          <div className="login-card fade-in">
+             <div className="login-header">
+               <div className="login-logo">G</div>
+               <h2>Gallo Azul</h2>
+               <p>Ingresa tus credenciales para continuar</p>
              </div>
-          </div>
-          <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0', fontSize: 14 }}>
-             {ticketToPrint.items_summary.split(', ').map((str: string, i: number) => (
-                <div key={i} style={{ marginBottom: 4 }}>- {str}</div>
-             ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
-             <span>Total:</span>
-             <span>${Number(ticketToPrint.total).toFixed(0)}</span>
+             <form onSubmit={handleLogin}>
+               <div className="login-field">
+                 <User size={18} />
+                 <input 
+                   type="text" 
+                   placeholder="Nombre de usuario" 
+                   value={loginName} 
+                   onChange={(e) => setLoginName(e.target.value)} 
+                   required
+                 />
+               </div>
+               <div className="login-field">
+                 <Lock size={18} />
+                 <input 
+                   type={showPassword ? "text" : "password"} 
+                   placeholder="Contraseña" 
+                   value={loginPassword} 
+                   onChange={(e) => setLoginPassword(e.target.value)} 
+                   required
+                 />
+                 <button type="button" className="pw-toggle" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                 </button>
+               </div>
+               {loginError && <div className="login-error-msg">{loginError}</div>}
+               <button type="submit" className="login-btn-premium" disabled={loginLoading}>
+                 {loginLoading ? 'Iniciando...' : 'Entrar al Sistema'}
+               </button>
+             </form>
           </div>
         </div>
       )}
+
+      {showCheckinModal && (
+        <div className="modal-overlay-premium" onClick={() => setShowCheckinModal(false)}>
+           <div className="modal-content-premium full" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <div className="m-h-info">
+                 <h3>Registro de Huésped</h3>
+                 <p>Completa los datos para el check-in online</p>
+               </div>
+               <button className="m-close-btn" onClick={() => setShowCheckinModal(false)}><X size={20} /></button>
+             </div>
+             
+             <div className="checkin-form-p">
+                <div className="form-group-p">
+                  <label>Nombre Completo</label>
+                  <input 
+                    type="text" 
+                    value={checkinForm.name} 
+                    onChange={e => setCheckinForm({...checkinForm, name: e.target.value})} 
+                    placeholder="Ej. Juan Pérez"
+                  />
+                </div>
+
+                <div className="form-row-p">
+                  <div className="form-group-p">
+                    <label>Nacionalidad</label>
+                    <select 
+                      value={checkinForm.nationality}
+                      onChange={e => setCheckinForm({...checkinForm, nationality: e.target.value, country: e.target.value})}
+                    >
+                      <option value="">Seleccionar...</option>
+                      {Object.entries(COUNTRIES_BY_CONTINENT).map(([continent, countries]) => (
+                        <optgroup key={continent} label={continent}>
+                          {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group-p">
+                    <label>Teléfono</label>
+                    <input 
+                      type="tel" 
+                      value={checkinForm.phone} 
+                      onChange={e => setCheckinForm({...checkinForm, phone: e.target.value})} 
+                      placeholder="+52 1..."
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group-p">
+                  <label>Correo Electrónico</label>
+                  <input 
+                    type="email" 
+                    value={checkinForm.email} 
+                    onChange={e => setCheckinForm({...checkinForm, email: e.target.value})} 
+                    placeholder="ejemplo@correo.com"
+                  />
+                </div>
+
+                <div className="form-row-p">
+                  <div className="form-group-p">
+                    <label>Ciudad de Residencia</label>
+                    <input 
+                      type="text" 
+                      value={checkinForm.city} 
+                      onChange={e => setCheckinForm({...checkinForm, city: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div className="checkin-res-summary">
+                  <div className="res-sum-header">Detalles de la Estancia</div>
+                  <div className="res-sum-grid">
+                    <div className="res-s-item">
+                       <span className="res-s-label">HABITACIÓN</span>
+                       <span className="res-s-val">{checkinForm.roomName}</span>
+                    </div>
+                    <div className="res-s-item">
+                       <span className="res-s-label">FECHAS</span>
+                       <span className="res-s-val">
+                         {new Date(checkinForm.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'})} - {new Date(checkinForm.departureDate + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'})}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group-p sig-section">
+                  <label>Firma del Huésped</label>
+                  <div className="signature-pad-p">
+                    <p>El huésped debe firmar en este espacio</p>
+                    {/* Placeholder for actual signature pad component */}
+                  </div>
+                </div>
+
+                <button 
+                  className="btn-premium-p" 
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase.from('guest_registrations').insert([{
+                        reservation_id: selectedReservation?.id,
+                        name: checkinForm.name,
+                        nationality: checkinForm.nationality,
+                        home_address: checkinForm.homeAddress,
+                        phone: checkinForm.phone,
+                        city: checkinForm.city,
+                        country: checkinForm.country,
+                        email: checkinForm.email,
+                        room_name: checkinForm.roomName,
+                        arrival_date: checkinForm.arrivalDate,
+                        departure_date: checkinForm.departureDate,
+                        nights: checkinForm.nights,
+                        pax: checkinForm.pax,
+                        price: checkinForm.price,
+                        currency: checkinForm.currency,
+                        payment_status: checkinForm.paymentStatus,
+                        source: checkinForm.source,
+                        signature: checkinForm.signature
+                      }]);
+                      
+                      if (error) throw error;
+                      
+                      alert('Check-in completado correctamente');
+                      setShowCheckinModal(false);
+                      fetchRegistrations();
+                    } catch (err: any) {
+                      alert('Error al registrar: ' + err.message);
+                    }
+                  }}
+                >
+                  Finalizar Registro
+                </button>
+             </div>
+           </div>
+        </div>
+      )}
+
+      {showNewResModal && (
+        <div className="modal-overlay-premium" onClick={() => setShowNewResModal(false)}>
+           <div className="modal-content-premium full" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <div className="m-h-info">
+                 <h3>Crear Nueva Reserva</h3>
+                 <p>Conexión directa con Hostaway API</p>
+               </div>
+               <button className="m-close-btn" onClick={() => setShowNewResModal(false)}><X size={20} /></button>
+             </div>
+             
+             <div className="checkin-form-p">
+                <div className="form-row-p">
+                  <div className="form-group-p">
+                    <label>Nombre</label>
+                    <input 
+                      type="text" 
+                      value={newResForm.guestFirstName} 
+                      onChange={e => setNewResForm({...newResForm, guestFirstName: e.target.value})} 
+                      placeholder="Nombre"
+                    />
+                  </div>
+                  <div className="form-group-p">
+                    <label>Apellido</label>
+                    <input 
+                      type="text" 
+                      value={newResForm.guestLastName} 
+                      onChange={e => setNewResForm({...newResForm, guestLastName: e.target.value})} 
+                      placeholder="Apellido"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row-p">
+                  <div className="form-group-p">
+                    <label>Teléfono</label>
+                    <input 
+                      type="tel" 
+                      value={newResForm.guestPhone} 
+                      onChange={e => setNewResForm({...newResForm, guestPhone: e.target.value})} 
+                      placeholder="+1 234..."
+                    />
+                  </div>
+                  <div className="form-group-p">
+                    <label>Email</label>
+                    <input 
+                      type="email" 
+                      value={newResForm.guestEmail} 
+                      onChange={e => setNewResForm({...newResForm, guestEmail: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row-p">
+                  <div className="form-group-p">
+                    <label>Check-in</label>
+                    <input 
+                      type="date" 
+                      value={newResForm.arrivalDate} 
+                      onChange={e => setNewResForm({...newResForm, arrivalDate: e.target.value})} 
+                    />
+                  </div>
+                  <div className="form-group-p">
+                    <label>Check-out</label>
+                    <input 
+                      type="date" 
+                      value={newResForm.departureDate} 
+                      onChange={e => setNewResForm({...newResForm, departureDate: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group-p">
+                  <label>Habitación Asignada</label>
+                  <select 
+                    value={newResForm.listingId} 
+                    onChange={e => setNewResForm({...newResForm, listingId: e.target.value})}
+                    disabled={isLoadingAvailability || (!newResForm.arrivalDate || !newResForm.departureDate)}
+                  >
+                    <option value="">{isLoadingAvailability ? 'Buscando disponibles...' : 'Seleccionar habitación...'}</option>
+                    {availableListings.map(l => (
+                      <option key={l.id} value={l.id}>{l.name} - {formatCurrency(l.basePrice, l.currency)}/noche</option>
+                    ))}
+                  </select>
+                  {!newResForm.arrivalDate && <small style={{ color: '#94a3b8' }}>Ingresa fechas para ver disponibilidad</small>}
+                </div>
+
+                <div className="price-config-box">
+                  <div className="price-toggle-row">
+                    <label>Precio Hostaway</label>
+                    <div className="price-display">
+                      {newResForm.listingId ? (
+                        formatCurrency(availableListings.find(l => String(l.id) === String(newResForm.listingId))?.basePrice || 0, availableListings.find(l => String(l.id) === String(newResForm.listingId))?.currency)
+                      ) : '--'}
+                    </div>
+                  </div>
+                  
+                  <div className="custom-price-toggle">
+                     <input 
+                        type="checkbox" 
+                        id="useCustomPrice" 
+                        checked={newResForm.useCustomPrice}
+                        onChange={e => setNewResForm({...newResForm, useCustomPrice: e.target.checked})}
+                     />
+                     <label htmlFor="useCustomPrice">Personalizar precio</label>
+                  </div>
+
+                  {newResForm.useCustomPrice && (
+                    <div className="custom-price-inputs fade-in">
+                       <select 
+                         value={newResForm.priceCurrency} 
+                         onChange={e => setNewResForm({...newResForm, priceCurrency: e.target.value})}
+                       >
+                         <option value="USD">USD</option>
+                         <option value="MXN">MXN</option>
+                       </select>
+                       <input 
+                         type="number" 
+                         placeholder="Nuevo precio total"
+                         value={newResForm.customPrice}
+                         onChange={e => setNewResForm({...newResForm, customPrice: e.target.value})}
+                       />
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  className="btn-premium-p highlight" 
+                  onClick={handleCreateReservation}
+                  disabled={isCreatingRes || !newResForm.listingId}
+                >
+                  {isCreatingRes ? 'Creando Reserva...' : 'Registrar en Hostaway'}
+                </button>
+             </div>
+           </div>
+        </div>
+      )}
+
+      {tableConfirmModal.isOpen && (
+        <div className="modal-overlay-premium" onClick={() => setTableConfirmModal({isOpen: false, type: 'open', tableId: null})}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+                <h3>{tableConfirmModal.type === 'open' ? 'Abrir Mesa' : (tableConfirmModal.type === 'pay' ? 'Confirmar Pago' : 'Cerrar Mesa')}</h3>
+             </div>
+             <div style={{ padding: '20px 0', fontSize: 16, color: '#475569', textAlign: 'center' }}>
+                {tableConfirmModal.type === 'open' 
+                  ? `¿Deseas abrir la cuenta para la Mesa ${tableConfirmModal.tableId}?` 
+                  : (tableConfirmModal.type === 'pay' ? '¿Confirmas el pago total de esta cuenta?' : `¿Deseas cerrar la Mesa ${tableConfirmModal.tableId}?`)}
+             </div>
+             <div className="modal-actions-p">
+                <button className="btn-sec-p" onClick={() => setTableConfirmModal({isOpen: false, type: 'open', tableId: null})}>Cancelar</button>
+                <button className="btn-pri-p" onClick={async () => {
+                   if (tableConfirmModal.type === 'open' && tableConfirmModal.tableId) {
+                      await createOrderForTable(tableConfirmModal.tableId);
+                      setSelectedTableId(tableConfirmModal.tableId);
+                      setCurrentView('mesa');
+                   } else if (tableConfirmModal.type === 'closeEmpty' && tableConfirmModal.tableId) {
+                      await cancelTable(tableConfirmModal.tableId);
+                      setCurrentView('salon');
+                   }
+                   setTableConfirmModal({isOpen: false, type: 'open', tableId: null});
+                }}>Confirmar</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {printCuentaModal.isOpen && (
+        <div className="modal-overlay-premium" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+                <h3>Imprimir Cuenta</h3>
+             </div>
+             <div style={{ padding: '20px 0', fontSize: 16, color: '#475569', textAlign: 'center' }}>
+                Esto enviará el ticket a la cola de impresión en caja.<br/>
+                Total: <strong>{formatCurrency(orderTotal)}</strong>
+             </div>
+             <div className="modal-actions-p">
+                <button className="btn-sec-p" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>Volver</button>
+                <button className="btn-pri-p" onClick={handleSendToPrinter}>Imprimir Ticket</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isExpenseModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsExpenseModalOpen(false)}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <h3>Registrar Gasto</h3>
+               <button className="m-close-btn" onClick={() => setIsExpenseModalOpen(false)}><X size={20} /></button>
+             </div>
+             <div className="modal-form-p">
+                <div className="form-group-p">
+                  <label>Monto ($)</label>
+                  <input type="number" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="form-group-p">
+                  <label>Concepto</label>
+                  <select value={expenseConcept} onChange={e => setExpenseConcept(e.target.value)}>
+                    <option>Pago a proveedores</option>
+                    <option>Sueldos / Nómina</option>
+                    <option>Servicios (Luz/Agua)</option>
+                    <option>Mantenimiento</option>
+                    <option>Otros</option>
+                  </select>
+                </div>
+                <div className="form-group-p">
+                  <label>Detalle (opcional)</label>
+                  <input type="text" value={expenseDetail} onChange={e => setExpenseDetail(e.target.value)} placeholder="Ej. Compra de verdura" />
+                </div>
+                <button className="btn-pri-p" style={{ width: '100%', marginTop: 10 }} onClick={() => {
+                  if (expenseAmount) {
+                    addExpense(parseFloat(expenseAmount), expenseConcept, expenseDetail);
+                    setIsExpenseModalOpen(false);
+                    setExpenseAmount(''); setExpenseDetail('');
+                  }
+                }}>Guardar Gasto</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isHotelModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsHotelModalOpen(false)}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <h3>Registrar Venta Hotel</h3>
+               <button className="m-close-btn" onClick={() => setIsHotelModalOpen(false)}><X size={20} /></button>
+             </div>
+             <div className="modal-form-p">
+                <div className="form-group-p">
+                  <label>Monto</label>
+                  <input type="number" value={hotelAmount} onChange={e => setHotelAmount(e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="form-group-p">
+                  <label>Moneda</label>
+                  <div className="config-row">
+                    <button className={`config-opt ${hotelCurrency === 'MXN' ? 'active' : ''}`} onClick={() => setHotelCurrency('MXN')}>Pesos (MXN)</button>
+                    <button className={`config-opt ${hotelCurrency === 'USD' ? 'active' : ''}`} onClick={() => setHotelCurrency('USD')}>Dólares (USD)</button>
+                  </div>
+                </div>
+                <div className="form-group-p">
+                  <label>Método de Pago</label>
+                  <div className="methods-grid-p small">
+                    <button className={`method-btn-p ${hotelPaymentMethod === 'efectivo' ? 'active' : ''}`} onClick={() => setHotelPaymentMethod('efectivo')}>
+                      <Wallet size={18} /><span>Efec.</span>
+                    </button>
+                    <button className={`method-btn-p ${hotelPaymentMethod === 'tarjeta' ? 'active' : ''}`} onClick={() => setHotelPaymentMethod('tarjeta')}>
+                      <CreditCard size={18} /><span>Tarj.</span>
+                    </button>
+                    <button className={`method-btn-p ${hotelPaymentMethod === 'transferencia' ? 'active' : ''}`} onClick={() => setHotelPaymentMethod('transferencia')}>
+                      <Building size={18} /><span>Transf.</span>
+                    </button>
+                  </div>
+                </div>
+                <button className="btn-pri-p" style={{ width: '100%', marginTop: 10 }} onClick={() => {
+                  if (hotelAmount) {
+                    addHotelSale(parseFloat(hotelAmount), hotelCurrency, hotelPaymentMethod);
+                    setIsHotelModalOpen(false);
+                    setHotelAmount('');
+                  }
+                }}>Registrar Venta</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isCierreModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsCierreModalOpen(false)}>
+          <div className="modal-content-premium full" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <h3>Resumen de Cierre de Turno</h3>
+               <button className="m-close-btn" onClick={() => setIsCierreModalOpen(false)}><X size={20} /></button>
+             </div>
+             
+             <div className="cierre-preview-p">
+                <div className="cierre-section">
+                  <h4>Ventas Totales</h4>
+                  <div className="cierre-grid">
+                    <div className="c-item"><span>Restaurante</span><strong>{formatCurrency(todayIncome)}</strong></div>
+                    <div className="c-item"><span>Hotel</span><strong>{formatCurrency(hotelCardSales + hotelCashSales)}</strong></div>
+                    <div className="c-item highlight"><span>Gran Total</span><strong>{formatCurrency(todayIncome + hotelCardSales + hotelCashSales + todayTotalTips)}</strong></div>
+                  </div>
+                </div>
+
+                <div className="cierre-section">
+                  <h4>Métodos de Pago</h4>
+                  <div className="cierre-grid">
+                    <div className="c-item"><span>Efectivo (Pesos)</span><strong>{formatCurrency(todayCashIncome + hotelCashSales)}</strong></div>
+                    <div className="c-item"><span>Tarjetas (TC)</span><strong>{formatCurrency(todayCardIncome + hotelCardSales)}</strong></div>
+                    <div className="c-item"><span>Transferencias</span><strong>{formatCurrency(todayTransferIncome)}</strong></div>
+                    <div className="c-item"><span>Propinas Totales</span><strong>{formatCurrency(todayTotalTips)}</strong></div>
+                  </div>
+                </div>
+
+                <div className="cierre-section danger">
+                  <h4>Gastos y Salidas</h4>
+                  <div className="cierre-grid">
+                    {todayExpensesList.map((exp, i) => (
+                      <div key={i} className="c-item"><span>{exp.concept}</span><strong style={{ color: '#dc2626' }}>-{formatCurrency(exp.amount)}</strong></div>
+                    ))}
+                    <div className="c-item highlight"><span>Total Gastos</span><strong>{formatCurrency(todayExpenses)}</strong></div>
+                  </div>
+                </div>
+
+                <div className="cierre-final-box">
+                   <div className="f-title">Balance de Caja (Efectivo)</div>
+                   <div className="f-math">
+                     {formatCurrency(pettyCashInitial)} (Inicio) + {formatCurrency(todayCashIncome + hotelCashSales + todayCashTips)} (Ingresos) - {formatCurrency(todayExpenses)} (Gastos)
+                   </div>
+                   <div className="f-total">
+                     <span>Total a Entregar:</span>
+                     <strong>{formatCurrency(pettyCashInitial + (todayCashIncome + hotelCashSales + todayCashTips) - todayExpenses)}</strong>
+                   </div>
+                   <p className="f-note">Al confirmar, el turno se cerrará y los datos se archivarán en el historial.</p>
+                </div>
+             </div>
+
+             <div className="modal-actions-p">
+                <button className="btn-sec-p" onClick={() => setIsCierreModalOpen(false)}>Cancelar</button>
+                <button className="btn-pri-p" style={{ background: '#0f172a' }} onClick={async () => {
+                   setIsClosingTurn(true);
+                   const res = await closeDay(currentUser?.name || 'Admin');
+                   if (res.success) {
+                      setIsCierreModalOpen(false);
+                      setCurrentView('home');
+                      alert('Cierre realizado con éxito.');
+                   } else {
+                      alert('Hubo un error al cerrar el turno. Por favor intenta de nuevo.');
+                   }
+                   setIsClosingTurn(false);
+                }}>{isClosingTurn ? 'Cerrando...' : 'Confirmar Cierre de Día'}</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isAddItemModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsAddItemModalOpen(false)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Nuevo Producto</h3>
+                <button className="m-close-btn" onClick={() => setIsAddItemModalOpen(false)}><X size={20} /></button>
+              </div>
+              <form className="modal-form-p" onSubmit={handleCreateMenuItem}>
+                <div className="form-group-p">
+                  <label>Nombre del Producto</label>
+                  <input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Ej. Pizza Margarita" required />
+                </div>
+                <div className="form-group-p">
+                  <label>Categoría</label>
+                  <select value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)} required>
+                    <option value="">Seleccionar...</option>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="NEW">+ Nueva Categoría</option>
+                  </select>
+                </div>
+                {newItemCategory === 'NEW' && (
+                  <div className="form-group-p fade-in">
+                    <label>Nombre de Categoría</label>
+                    <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Ej. Postres" />
+                  </div>
+                )}
+                <div className="form-group-p">
+                  <label>Tipo de Precio</label>
+                  <div className="config-row">
+                    <button type="button" className={`config-opt ${newItemType === 'fixed' ? 'active' : ''}`} onClick={() => setNewItemType('fixed')}>Fijo</button>
+                    <button type="button" className={`config-opt ${newItemType === 'variants' ? 'active' : ''}`} onClick={() => setNewItemType('variants')}>Con Variantes</button>
+                  </div>
+                </div>
+                {newItemType === 'fixed' ? (
+                  <div className="form-group-p fade-in">
+                    <label>Precio ($)</label>
+                    <input type="number" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} placeholder="0.00" />
+                  </div>
+                ) : (
+                  <div className="form-group-p fade-in">
+                    <label>Variantes</label>
+                    {newItemVariants.map((v, i) => (
+                      <div key={i} className="variant-input-row">
+                        <input type="text" placeholder="Opción" value={v.label} onChange={e => {
+                          const next = [...newItemVariants];
+                          next[i].label = e.target.value;
+                          setNewItemVariants(next);
+                        }} />
+                        <input type="number" placeholder="$" value={v.price} onChange={e => {
+                          const next = [...newItemVariants];
+                          next[i].price = e.target.value;
+                          setNewItemVariants(next);
+                        }} />
+                        <button type="button" onClick={() => setNewItemVariants(newItemVariants.filter((_, idx) => idx !== i))}>&times;</button>
+                      </div>
+                    ))}
+                    <button type="button" className="add-var-btn" onClick={() => setNewItemVariants([...newItemVariants, {label: '', price: ''}])}>+ Añadir Variante</button>
+                  </div>
+                )}
+                <button type="submit" className="btn-pri-p" style={{ width: '100%', marginTop: 10 }}>Crear Producto</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {isAddUserModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsAddUserModalOpen(false)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Nuevo Usuario</h3>
+                <button className="m-close-btn" onClick={() => setIsAddUserModalOpen(false)}><X size={20} /></button>
+              </div>
+              <div className="modal-form-p">
+                <div className="form-group-p">
+                  <label>Nombre Completo</label>
+                  <input type="text" value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Ej. Juan Pérez" />
+                </div>
+                <div className="form-group-p">
+                  <label>Rol de Usuario</label>
+                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as any)}>
+                    <option value="Staff">Staff (Mesero)</option>
+                    <option value="Encargado">Encargado</option>
+                    <option value="Administrador">Administrador</option>
+                  </select>
+                </div>
+                <div className="form-group-p">
+                  <label>Contraseña Provisional</label>
+                  <input type="text" value={INITIAL_PASSWORD} disabled />
+                  <small style={{ color: '#94a3b8' }}>El usuario podrá cambiarla después</small>
+                </div>
+                <button className="btn-pri-p" style={{ width: '100%', marginTop: 10 }} onClick={async () => {
+                  if (newUserName) {
+                    await addUser(newUserName, newUserRole, INITIAL_PASSWORD);
+                    setIsAddUserModalOpen(false);
+                    setNewUserName('');
+                  }
+                }}>Crear Usuario</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isEditUserModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsEditUserModalOpen(false)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Editar Usuario</h3>
+                <button className="m-close-btn" onClick={() => setIsEditUserModalOpen(false)}><X size={20} /></button>
+              </div>
+              <div className="modal-form-p">
+                <div className="form-group-p">
+                  <label>Nombre Completo</label>
+                  <input type="text" value={editUserName} onChange={e => setEditUserName(e.target.value)} />
+                </div>
+                <div className="form-group-p">
+                  <label>Rol de Usuario</label>
+                  <select value={editUserRole} onChange={e => setEditUserRole(e.target.value as any)}>
+                    <option value="Staff">Staff (Mesero)</option>
+                    <option value="Encargado">Encargado</option>
+                    <option value="Administrador">Administrador</option>
+                  </select>
+                </div>
+                <button className="btn-pri-p" style={{ width: '100%', marginTop: 10 }} onClick={async () => {
+                  if (editingUserId && editUserName) {
+                    await updateUser(editingUserId, editUserName, editUserRole);
+                    setIsEditUserModalOpen(false);
+                  }
+                }}>Guardar Cambios</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="modal-overlay-premium" onClick={() => setEditTarget(null)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Editar {editTarget.type === 'category' ? 'Categoría' : 'Producto'}</h3>
+                <button className="m-close-btn" onClick={() => setEditTarget(null)}><X size={20} /></button>
+              </div>
+              <form className="modal-form-p" onSubmit={handleEditSave}>
+                <div className="form-group-p">
+                  <label>Nombre / Etiqueta</label>
+                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} required />
+                </div>
+                {editTarget.type !== 'category' && (
+                  <div className="form-group-p">
+                    <label>Precio ($)</label>
+                    <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} required />
+                  </div>
+                )}
+                <button type="submit" className="btn-pri-p" style={{ width: '100%', marginTop: 10 }}>Guardar Cambios</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {isDeliveryModalOpen && (
+        <div className="modal-overlay-premium" onClick={() => setIsDeliveryModalOpen(false)}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+               <h3>Pedido para llevar</h3>
+               <button className="m-close-btn" onClick={() => setIsDeliveryModalOpen(false)}><X size={20} /></button>
+             </div>
+             <div className="modal-form-p">
+                <div className="form-group-p">
+                  <label>Nombre del Cliente</label>
+                  <input 
+                    type="text" 
+                    value={deliveryCustomerName} 
+                    onChange={e => setDeliveryCustomerName(e.target.value)} 
+                    placeholder="Ej. Juan Pérez" 
+                  />
+                </div>
+                <button className="btn-pri-p" style={{ width: '100%', marginTop: 10 }} onClick={async () => {
+                  if (deliveryCustomerName.trim()) {
+                    const tableId = await createDeliveryOrder(deliveryCustomerName.trim());
+                    if (tableId) {
+                      setSelectedTableId(tableId);
+                      setCurrentView('mesa');
+                      setIsDeliveryModalOpen(false);
+                      setDeliveryCustomerName('');
+                    }
+                  }
+                }}>Empezar Pedido</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {confirmPending && (
+        <div className="modal-overlay-premium" onClick={() => setConfirmPending(null)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Añadir a la Orden</h3>
+              </div>
+              <div className="confirm-item-info-p">
+                <span className="ci-name">{confirmPending.item.name}</span>
+                {confirmPending.item.hasVariants && (
+                   <div className="ci-variants-grid">
+                      {confirmPending.item.variants?.filter(v => v.active).map(v => (
+                        <button 
+                          key={v.id} 
+                          className={`ci-variant-btn ${confirmPending.variant?.id === v.id ? 'active' : ''}`}
+                          onClick={() => setConfirmPending({ ...confirmPending, variant: v })}
+                        >
+                          <span className="v-label">{v.label}</span>
+                          <span className="v-price">{formatCurrency(v.price)}</span>
+                        </button>
+                      ))}
+                   </div>
+                )}
+                
+                <div className="ci-notes-section">
+                   <div className="notes-header-row" onClick={() => setShowExtras(!showExtras)}>
+                     <label>Notas / Modificaciones</label>
+                     {showExtras ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                   </div>
+                   {showExtras && (
+                     <div className="notes-input-box fade-in">
+                        <textarea 
+                          placeholder="Sin cebolla, extra salsa, etc..." 
+                          value={confirmNotes}
+                          onChange={(e) => setConfirmNotes(e.target.value)}
+                        />
+                     </div>
+                   )}
+                </div>
+              </div>
+              <div className="modal-actions-p">
+                 <button className="btn-sec-p" onClick={() => setConfirmPending(null)}>Cancelar</button>
+                 <button 
+                  className="btn-pri-p" 
+                  disabled={confirmPending.item.hasVariants && !confirmPending.variant}
+                  onClick={() => {
+                    addItemToOrder(selectedTableId!, confirmPending.item, confirmPending.variant, confirmNotes);
+                    setConfirmPending(null);
+                    setConfirmNotes('');
+                    setShowExtras(false);
+                  }}
+                 >Añadir</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {notesModal && (
+        <div className="modal-overlay-premium" onClick={() => setNotesModal(null)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-p">
+                <h3>Editar Notas</h3>
+              </div>
+              <div className="modal-form-p">
+                <textarea 
+                  className="notes-textarea"
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  placeholder="Instrucciones especiales..."
+                  autoFocus
+                />
+              </div>
+              <div className="modal-actions-p">
+                 <button className="btn-sec-p" onClick={() => setNotesModal(null)}>Cerrar</button>
+                 <button className="btn-pri-p" onClick={() => {
+                   updateItemNotes(notesModal.itemId, notesDraft);
+                   setNotesModal(null);
+                 }}>Guardar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {deleteReportId && (
+        <div className="modal-overlay-premium" onClick={() => setDeleteReportId(null)}>
+          <div className="modal-content-premium" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header-p">
+                <h3>Eliminar Reporte</h3>
+             </div>
+             <div style={{ padding: '20px 0', fontSize: 16, color: '#475569', textAlign: 'center' }}>
+                ¿Estás seguro de que deseas eliminar este reporte del historial?<br/>
+                <strong>Esta acción no se puede deshacer.</strong>
+             </div>
+             <div className="modal-actions-p">
+                <button className="btn-sec-p" onClick={() => setDeleteReportId(null)}>Cancelar</button>
+                <button className="btn-pri-p" style={{ background: '#dc2626' }} onClick={async () => {
+                   await deleteShiftSummary(deleteReportId);
+                   setDeleteReportId(null);
+                }}>Eliminar Permanentemente</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isIosPromptVisible && (
+        <div className="modal-overlay-premium" onClick={() => setIsIosPromptVisible(false)}>
+           <div className="modal-content-premium" onClick={(e) => e.stopPropagation()} style={{ padding: '32px 24px', textAlign: 'center' }}>
+              <div style={{ background: '#f0f7ff', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#3b82f6' }}>
+                <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>Instalar Gallo Azul</h3>
+              <p style={{ color: '#64748b', fontSize: 15, lineHeight: 1.5, marginBottom: 24 }}>
+                Para instalar esta aplicación en tu iPhone:<br/><br/>
+                1. Pulsa el botón <strong>'Compartir'</strong> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', margin: '0 2px' }}><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> en la parte inferior.<br/>
+                2. Selecciona <strong>'Añadir a pantalla de inicio'</strong>.
+              </p>
+              <button className="btn-pri-p" style={{ width: '100%' }} onClick={() => setIsIosPromptVisible(false)}>Entendido</button>
+           </div>
+        </div>
+      )}
+
+      {ticketToPrint && (
+        <div className="print-only">
+          <div className="print-ticket">
+            <div className="pt-header">
+              <h1>Gallo Azul</h1>
+              <p>Restaurante & Hotel</p>
+              <p>{new Date().toLocaleString('es-MX')}</p>
+            </div>
+            <div className="pt-divider">********************************</div>
+            <div className="pt-info">
+              <p>Mesa: {ticketToPrint.table_id}</p>
+              <p>Atendió: {ticketToPrint.printed_by}</p>
+            </div>
+            <div className="pt-divider">--------------------------------</div>
+            <div className="pt-items">
+              {ticketToPrint.items_summary.split(', ').map((line: string, i: number) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+            <div className="pt-divider">--------------------------------</div>
+            <div className="pt-total">
+              <p>TOTAL: {formatCurrency(ticketToPrint.total)}</p>
+            </div>
+            <div className="pt-footer">
+              <p>¡Gracias por su visita!</p>
+              <p>Propina no incluida</p>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </>
   );
 }
