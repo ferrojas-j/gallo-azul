@@ -104,3 +104,30 @@ export async function createReservation(params: any): Promise<any> {
     throw new Error(error.message || 'No se pudo crear la reserva en Hostaway');
   }
 }
+
+export async function addTransaction(reservationId: number, params: { title: string; description: string; amount: number; paymentMethod: string; }): Promise<any> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/hostaway-proxy`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'addTransaction',
+        params: { reservationId, ...params }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('Hostaway Transaction Error:', error);
+    throw new Error(error.message || 'No se pudo registrar la transacción en Hostaway');
+  }
+}

@@ -16,7 +16,7 @@ import type { MenuItem, MenuVariant } from './data/menu';
 import { supabase } from './lib/supabase';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
 import type { UserRow } from './lib/supabaseService';
-import { getUpcomingCheckins, updateReservationStatus, createReservation } from './lib/hostawayService';
+import { getUpcomingCheckins, updateReservationStatus, createReservation, addTransaction } from './lib/hostawayService';
 import type { Reservation } from './lib/hostawayService';
 
 const formatCurrency = (amount: number) => {
@@ -372,6 +372,8 @@ export default function App() {
     priceCurrency: 'USD',
     useCustomPrice: false,
     isPaid: false,
+    transactionMethod: 'cash',
+    transactionDescription: '',
     adults: 1,
     children: 0
   });
@@ -618,6 +620,21 @@ export default function App() {
           'host',
           true
         );
+
+        let hwMethod = 'cash';
+        if (hotelPaymentForm.method === 'tarjeta') hwMethod = 'creditCard';
+        if (hotelPaymentForm.method === 'transferencia') hwMethod = 'bankTransfer';
+
+        try {
+          await addTransaction(hotelPaymentForm.hostaway_reservation_id, {
+            title: 'Pago en Recepción',
+            description: `Pago procesado localmente`,
+            amount: hotelPaymentForm.amount,
+            paymentMethod: hwMethod
+          });
+        } catch (txErr) {
+          console.error("No se pudo agregar la transacción formal a Hostaway:", txErr);
+        }
       }
       await addHotelSale(hotelPaymentForm.amount, hotelPaymentForm.currency, hotelPaymentForm.method);
       alert("Pago registrado correctamente.");
@@ -657,16 +674,32 @@ export default function App() {
         currency: newResForm.useCustomPrice ? newResForm.priceCurrency : selectedListing.currency,
         isPaid: newResForm.isPaid ? 1 : 0,
         paymentStatus: newResForm.isPaid ? 'paid' : 'unpaid',
+        paidAmount: newResForm.isPaid ? totalAmount : 0,
+        hostNote: newResForm.isPaid ? 'PAID' : '',
         numberOfGuests: 1,
         adults: 1
       };
 
-      await createReservation(params);
+      const res = await createReservation(params);
       
-      // Si está marcado como pagado, lo registramos en el sistema local
+      // Si está marcado como pagado, lo registramos en el sistema local y en Hostaway
       if (newResForm.isPaid) {
         const currency = newResForm.useCustomPrice ? newResForm.priceCurrency : selectedListing.currency;
-        await addHotelSale(totalAmount, currency, 'tarjeta');
+        await addHotelSale(totalAmount, currency, newResForm.transactionMethod === 'cash' ? 'efectivo' : 'tarjeta');
+        
+        // Add transaction to Hostaway
+        if (res && res.result && res.result.id) {
+          try {
+            await addTransaction(res.result.id, {
+              title: 'Pago Inicial',
+              description: newResForm.transactionDescription,
+              amount: totalAmount,
+              paymentMethod: newResForm.transactionMethod
+            });
+          } catch (txErr) {
+            console.error("Error al registrar el cargo offline en Hostaway", txErr);
+          }
+        }
       }
 
       alert("Reserva creada con éxito en Hostaway" + (newResForm.isPaid ? " y registrada como Pagada." : ""));
@@ -2408,9 +2441,38 @@ export default function App() {
                   />
                   <div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: newResForm.isPaid ? '#065f46' : '#334155', display: 'block' }}>Marcar como Pagado</span>
-                    <span style={{ fontSize: 12, color: newResForm.isPaid ? '#059669' : '#64748b' }}>Registrará la reserva como cobrada en Hostaway</span>
+                    <span style={{ fontSize: 12, color: newResForm.isPaid ? '#059669' : '#64748b' }}>Registrará un cargo por el total en Hostaway</span>
                   </div>
                 </label>
+
+                {newResForm.isPaid && (
+                  <div style={{ padding: '16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <h5 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#334155' }}>Detalles de la Transacción</h5>
+                    <div className="form-group-premium">
+                      <label>Método de Pago</label>
+                      <select
+                        value={newResForm.transactionMethod}
+                        onChange={e => setNewResForm({...newResForm, transactionMethod: e.target.value})}
+                      >
+                        <option value="cash">Efectivo (Cash)</option>
+                        <option value="creditCard">Tarjeta (Credit Card)</option>
+                        <option value="bankTransfer">Transferencia (Bank Transfer)</option>
+                        <option value="paypal">PayPal</option>
+                        <option value="otaPayment">Pago por OTA</option>
+                        <option value="other">Otro</option>
+                      </select>
+                    </div>
+                    <div className="form-group-premium">
+                      <label>Descripción (Opcional)</label>
+                      <input 
+                        type="text" 
+                        value={newResForm.transactionDescription} 
+                        onChange={e => setNewResForm({...newResForm, transactionDescription: e.target.value})}
+                        placeholder="Ej. Pago en recepción, Depósito..."
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

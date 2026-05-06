@@ -192,9 +192,11 @@ serve(async (req) => {
       if (!reservationId) throw new Error("Missing reservationId");
 
       let hostNoteToUpdate = undefined;
+      let paidAmountToUpdate = undefined;
+      let paymentStatusToUpdate = undefined;
       
       if (typeof isPaid === 'boolean' && isPaid) {
-        // Fetch current reservation to append PAID to hostNote without overwriting
+        // Fetch current reservation to append PAID to hostNote without overwriting and get total price
         const getRes = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -204,6 +206,8 @@ serve(async (req) => {
           if (!currentNote.includes("PAID")) {
             hostNoteToUpdate = currentNote ? `${currentNote} | PAID` : "PAID";
           }
+          paidAmountToUpdate = resData?.result?.totalPrice || resData?.result?.totalAmount || 0;
+          paymentStatusToUpdate = 'paid';
         }
       }
 
@@ -212,6 +216,8 @@ serve(async (req) => {
       if (typeof noShow === 'boolean') updatePayload.noShow = noShow ? 1 : 0;
       if (typeof isPaid === 'boolean') updatePayload.isPaid = isPaid ? 1 : 0;
       if (hostNoteToUpdate !== undefined) updatePayload.hostNote = hostNoteToUpdate;
+      if (paidAmountToUpdate !== undefined) updatePayload.paidAmount = paidAmountToUpdate;
+      if (paymentStatusToUpdate !== undefined) updatePayload.paymentStatus = paymentStatusToUpdate;
 
       const resResponse = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
         method: 'PUT',
@@ -221,6 +227,39 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(updatePayload),
+      });
+
+      if (!resResponse.ok) {
+        const err = await resResponse.text();
+        throw new Error(`Hostaway error: ${err}`);
+      }
+      const resData = await resResponse.json();
+      return new Response(JSON.stringify(resData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // --- ACTION: addTransaction ---
+    if (action === 'addTransaction') {
+      const { reservationId, title, description, amount, paymentMethod } = params;
+      if (!reservationId) throw new Error("Missing reservationId");
+
+      const payload = {
+        title: title || 'Pago de reserva',
+        description: description || '',
+        amount: parseFloat(amount),
+        paymentMethod: paymentMethod || 'cash',
+        status: 'paid'
+      };
+
+      const resResponse = await fetch(`https://api.hostaway.com/v1/guestPayments/charges/${reservationId}`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'X-Hostaway-Account-Id': HOSTAWAY_ACCOUNT_ID,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!resResponse.ok) {
