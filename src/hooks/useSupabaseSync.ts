@@ -819,7 +819,11 @@ export function useSupabaseSync() {
 
     pendingTickets,
     isLoading,
-    // Operations
+    exchangeRate,
+    pendingTickets,
+    registrations,
+
+    // Actions
     createOrderForTable,
     createDeliveryOrder,
     addItemToOrder,

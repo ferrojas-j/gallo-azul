@@ -798,6 +798,9 @@ export default function App() {
   }, [statsSubView, analyticsFilter, dailySummaries, todayClosedOrders]);
 
   // ── Computed ─────────────────────────────────────────
+  const activeOrder = selectedTableId ? tableOrders[selectedTableId] : null;
+  const orderItems = selectedTableId ? activeItems.filter(i => i.table_id === selectedTableId) : [];
+  const orderTotal = orderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
   const selectedTableItems = useMemo(
     () => (activeItems || []).filter(i => i.table_id === selectedTableId),
@@ -844,19 +847,8 @@ export default function App() {
     if (view === 'admin') setAdminSubView('main');
   };
 
-  const openTable = async (id: number) => {
-    const isOccupied = !!tableOrders[id];
-    if (!isOccupied) {
-      // Free table -> Show custom UI prompt
-      setTableConfirmModal({ isOpen: true, type: 'open', tableId: id });
-      return;
-    }
-    // Already occupied -> open directly
-    setSelectedTableId(id);
-    setCurrentView('mesa');
-    setMesaTab('orden');
-    setMenuCategory(CATEGORIES[0]);
-    setMenuSearch('');
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
   };
 
   const handleConfirmOpenTable = async () => {
@@ -1115,10 +1107,9 @@ export default function App() {
             <div className="home-stat-value">{freeTables}</div>
             <div className="home-stat-label">Mesas disponibles</div>
           </div>
-          <div className="home-stat-card orders">
-            <div className="home-stat-icon">🛎️</div>
-            <div className="home-stat-value">{activePedidos}</div>
-            <div className="home-stat-label">Pedidos activos</div>
+          <div className="hero-time-card">
+            <Clock size={16} />
+            <span>{formatTime(currentTime)}</span>
           </div>
         </div>
       </div>
@@ -2105,30 +2096,26 @@ export default function App() {
     const freeCount = filteredTablesForCounts.filter(t => getEffectiveStatus(t.id) === 'free').length;
 
     return (
-      <div className="fade-in">
-        {/* Summary stats */}
+      <div className="salon-view fade-in">
         <div className="salon-summary-bar">
           <div className="salon-stat ocp">
-            <div className="salon-stat-count">{occupiedCount}</div>
-            <div className="salon-stat-label">Ocupadas</div>
+            <span className="salon-stat-count">{occupied}</span>
+            <span className="salon-stat-label">Ocupadas</span>
+          </div>
+          <div className="salon-stat pay">
+            <span className="salon-stat-count">{paying}</span>
+            <span className="salon-stat-label">Pagando</span>
           </div>
           <div className="salon-stat free">
-            <div className="salon-stat-count">{freeCount}</div>
-            <div className="salon-stat-label">Libres</div>
+            <span className="salon-stat-count">{free}</span>
+            <span className="salon-stat-label">Libres</span>
           </div>
         </div>
 
-        {/* Legend */}
         <div className="salon-legend">
-          <div className="salon-legend-item free">
-            <div className="salon-legend-pip" style={{ background: '#22c55e', border: '1px solid #16a34a' }} /> Libre
-          </div>
-          <div className="salon-legend-item occupied-pending">
-            <div className="salon-legend-pip" style={{ background: '#ef4444', border: '1px solid #dc2626' }} /> Con Pendientes
-          </div>
-          <div className="salon-legend-item occupied-done">
-            <div className="salon-legend-pip" style={{ background: '#a855f7', border: '1px solid #9333ea' }} /> Sin Pendientes
-          </div>
+           <div className="salon-legend-item free"><div className="salon-legend-pip"></div> LIBRE</div>
+           <div className="salon-legend-item occupied"><div className="salon-legend-pip"></div> OCUPADA</div>
+           <div className="salon-legend-item paying"><div className="salon-legend-pip"></div> CUENTA</div>
         </div>
 
         {/* Table grid grouped by category */}
@@ -2249,44 +2236,46 @@ export default function App() {
   };
 
   const renderMesa = () => {
-    const count = selectedTableItems.length;
-    const hasPendingItems = selectedTableItems.some(i => i.status === 'pending');
+    if (!selectedTableId) return null;
+    const table = tables.find(t => t.id === selectedTableId);
+    
     return (
-      <div className="fade-in mesa-layout">
-        <div className="mesa-tabs">
-          <button className={`mesa-tab ${mesaTab === 'orden' ? 'active' : ''}`} onClick={() => setMesaTab('orden')}>
-            📋 Orden {count > 0 && <span className="mesa-tab-badge">{count}</span>}
+      <div className="mesa-view fade-in">
+        <div className="mesa-header-premium">
+          <button className="back-btn-pill" onClick={() => setCurrentView('salon')}>
+            <ChevronLeft size={20} />
+            <span>Salón</span>
           </button>
-          <button className={`mesa-tab ${mesaTab === 'menu' ? 'active' : ''}`} onClick={() => setMesaTab('menu')}>
-            🍰 Ver Menú
+          <div className="mesa-title-wrap">
+             <h2>{table?.name}</h2>
+             <span className={`mesa-status-tag ${table?.status}`}>{table?.status === 'paying' ? 'Impreso' : 'Ocupada'}</span>
+          </div>
+          <button className="action-btn-circle danger" onClick={() => setTableConfirmModal({isOpen: true, type: 'closeEmpty', tableId: selectedTableId})}>
+             <Trash2 size={20} />
           </button>
         </div>
 
-        {/* ORDEN tab */}
-        {mesaTab === 'orden' && (
-          <div className="mesa-orden-panel">
-            {selectedTableItems.length === 0 ? (
-              <div className="empty-order">
-                <div style={{ fontSize: 56, marginBottom: 16 }}>🥐</div>
-                <h3 style={{ fontSize: 18, color: '#0f172a', marginBottom: 4 }}>Cuenta vacía</h3>
-                <p style={{ fontSize: 14, marginBottom: 20 }}>Toca <strong>Menú</strong> para agregar deliciosa comida</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280, margin: '0 auto' }}>
-                  <button
-                    className="btn-primary"
-                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
-                    onClick={() => setMesaTab('menu')}
-                  >
-                    <Plus size={18} />
-                    Agregar pedidos
-                  </button>
-                  <button
-                    className="btn-outline"
-                    style={{ borderRadius: 20, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
-                    onClick={() => {
-                        setTableConfirmModal({ isOpen: true, type: 'closeEmpty', tableId: selectedTableId })
-                    }}
-                  >
-                    <X size={18} /> Liberar mesa
+        <div className="tab-control-premium">
+          <button className={`tab-btn-p ${mesaTab === 'orden' ? 'active' : ''}`} onClick={() => setMesaTab('orden')}>
+            <ClipboardList size={18} />
+            Orden ({orderItems.length})
+          </button>
+          <button className={`tab-btn-p ${mesaTab === 'menu' ? 'active' : ''}`} onClick={() => setMesaTab('menu')}>
+            <Plus size={18} />
+            Añadir
+          </button>
+        </div>
+
+        <div className="tab-content-premium">
+          {mesaTab === 'orden' ? (
+            <div className="order-details-p fade-in">
+              {orderItems.length === 0 ? (
+                <div className="empty-order-state">
+                  <div className="empty-order-icon"><Zap size={32} /></div>
+                  <h3>Sin productos aún</h3>
+                  <p>Añade platillos desde el menú</p>
+                  <button className="btn-premium" onClick={() => setMesaTab('menu')} style={{ width: 'auto', padding: '12px 24px', marginTop: 12 }}>
+                    Ver Menú
                   </button>
                 </div>
               </div>
@@ -2311,94 +2300,18 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <div className="order-item-right">
-                      <div className="order-item-price">${item.price}</div>
-                      <button className="notes-btn" onClick={() => {
-                        setNotesDraft(item.notes ?? '');
-                        setNotesModal({ itemId: item.id, current: item.notes ?? '' });
-                      }}>
-                        <StickyNote size={13} strokeWidth={2.5} />
-                      </button>
+                    <div className="order-actions-grid">
+                       <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}>
+                         <Printer size={18} />
+                         Imprimir
+                       </button>
+                       <button className="order-btn-pri" onClick={() => setCurrentView('checkout')}>
+                         Cobrar Mesa
+                       </button>
                     </div>
                   </div>
-                ))}
-
-                <button
-                  onClick={() => setMesaTab('menu')}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    marginTop: '16px',
-                    borderRadius: '16px',
-                    border: '2px dashed #cbd5e1',
-                    background: '#f8fafc',
-                    color: '#64748b',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                  Agregar más pedidos
-                </button>
-              </div>
-            )}
-            {selectedTableItems.length > 0 && (
-              <div className="order-footer">
-                <div className="order-total-row">
-                  <span className="order-total-label">Subtotal Mesa</span>
-                  <span className="order-total-amount">${currentTableTotal}</span>
-                </div>
-                <button
-                  className="btn-outline"
-                  disabled={hasPendingItems}
-                  style={{ 
-                    marginBottom: '12px', width: '100%', padding: '12px', borderRadius: '12px', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
-                    fontWeight: 600, color: hasPendingItems ? '#94a3b8' : '#4f46e5', 
-                    borderColor: hasPendingItems ? '#e2e8f0' : '#cbd5e1',
-                    opacity: hasPendingItems ? 0.6 : 1,
-                    cursor: hasPendingItems ? 'not-allowed' : 'pointer'
-                  }}
-                  onClick={() => {
-                    if (!hasPendingItems) {
-                      setPrintCuentaModal({isOpen: true, tableId: selectedTableId})
-                    }
-                  }}
-                >
-                  <Printer size={20} /> Generar cuenta de la mesa
-                </button>
-                <button 
-                  className="btn-dark" 
-                  disabled={!mesasConCuentaActivada.has(selectedTableId!)}
-                  onClick={() => {
-                    if (mesasConCuentaActivada.has(selectedTableId!)) handleProceedToCheckout();
-                  }}
-                  style={{ opacity: mesasConCuentaActivada.has(selectedTableId!) ? 1 : 0.4, cursor: mesasConCuentaActivada.has(selectedTableId!) ? 'pointer' : 'not-allowed' }}
-                >
-                  <Check size={20} /> Proceder al Pago
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* MENÚ tab */}
-        {mesaTab === 'menu' && (
-          <div className="mesa-menu-panel">
-            <div className="menu-search-wrap">
-              <Search size={16} className="menu-search-icon" />
-              <input
-                className="menu-search-input"
-                placeholder="Buscar platillo..."
-                value={menuSearch}
-                onChange={e => setMenuSearch(e.target.value)}
-              />
-              {menuSearch && <button className="menu-search-clear" onClick={() => setMenuSearch('')}><X size={14} /></button>}
+                </>
+              )}
             </div>
             {!menuSearch && (
               <div className="category-chips-wrap">
@@ -2486,20 +2399,14 @@ export default function App() {
                 });
               })()}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
 
   const renderCheckout = () => {
-    const dVal = parseFloat(discountValue) || 0;
-    let finalTotal = currentTableTotal;
-    if (discountType === 'amount') {
-      finalTotal = Math.max(0, currentTableTotal - dVal);
-    } else if (discountType === 'percentage') {
-      finalTotal = Math.max(0, currentTableTotal * (1 - dVal / 100));
-    }
+    if (!selectedTableId) return null;
     
     const isEfectivo = paymentMethod === 'efectivo';
     const tipVal = tipPercent === 'Otro' 
@@ -2863,37 +2770,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-      {/* Delivery Confirmation Modal */}
-      {deliveryConfirm && (
-        <div className="confirm-overlay" onClick={() => setDeliveryConfirm(null)}>
-          <div className="confirm-sheet" onClick={e => e.stopPropagation()}>
-            <div className="confirm-sheet-pill" />
-            <div className="confirm-sheet-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-              <Check size={32} />
+              )}
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 12 }}>
-              ¿Confirmas que este pedido fue entregado?
-            </h3>
-            <div className="confirm-actions">
-              <button className="confirm-cancel" onClick={() => setDeliveryConfirm(null)}>No, aún no</button>
-              <button className="confirm-ok" onClick={async () => {
-                await markItemDone(deliveryConfirm);
-                setDeliveryConfirm(null);
-              }}>
-                Sí, entregado
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-    );
-  };
 
   const renderAdminMain = () => {
     const mexicoDate = currentTime.toLocaleDateString('es-MX', {
@@ -2978,7 +2856,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 32 }}>
@@ -2997,8 +2875,7 @@ export default function App() {
 
 
             </div>
-          </>
-        )}
+         </div>
 
         <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Administración</div>
         <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
@@ -3069,32 +2946,22 @@ export default function App() {
           ))}
         </div>
 
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Usuarios Conectados</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 40 }}>
-          {users.filter(u => u.session_active).length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>Ningún usuario conectado.</div>
-          ) : users.filter(u => u.session_active).map(user => (
-            <div key={user.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={20} color="var(--primary-dark)" />
-                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, backgroundColor: '#22c55e', borderRadius: '50%', border: '2px solid #fff' }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{user.name}</div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>{user.role}</div>
-                </div>
-              </div>
-              <button 
-                onClick={() => closeSession(user.id)} 
-                title="Cerrar sesión de este usuario remotamente"
-                style={{ backgroundColor: 'transparent', border: '1px solid var(--danger-light)', borderRadius: 12, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--danger)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-              >
-                <LogOut size={14} /> Desconectar
-              </button>
-            </div>
-          ))}
-        </div>
+         <div className="checkout-actions">
+            <button 
+              className="confirm-pay-btn" 
+              disabled={(discountType !== 'none' && !discountReason.trim())}
+              onClick={() => {
+                confirmPayment(selectedTableId, paymentMethod, afterDiscount, tip, discountReason);
+                setCurrentView('salon');
+                setSelectedTableId(null);
+                // Reset checkout states
+                setDiscountType('none'); setDiscountValue(''); setDiscountReason('');
+                setTipPercent('none'); setCustomTip(''); setCashReceived('');
+              }}
+            >
+              Confirmar y Cerrar Mesa
+            </button>
+         </div>
       </div>
     );
   };
@@ -3325,14 +3192,50 @@ export default function App() {
               />
             ))}
           </div>
-        </>
-      ) : (
-        <div className="analytics-view">
-          <div className="analytics-filters">
-            <button className={`filter-btn ${analyticsFilter === 'day' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('day')}>Hoy</button>
-            <button className={`filter-btn ${analyticsFilter === 'month' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('month')}>Este Mes</button>
-            <button className={`filter-btn ${analyticsFilter === 'total' ? 'active' : ''}`} onClick={() => setAnalyticsFilter('total')}>Acumulado</button>
+        )}
+      </div>
+    );
+  };
+
+  const renderCheckin = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const enCasa = upcomingCheckins.filter(res => {
+      const arr = new Date(res.arrivalDate + 'T12:00:00');
+      const dep = new Date(res.departureDate + 'T12:00:00');
+      return today >= arr && today <= dep && res.status !== 'cancelled' && res.status !== 'declined';
+    });
+
+    const proximas = upcomingCheckins.filter(res => {
+      const arr = new Date(res.arrivalDate + 'T12:00:00');
+      return arr > today && res.status !== 'cancelled' && res.status !== 'declined';
+    });
+
+    return (
+      <div className="checkin-view fade-in">
+        <div className="view-header">
+          <h2 className="view-title-premium">Hotel / Check-in</h2>
+          <p className="view-subtitle-premium">Gestión de huéspedes y registros online</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+          <button className="action-btn-premium" onClick={() => setCurrentView('registros')}>
+            <ClipboardList size={20} />
+            Ver registros
+          </button>
+          <button className="action-btn-premium highlight" onClick={() => setShowNewResModal(true)}>
+            <PlusCircle size={20} />
+            Crear nueva reserva
+          </button>
+        </div>
+
+        {checkinsError && (
+          <div className="error-notice">
+            <AlertCircle size={20} />
+            <span>{checkinsError}</span>
           </div>
+        )}
 
           {(() => {
             const now = new Date();
@@ -3390,17 +3293,131 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-                      ))
+                      </div>
+                      <div className="res-room">
+                        <span className="room-label">HABITACIÓN</span>
+                        <span className="room-val">{res.roomName}</span>
+                      </div>
+                    </div>
+                    <div className="res-dates">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {res.arrivalDate === todayStr && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <button 
+                            onClick={() => handleNoShow(res)}
+                            style={{ 
+                              background: '#fff1f2',
+                              color: '#e11d48',
+                              border: '1.5px solid #fecdd3',
+                              padding: '10px',
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <UserMinus size={16} />
+                            No-show
+                          </button>
+                          <button 
+                            onClick={() => handleCancelRes(res)}
+                            style={{ 
+                              background: 'white',
+                              color: '#64748b',
+                              border: '1.5px solid #e2e8f0',
+                              padding: '10px',
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={16} />
+                            Eliminar
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setSelectedReservation(res);
+                            const cleanResPhone = (res.guestPhone || "").replace(/\D/g, "");
+                            const phonePrefix = COUNTRY_CODES.find(c => {
+                              const cleanCode = c.code.replace(/\D/g, "");
+                              return cleanResPhone.length > 0 && cleanResPhone.startsWith(cleanCode);
+                            });
+                            const initialCountry = findCountryWithFlag(res.guestCountry || phonePrefix?.name || "");
+                            
+                            setCheckinForm({
+                              name: res.guestName || '',
+                              nationality: initialCountry,
+                              homeAddress: res.guestAddress || '',
+                              phone: res.guestPhone || (phonePrefix ? `${phonePrefix.code} ` : ''),
+                              city: res.guestCity || '',
+                              country: initialCountry,
+                              email: res.guestEmail || '',
+                              roomName: res.roomName || '',
+                              arrivalDate: res.arrivalDate || '',
+                              departureDate: res.departureDate || '',
+                              nights: res.nights || 0,
+                              pax: (res.adults || 0) + (res.children || 0) || 1,
+                              price: res.totalAmount || 0,
+                              currency: res.currency || 'USD',
+                              paymentStatus: res.paymentStatus || 'Por Pagar',
+                              source: res.sourceName || '',
+                              signature: ''
+                            });
+                            setShowCheckinModal(true);
+                          }}
+                          className="btn-premium"
+                          style={{ 
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: 12, 
+                            padding: '12px', 
+                            fontWeight: 700, 
+                            fontSize: 14, 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            width: '100%',
+                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                          }}
+                        >
+                          <UserPlus size={18} />
+                          Registrar ingreso
+                        </button>
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
-            );
-          })()}
+                ))
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
 
   const renderAdminTables = () => (
     <div className="fade-in" style={{ paddingBottom: 40 }}>
@@ -3421,51 +3438,333 @@ export default function App() {
             </div>
             <Trash2 size={18} color="var(--danger)" style={{ cursor: 'pointer' }} onClick={() => handleAdminDeleteTable(table.id)} />
           </div>
-        ))}
+          
+          {isProximosExpanded && (
+            <div className="res-list-p">
+              {proximas.length === 0 ? (
+                <p className="empty-msg">No hay reservas próximas registradas.</p>
+              ) : (
+                proximas.map(res => (
+                  <div key={res.id} className="res-card-p secondary">
+                    <div className="res-main">
+                      <div className="res-guest">
+                        <div className="res-avatar">{res.guestName?.[0]}</div>
+                        <div className="res-name-wrap">
+                          <span className="res-name">{res.guestName}</span>
+                          <span className="res-phone">{res.guestPhone || 'Sin teléfono'}</span>
+                        </div>
+                      </div>
+                      <div className="res-room">
+                        <span className="room-label">HABITACIÓN</span>
+                        <span className="room-val">{res.roomName}</span>
+                      </div>
+                    </div>
+                    <div className="res-dates">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
+                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderAdminUsers = () => (
-    <div className="fade-in" style={{ paddingBottom: 40 }}>
-      <button className="btn-primary" onClick={() => setIsAddUserModalOpen(true)} style={{ marginBottom: 24 }}>
-        <UserPlus size={18} /> Agregar Usuario
-      </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {users.map(user => (
-          <div key={user.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: '50%',
-                backgroundColor: user.role === 'Administrador' ? '#e0e7ff' : user.role === 'Encargado' ? '#fefce8' : '#f0fdf4',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <User size={20} color={user.role === 'Administrador' ? '#4f46e5' : user.role === 'Encargado' ? '#ca8a04' : '#16a34a'} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>{user.name}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  {user.role === 'Administrador' ? '🔑 Administrador' : user.role === 'Encargado' ? '🛡️ Encargado' : '👤 Staff'} — {user.active ? 'Autorizado' : 'Bloqueado'}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <Pencil size={18} color="#94a3b8" style={{ cursor: 'pointer' }} onClick={() => openEditUser(user)} />
-              <Trash2 size={18} color="var(--danger)" style={{ cursor: 'pointer' }} onClick={() => {
-                if (confirm(`¿Eliminar al usuario ${user.name}?`)) deleteUser(user.id);
-              }} />
-            </div>
+  const renderRegistros = () => {
+    return (
+      <div className="registros-view fade-in">
+        <div className="view-header" style={{ marginBottom: 24 }}>
+          <button className="back-btn-pill" onClick={() => setCurrentView('checkin')} style={{ marginBottom: 12 }}>
+            <ChevronLeft size={20} />
+            <span>Volver</span>
+          </button>
+          <h2 className="view-title-premium">Historial de Registros</h2>
+          <p className="view-subtitle-premium">Base de datos de huéspedes que han completado el check-in online</p>
+        </div>
+
+        {registrations.length === 0 ? (
+          <div className="empty-state-p">
+            <ClipboardList size={48} color="#94a3b8" />
+            <h3>No hay registros</h3>
+            <p>Los datos de huéspedes registrados aparecerán aquí</p>
           </div>
-        ))}
+        ) : (
+          <div className="registros-list-p">
+            {registrations.map(reg => (
+              <div key={reg.id} className="reg-card-p">
+                <div className="reg-header-p">
+                   <div className="reg-guest-p">
+                     <div className="reg-avatar-p">{reg.name?.[0]}</div>
+                     <div className="reg-info-p">
+                       <span className="reg-name-p">{reg.name}</span>
+                       <span className="reg-meta-p">{reg.email} • {reg.phone}</span>
+                     </div>
+                   </div>
+                   <div className="reg-date-badge-p">
+                     {new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                   </div>
+                </div>
+                <div className="reg-body-p">
+                   <div className="reg-detail-grid-p">
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">NACIONALIDAD</span>
+                        <span className="reg-d-val">{reg.nationality}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">HABITACIÓN</span>
+                        <span className="reg-d-val">{reg.room_name}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">CIUDAD</span>
+                        <span className="reg-d-val">{reg.city}</span>
+                      </div>
+                      <div className="reg-d-item">
+                        <span className="reg-d-label">ESTANCIA</span>
+                        <span className="reg-d-val">{new Date(reg.arrival_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric'})} - {new Date(reg.departure_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'})}</span>
+                      </div>
+                   </div>
+                </div>
+                {reg.signature && (
+                  <div className="reg-sig-p">
+                    <span className="reg-d-label">FIRMA</span>
+                    <img src={reg.signature} alt="Firma del huésped" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderAdmin = () => {
+    return (
+      <div className="admin-view fade-in">
+        <div className="view-header">
+           <h2 className="view-title-premium">Panel de Control</h2>
+           <p className="view-subtitle-premium">Configuración de sistema y analíticas</p>
+        </div>
+
+        <div className="admin-nav-grid">
+           <button className={`admin-nav-btn ${adminSubView === 'stats' ? 'active' : ''}`} onClick={() => setAdminSubView('stats')}>
+             <TrendingUp size={24} />
+             <span>Finanzas</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'menu' ? 'active' : ''}`} onClick={() => setAdminSubView('menu')}>
+             <Pencil size={24} />
+             <span>Menú</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'users' ? 'active' : ''}`} onClick={() => setAdminSubView('users')}>
+             <Users size={24} />
+             <span>Personal</span>
+           </button>
+           <button className={`admin-nav-btn ${adminSubView === 'tables' ? 'active' : ''}`} onClick={() => setAdminSubView('tables')}>
+             <LayoutGrid size={24} />
+             <span>Mesas</span>
+           </button>
+        </div>
+
+        <div className="admin-content-box">
+          {adminSubView === 'menu' && (
+            <div className="admin-menu-section fade-in">
+              <div className="section-title-row">
+                <h3>Gestión de Menú</h3>
+                <button className="btn-small" onClick={handleAddItemModalOpen}>
+                  <Plus size={14} /> Nuevo Producto
+                </button>
+              </div>
+
+              <div className="admin-menu-list">
+                {CATEGORIES.map(cat => {
+                  const items = menuItems.filter(m => m.category === cat);
+                  const isExpanded = expandedItems.has(cat);
+                  
+                  return (
+                    <div key={cat} className="admin-cat-block">
+                      <div className="admin-cat-header" onClick={() => toggleExpanded(cat)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                          <span className="cat-name">{cat}</span>
+                          <span className="cat-count">{items.length} items</span>
+                        </div>
+                        <button className="cat-edit-btn" onClick={(e) => { e.stopPropagation(); openEditCategory(items[0]?.categoryId || '', cat); }}>
+                           <Pencil size={14} />
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="admin-items-grid fade-in">
+                          {items.map(item => (
+                            <div key={item.id} className={`admin-item-row ${!item.active ? 'inactive' : ''}`}>
+                              <div className="ai-info">
+                                <span className="ai-name">{item.name}</span>
+                                <span className="ai-price">{formatCurrency(item.price)}</span>
+                              </div>
+                              <div className="ai-actions">
+                                <button className="ai-btn edit" onClick={() => openEditItem(item)}><Pencil size={14} /></button>
+                                <button className={`ai-btn toggle ${item.active ? 'on' : 'off'}`} onClick={() => toggleMenuItem(item.id, !item.active)}>
+                                  {item.active ? 'Visible' : 'Oculto'}
+                                </button>
+                              </div>
+                              {item.hasVariants && item.variants && (
+                                <div className="ai-variants-list">
+                                  {item.variants.map(v => (
+                                    <div key={v.id} className="ai-variant-row">
+                                      <span className="av-label">{v.label}</span>
+                                      <span className="av-price">{formatCurrency(v.price)}</span>
+                                      <div className="av-actions">
+                                        <button className="av-btn edit" onClick={() => openEditVariant(v)}><Pencil size={12} /></button>
+                                        <button className={`av-btn toggle ${v.active ? 'on' : 'off'}`} onClick={() => toggleMenuVariant(v.id, !v.active)}>
+                                          {v.active ? <Check size={12} /> : <X size={12} />}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {adminSubView === 'stats' && (
+            <div className="admin-stats-section fade-in">
+              <div className="stats-nav-p">
+                <button className={`stats-nav-btn-p ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
+                <button className={`stats-nav-btn-p ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Analíticas</button>
+              </div>
+
+              {statsSubView === 'history' ? (
+                <div className="history-list-p">
+                  {dailySummaries.length === 0 ? (
+                    <div className="empty-state-p">No hay cierres registrados aún</div>
+                  ) : (
+                    dailySummaries.map(s => (
+                      <HistoryReportCard 
+                        key={s.id} 
+                        report={s} 
+                        formatCurrency={formatCurrency} 
+                        onDelete={(id: string) => setDeleteReportId(id)}
+                      />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="analytics-content-p">
+                   <div className="analytics-filter-p">
+                      {['day', 'month', 'total'].map(f => (
+                        <button key={f} className={`filter-btn-p ${analyticsFilter === f ? 'active' : ''}`} onClick={() => setAnalyticsFilter(f as any)}>
+                          {f === 'day' ? 'Hoy' : (f === 'month' ? 'Mes' : 'Histórico')}
+                        </button>
+                      ))}
+                   </div>
+
+                   <div className="ranking-card-p">
+                     <h4>Top 10 Productos</h4>
+                     <div className="ranking-list-p">
+                        {ranking.map((item, i) => (
+                          <div key={item.name} className="ranking-row-p">
+                            <span className="rank-num">#{i+1}</span>
+                            <span className="rank-name">{item.name}</span>
+                            <span className="rank-qty">{item.count} vendidos</span>
+                          </div>
+                        ))}
+                     </div>
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {adminSubView === 'users' && (
+            <div className="admin-users-section fade-in">
+              <div className="section-title-row">
+                <h3>Personal</h3>
+                <button className="btn-small" onClick={() => setIsAddUserModalOpen(true)}>
+                  <Plus size={14} /> Nuevo Usuario
+                </button>
+              </div>
+              <div className="users-list-p">
+                {users.map(user => (
+                  <div key={user.id} className="user-card-p">
+                    <div className="user-avatar-p">{user.name[0].toUpperCase()}</div>
+                    <div className="user-info-p">
+                      <span className="user-name-p">{user.name}</span>
+                      <span className="user-role-p">{user.role}</span>
+                    </div>
+                    <div className="user-actions-p">
+                      <div className={`user-session-p ${user.session_active ? 'active' : ''}`}>
+                         {user.session_active ? 'Online' : 'Offline'}
+                      </div>
+                      <button className="user-edit-btn-p" onClick={() => {
+                        setEditingUserId(user.id);
+                        setEditUserName(user.name);
+                        setEditUserRole(user.role);
+                        setIsEditUserModalOpen(true);
+                      }}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="user-del-btn-p" onClick={() => deleteUser(user.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminSubView === 'tables' && (
+            <div className="admin-tables-section fade-in">
+              <div className="section-title-row">
+                <h3>Mesas</h3>
+              </div>
+              <div className="tables-admin-grid">
+                {tables.filter(t => t.category !== 'Pedidos para llevar').map(table => (
+                   <div key={table.id} className="table-admin-card">
+                     <span className="tac-number">{table.id}</span>
+                     <span className="tac-cat">{table.category}</span>
+                     <button className="tac-del-btn" onClick={() => deleteTable(table.id)}>Eliminar</button>
+                   </div>
+                ))}
+                <button className="table-admin-add" onClick={() => {
+                  const id = prompt('Número de la nueva mesa:');
+                  if (id && !isNaN(parseInt(id))) addTable(parseInt(id));
+                }}>
+                  <Plus size={24} />
+                  <span>Añadir Mesa</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderHeader = () => {
-    const isSubView = ['mesa', 'checkout'].includes(currentView) || (currentView === 'admin' && adminSubView !== 'main');
-    const subTitles: Record<string, string> = {
-      menu: 'Menú', users: 'Autorizados', tables: 'Mesas', stats: 'Estadísticas',
-    };
+    if (!currentUser) return null;
+    
     return (
       <div className="header">
         {isSubView ? (
@@ -3513,21 +3812,11 @@ export default function App() {
           <div style={{ width: 44 }} />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {deferredPrompt && (
-              <button
-                onClick={handleInstallPWA}
-                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
-                title="Instalar Aplicación"
-              >
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                Instalar
-              </button>
-            )}
-            {!deferredPrompt && showIosButton && (
-              <button
+            {showIosButton && (
+              <button 
+                className="btn-premium" 
+                style={{ width: 'auto', padding: '10px 16px', background: '#3b82f6', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: 'none' }}
                 onClick={() => setIsIosPromptVisible(true)}
-                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16,185,129,0.2)' }}
-                title="Instalar en iOS"
               >
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                 Instalar
@@ -3627,37 +3916,41 @@ export default function App() {
             <div key={view} className={`nav-item ${currentView === view ? 'active' : ''}`} onClick={() => navTo(view as any)}>
               {icon}{label}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Notes Modal */}
-      {notesModal && (
-        <div className="modal-overlay" onClick={() => setNotesModal(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Notas del item</h3>
-              <button className="modal-close" onClick={() => setNotesModal(null)}><X size={20} /></button>
-            </div>
-            <div className="form-group">
-              <label>Indicaciones especiales</label>
-              <textarea rows={3} value={notesDraft} onChange={e => setNotesDraft(e.target.value)} placeholder="Sin cebolla, extra picante..." />
-            </div>
-            <button className="btn-primary" onClick={handleSaveNotes}>Guardar nota</button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Confirm Modal */}
-      {confirmPending && (
-        <div className="confirm-overlay" onClick={() => setConfirmPending(null)}>
-          <div className="confirm-sheet" onClick={e => e.stopPropagation()}>
-            <div className="confirm-sheet-pill" />
-            <div className="confirm-sheet-label">Confirmar pedido</div>
-            <div className="confirm-item-name">{confirmPending.item.name}</div>
-            {confirmPending.variant && (
-              <div className={`confirm-variant-badge ${confirmPending.variant.label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}>
-                {confirmPending.variant.label}
+            
+            {activeItems.filter(i => i.status === 'pending').length === 0 ? (
+              <div className="empty-pedidos">
+                <h2>¡Cocina al día!</h2>
+                <p>No hay pedidos pendientes en este momento.</p>
+              </div>
+            ) : (
+              <div className="pedidos-list">
+                {activeItems
+                  .filter(i => i.status === 'pending')
+                  .sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                  .map(item => (
+                    <div key={item.id} className="qa-card">
+                      <div className="qa-header">
+                        <span className="qa-table-badge">MESA {item.table_id}</span>
+                        <span className="qa-qty-label">{item.qty} UNIDADES</span>
+                      </div>
+                      <div className="qa-body">
+                         <div className="qa-info">
+                            <div className="qa-name">{item.name}</div>
+                            {item.variant_label && <div className="qa-variant">{item.variant_label}</div>}
+                            {item.notes && (
+                              <div className="qa-notes-box">
+                                <StickyNote size={14} />
+                                <span>{item.notes}</span>
+                              </div>
+                            )}
+                         </div>
+                         <button className="qa-done-btn" onClick={() => markItemDone(item.id)}>
+                            <Check size={28} />
+                         </button>
+                      </div>
+                    </div>
+                  ))
+                }
               </div>
             )}
             <div className="confirm-price">
@@ -4610,15 +4903,35 @@ export default function App() {
              <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
                 Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mazatlan', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
              </div>
-          </div>
-          <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0', fontSize: 14 }}>
-             {ticketToPrint.items_summary.split(', ').map((str: string, i: number) => (
-                <div key={i} style={{ marginBottom: 4 }}>- {str}</div>
-             ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
-             <span>Total:</span>
-             <span>${Number(ticketToPrint.total).toFixed(0)}</span>
+             <form onSubmit={handleLogin}>
+               <div className="login-field">
+                 <User size={18} />
+                 <input 
+                   type="text" 
+                   placeholder="Nombre de usuario" 
+                   value={loginName} 
+                   onChange={(e) => setLoginName(e.target.value)} 
+                   required
+                 />
+               </div>
+               <div className="login-field">
+                 <Lock size={18} />
+                 <input 
+                   type={showPassword ? "text" : "password"} 
+                   placeholder="Contraseña" 
+                   value={loginPassword} 
+                   onChange={(e) => setLoginPassword(e.target.value)} 
+                   required
+                 />
+                 <button type="button" className="pw-toggle" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                 </button>
+               </div>
+               {loginError && <div className="login-error-msg">{loginError}</div>}
+               <button type="submit" className="login-btn-premium" disabled={loginLoading}>
+                 {loginLoading ? 'Iniciando...' : 'Entrar al Sistema'}
+               </button>
+             </form>
           </div>
         </div>
       )}
