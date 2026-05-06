@@ -612,10 +612,11 @@ export function useSupabaseSync() {
       const totalTarjeta = todayCardIncome + hotelCardSales;
       const propinasTC = todayCardTips;
 
-      const handoverCash = (pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000 + todayCashTips;
+      const handoverCash = (pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000;
       const handoverDollars = dolaresEfectivoConvertido;
       const handoverCard = totalTarjeta + propinasTC;
-      const handoverTotal = handoverCash + handoverDollars + handoverCard;
+      const handoverTransfer = todayTransferIncome + todayTransferTips;
+      const handoverTotal = handoverCash + handoverDollars + handoverCard + handoverTransfer;
 
       const { error } = await dbShiftSummaries.insert({
         income: todayIncome,

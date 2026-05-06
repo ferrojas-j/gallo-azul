@@ -3867,7 +3867,7 @@ export default function App() {
                 const ventasRestauranteBase = todayIncome;
                 const propinasTotales = todayTotalTips;
                 const ventasHotel = hotelCardSales + hotelCashSales;
-                const ventasTotales = ventasRestauranteBase + propinasTotales + ventasHotel;
+                const ventasTotales = ventasRestauranteBase + ventasHotel;
                 
                 const efectivoMXNHotel = hotelSalesList.filter(s => s.currency === 'MXN' && s.payment_method === 'efectivo').reduce((acc, s) => acc + Number(s.amount), 0);
                 const dolaresEfectivoOriginal = hotelSalesList.filter(s => s.currency === 'USD' && s.payment_method === 'efectivo').reduce((acc, s) => acc + Number(s.amount), 0);
@@ -3897,10 +3897,6 @@ export default function App() {
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasRestauranteBase)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Propinas restaurante:</span>
-                          <span style={{ color: '#10b981', fontWeight: 600 }}>{formatCurrency(propinasTotales)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Ventas hotel:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasHotel)}</span>
                         </div>
@@ -3916,8 +3912,8 @@ export default function App() {
                       <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Corte</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Pesos (Fondo - gastos + efectivo del día - propinas en efectivo):</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(pettyCashInitial - todayExpenses + totalEfectivoPesos - todayCashTips)}</span>
+                          <span>Pesos (Fondo - gastos + efectivo del día):</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Dólares convertidos ({formatCurrency(dolaresEfectivoOriginal, 'USD')}):</span>
@@ -3994,7 +3990,7 @@ export default function App() {
                       <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Efectivo:</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency((pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000 + todayCashTips)}</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency((pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Dólares:</span>
@@ -4006,7 +4002,7 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 800, color: '#1e3a8a', fontSize: '16px' }}>
                           <span>Entrega:</span>
-                          <span>{formatCurrency(((pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000 + todayCashTips) + dolaresEfectivoConvertido + (totalTarjeta + todayCardTips))}</span>
+                          <span>{formatCurrency(((pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000) + dolaresEfectivoConvertido + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips))}</span>
                         </div>
                       </div>
                     </div>
@@ -4029,7 +4025,7 @@ export default function App() {
                   console.log('Iniciando cierre general...');
                   
                   const summary = {
-                    total_income: todayIncome + todayTotalTips,
+                    total_income: todayIncome,
                     restaurant_income: todayIncome,
                     tips: todayTotalTips,
                     expenses: todayExpenses,
