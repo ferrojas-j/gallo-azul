@@ -581,6 +581,55 @@ export default function App() {
       setLoginLoading(false);
     }
   };
+  
+  const renderLogin = () => (
+    <div className="login-screen">
+      <div className="login-logo">🏨</div>
+      <h1 className="login-title">Gallo Azul</h1>
+      <p className="login-subtitle">Sistema de Control Operativo</p>
+      
+      <form onSubmit={handleLogin} className="login-form">
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label>Usuario</label>
+          <input 
+            type="text" 
+            placeholder="Tu nombre" 
+            value={loginName}
+            onChange={e => setLoginName(e.target.value)}
+            required 
+            className="input-large"
+          />
+        </div>
+        
+        <div style={{ display: 'grid', gap: 6, position: 'relative' }}>
+          <label>Contraseña</label>
+          <input 
+            type={showPassword ? "text" : "password"} 
+            placeholder="Contraseña" 
+            value={loginPassword}
+            onChange={e => setLoginPassword(e.target.value)}
+            required 
+            className="input-large"
+          />
+          <button 
+            type="button" 
+            onClick={() => setShowPassword(!showPassword)}
+            style={{ position: 'absolute', right: 12, top: 32, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+
+        {loginError && <div className="login-error">{loginError}</div>}
+
+        <button type="submit" className="btn-primary" disabled={loginLoading} style={{ marginTop: 12 }}>
+          {loginLoading ? 'Iniciando...' : 'Entrar al Sistema'}
+        </button>
+      </form>
+      <div className="login-hint">Gestión centralizada de <strong>Hotel & Restaurante</strong></div>
+    </div>
+  );
+
 
   // Unified Custom Confirm Modal for tables (opening accounts and confirming payments)
   const [tableConfirmModal, setTableConfirmModal] = useState<{
@@ -2880,8 +2929,11 @@ export default function App() {
 
   // ── Render ───────────────────────────────────────────
 
+  if (!currentUser) return renderLogin();
+
   return (
     <>
+
       <div className="app-container">
       {renderHeader()}
       <div className="content-area">
