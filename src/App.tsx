@@ -3881,17 +3881,18 @@ export default function App() {
              <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
                 Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mazatlan', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
              </div>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                 </button>
-               </div>
-               {loginError && <div className="login-error-msg">{loginError}</div>}
-               <button type="submit" className="login-btn-premium" disabled={loginLoading}>
-                 {loginLoading ? 'Iniciando...' : 'Entrar al Sistema'}
-               </button>
-             </form>
+          </div>
+
+          <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0' }}>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{ticketToPrint.items_summary}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
+             <span>Total:</span>
+             <span>${Number(ticketToPrint.total).toFixed(0)}</span>
           </div>
         </div>
       )}
+
       {renderCheckinModal()}
       {renderNewResModal()}
       </div>
