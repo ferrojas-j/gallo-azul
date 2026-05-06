@@ -49,4 +49,7 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
   },
+  define: {
+    __BUILD_TIMESTAMP__: JSON.stringify(Date.now()),
+  },
 })
