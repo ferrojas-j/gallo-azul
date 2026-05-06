@@ -695,7 +695,15 @@ export function useSupabaseSync() {
       setHotelCardSales(0);
       setHotelCashSales(0);
       setHotelSalesList([]);
-      // 4. Deactivate all "Pedidos para llevar" tables
+      setActiveItems([]);
+      setTableOrders({});
+
+      // 4. Cancel any dangling open orders and reset all tables
+      await Promise.all([
+        supabase.from('orders').update({ status: 'cancelled' }).in('status', ['open', 'paying']),
+        supabase.from('tables').update({ status: 'free' }).neq('status', 'free')
+      ]);
+
       const deliveryTables = tables.filter(t => t.category === 'Pedidos para llevar');
       if (deliveryTables.length > 0) {
         const deliveryIds = deliveryTables.map(t => t.id);
