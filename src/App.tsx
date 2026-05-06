@@ -421,11 +421,13 @@ export default function App() {
   const dynamicCategories = useMemo(() => {
     const set = new Set<string>();
     menuItems.forEach(m => {
-      if (m.active && m.category) {
+      if (m.active && m.category && m.category.toUpperCase() !== 'INGREDIENTES EXTRA') {
         let isSub = false;
         for (const [parent, subs] of Object.entries(CATEGORY_MAPPING)) {
           if (subs.includes(m.category) || m.category.startsWith(`${parent}:`) || m.category.startsWith(`${parent} `)) {
-            set.add(parent);
+            if (parent !== 'INGREDIENTES EXTRA') {
+              set.add(parent);
+            }
             isSub = true;
             break;
           }
