@@ -2086,12 +2086,12 @@ export default function App() {
           <div style={{ display: 'grid', gap: 16 }}>
             {filteredRegistrations.map(reg => (
               <div key={reg.id} style={{ background: 'white', padding: 20, borderRadius: 24, border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                  <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>{reg.name}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                  <div style={{ flex: '1 1 min-content' }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0, wordBreak: 'break-word' }}>{reg.name}</h3>
                     <div style={{ fontSize: 13, color: '#3b82f6', fontWeight: 600, marginTop: 4 }}>{reg.room_name}</div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                     <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>
                       <div>{new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</div>
                       <div style={{ fontSize: 10, opacity: 0.7 }}>{new Date(reg.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
@@ -2101,17 +2101,17 @@ export default function App() {
                         setDeleteRegistrationId(reg.id);
                       }}
                       className="btn-icon danger" 
-                      style={{ padding: 6, background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                      style={{ padding: 8, background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
                   <div>
                     <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Contacto</div>
-                    <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>{reg.email || 'N/A'}</div>
+                    <div style={{ fontSize: 13, color: '#334155', fontWeight: 500, wordBreak: 'break-all' }}>{reg.email || 'N/A'}</div>
                     <div style={{ fontSize: 13, color: '#64748b' }}>{reg.phone || 'N/A'}</div>
                   </div>
                   <div>

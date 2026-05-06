@@ -94,7 +94,8 @@ serve(async (req) => {
           const totalAmount = parseFloat(r.totalAmount || r.totalPrice || r.price || 0);
           const paidAmount = parseFloat(r.paidAmount || 0);
           const pStatus = (r.paymentStatus || "").toLowerCase();
-          const isPaid = pStatus === 'paid' || r.isPaid === true || r.isPaid === 1 || (paidAmount >= (totalAmount - 0.01) && totalAmount > 0);
+          const noteText = ((r.hostNote || "") + " " + (r.guestNote || "")).toUpperCase();
+          const isPaid = pStatus === 'paid' || r.isPaid === true || r.isPaid === 1 || (paidAmount >= (totalAmount - 0.01) && totalAmount > 0) || noteText.includes('PAID');
 
           uniqueMap.set(compositeKey, {
             id: r.id,
@@ -190,10 +191,27 @@ serve(async (req) => {
       const { reservationId, status, noShow, isPaid } = params;
       if (!reservationId) throw new Error("Missing reservationId");
 
+      let hostNoteToUpdate = undefined;
+      
+      if (typeof isPaid === 'boolean' && isPaid) {
+        // Fetch current reservation to append PAID to hostNote without overwriting
+        const getRes = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (getRes.ok) {
+          const resData = await getRes.json();
+          const currentNote = resData?.result?.hostNote || "";
+          if (!currentNote.includes("PAID")) {
+            hostNoteToUpdate = currentNote ? `${currentNote} | PAID` : "PAID";
+          }
+        }
+      }
+
       const updatePayload: any = {};
       if (status) updatePayload.status = status;
       if (typeof noShow === 'boolean') updatePayload.noShow = noShow ? 1 : 0;
       if (typeof isPaid === 'boolean') updatePayload.isPaid = isPaid ? 1 : 0;
+      if (hostNoteToUpdate !== undefined) updatePayload.hostNote = hostNoteToUpdate;
 
       const resResponse = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
         method: 'PUT',
