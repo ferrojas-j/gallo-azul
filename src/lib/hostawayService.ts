@@ -17,6 +17,7 @@ export interface Reservation {
   totalAmount?: number;
   currency?: string;
   paymentStatus?: string;
+  isPaid?: boolean | number;
   sourceName?: string;
   listingMapId: number;
   roomName: string;
@@ -50,7 +51,7 @@ export async function getUpcomingCheckins(): Promise<Reservation[]> {
   }
 }
 
-export async function updateReservationStatus(reservationId: number, status?: string, noShow?: boolean): Promise<any> {
+export async function updateReservationStatus(reservationId: number, status?: string, noShow?: boolean, cancelledBy: string = 'host'): Promise<any> {
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/hostaway-proxy`, {
       method: 'POST',
@@ -61,7 +62,7 @@ export async function updateReservationStatus(reservationId: number, status?: st
       },
       body: JSON.stringify({
         action: 'updateReservationStatus',
-        params: { reservationId, status, noShow }
+        params: { reservationId, status, noShow, cancelledBy }
       })
     });
 
@@ -74,5 +75,32 @@ export async function updateReservationStatus(reservationId: number, status?: st
   } catch (error: any) {
     console.error('Hostaway Update Error:', error);
     throw new Error(error.message || 'No se pudo actualizar la reserva');
+  }
+}
+
+export async function createReservation(params: any): Promise<any> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/hostaway-proxy`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'createReservation',
+        params
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('Hostaway Create Error:', error);
+    throw new Error(error.message || 'No se pudo crear la reserva en Hostaway');
   }
 }

@@ -5,6 +5,7 @@ import {
   FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
 
   Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
+  FileText, Package, Utensils,
 
   UserMinus, ExternalLink, CheckCircle2, AlertCircle
 
@@ -15,8 +16,16 @@ import type { MenuItem, MenuVariant } from './data/menu';
 import { supabase } from './lib/supabase';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
 import type { UserRow } from './lib/supabaseService';
-import { getUpcomingCheckins, updateReservationStatus } from './lib/hostawayService';
+import { getUpcomingCheckins, updateReservationStatus, createReservation } from './lib/hostawayService';
 import type { Reservation } from './lib/hostawayService';
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 0
+  }).format(amount);
+};
 
 const COUNTRIES_BY_CONTINENT = {
   "América": [
@@ -287,7 +296,7 @@ export default function App() {
     todayIncome, todayCashIncome, todayCashTips, todayTransferIncome, todayTransferTips,
     todayDebitIncome, todayDebitTips, todayCreditIncome, todayCreditTips,
     todayCardIncome, todayCardTips, todayTotalTips, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, pettyCashInitial, hotelCardSales, hotelCashSales, hotelSalesList, dailySummaries, isLoading,
-    createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes,
+    createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes, markItemsPrinted,
     checkoutTable, confirmPayment, cancelTable, addExpense,
     toggleMenuItem, toggleMenuVariant,
     updateMenuItem, updateMenuVariant, updateCategory,
@@ -296,25 +305,36 @@ export default function App() {
     addUser, deleteUser, updateUser, closeSession,
     closeDay, deleteShiftSummary, logPrintedTicket,
     addHotelSale, deleteHotelSale, exchangeRate,
-    pendingTickets, markTicketPrinted, deleteTicket, fetchTodayTotals,
-    createDeliveryOrder, registrations, fetchRegistrations
+    pendingTickets, markTicketPrinted, deleteTicket, deleteClosedOrder, fetchTodayTotals,
+    createDeliveryOrder, registrations, fetchRegistrations, deleteRegistration
   } = useSupabaseSync();
-
 
   // UI state
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>({
     id: 'default-admin', name: 'Administrador', role: 'Administrador'
   });
 
-
-
-
   const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
+  const [statsSubView, setStatsSubView] = useState<'history' | 'analytics'>('history');
+  const [analyticsFilter, setAnalyticsFilter] = useState<'day' | 'month' | 'total'>('day');
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+  const [deleteRegistrationId, setDeleteRegistrationId] = useState<string | null>(null);
+  const [showPosExpenseModal, setShowPosExpenseModal] = useState(false);
+  const [posExpenseDesc, setPosExpenseDesc] = useState('');
+  const [posExpenseAmount, setPosExpenseAmount] = useState('');
   const [isIosPromptVisible, setIsIosPromptVisible] = useState(false);
   const showIosButton = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).standalone;
 
+  // Checkout & Discount State
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'amount'>('none');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [tipPercent, setTipPercent] = useState('none');
+  const [customTip, setCustomTip] = useState('');
+  const [cashReceived, setCashReceived] = useState('');
+  const [expandedPedidos, setExpandedPedidos] = useState<number[]>([]);
 
   const [upcomingCheckins, setUpcomingCheckins] = useState<Reservation[]>([]);
   const [isLoadingCheckins, setIsLoadingCheckins] = useState(false);
@@ -339,6 +359,7 @@ export default function App() {
     customPrice: '',
     priceCurrency: 'USD',
     useCustomPrice: false,
+    isPaid: false,
     adults: 1,
     children: 0
   });
@@ -350,6 +371,72 @@ export default function App() {
     name: '', nationality: '', homeAddress: '', phone: '', city: '', country: '', email: '',
     roomName: '', arrivalDate: '', departureDate: '', nights: 0, pax: 1, price: 0, currency: 'USD', paymentStatus: 'Por Pagar', source: '', signature: ''
   });
+
+  const [menuSearch, setMenuSearch] = useState('');
+  const [menuCategory, setMenuCategory] = useState(CATEGORIES[0]);
+
+  const [itemToConfirm, setItemToConfirm] = useState<MenuItem | null>(null);
+  const [itemVariantToConfirm, setItemVariantToConfirm] = useState<MenuVariant | undefined>(undefined);
+  const [itemNotesToConfirm, setItemNotesToConfirm] = useState('');
+  const [itemExtrasSelected, setItemExtrasSelected] = useState<MenuItem[]>([]);
+
+  // Derived state
+  const orderItems = useMemo(() => {
+    return activeItems.filter(i => i.table_id === selectedTableId);
+  }, [activeItems, selectedTableId]);
+
+  const selectedTableItems = orderItems;
+
+  const filteredMenuItems = useMemo(() => {
+    let list = menuItems.filter(m => m.active);
+    if (menuSearch.trim()) {
+      const s = menuSearch.toLowerCase().trim();
+      list = list.filter(m => 
+        m.name.toLowerCase().includes(s) || 
+        m.category.toLowerCase().includes(s)
+      );
+    } else {
+      list = list.filter(m => m.category === menuCategory);
+    }
+    return list;
+  }, [menuItems, menuCategory, menuSearch]);
+
+  const ranking = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const ordersToProcess = analyticsFilter === 'day' ? todayClosedOrders : []; // For now day only
+    ordersToProcess.forEach(order => {
+      const items = order.items_summary?.split(', ') || [];
+      items.forEach(i => {
+        const match = i.match(/^(\d+)x\s+(.+)$/);
+        if (match) {
+          const qty = parseInt(match[1]);
+          const name = match[2];
+          counts[name] = (counts[name] || 0) + qty;
+        }
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [todayClosedOrders, analyticsFilter]);
+
+  const dVal = parseFloat(discountValue) || 0;
+  
+  const finalTotal = useMemo(() => {
+    if (!selectedTableId) return 0;
+    const subtotal = activeItems
+      .filter(i => i.table_id === selectedTableId)
+      .reduce((s, i) => s + (i.price * i.qty), 0);
+    
+    if (discountType === 'percentage') return subtotal * (1 - dVal / 100);
+    if (discountType === 'amount') return Math.max(0, subtotal - dVal);
+    return subtotal;
+  }, [activeItems, selectedTableId, discountType, dVal]);
+
+
+  // UI state
+
 
   // Efecto para sincronizar País/Nacionalidad con el código de área del teléfono
   useEffect(() => {
@@ -475,6 +562,7 @@ export default function App() {
         : selectedListing.basePrice;
 
       const params = {
+        channelId: 2000,
         listingMapId: parseInt(newResForm.listingId),
         arrivalDate: newResForm.arrivalDate,
         departureDate: newResForm.departureDate,
@@ -487,20 +575,21 @@ export default function App() {
         phone: newResForm.guestPhone,
         totalPrice: totalAmount,
         currency: newResForm.useCustomPrice ? newResForm.priceCurrency : selectedListing.currency,
+        isPaid: newResForm.isPaid ? 1 : 0,
+        paymentStatus: newResForm.isPaid ? 'paid' : 'unpaid',
         numberOfGuests: 1,
         adults: 1
       };
 
-      const { data, error } = await supabase.functions.invoke('hostaway-proxy', {
-        body: { 
-          action: 'createReservation',
-          params
-        }
-      });
-
-      if (error) throw error;
+      await createReservation(params);
       
-      alert("Reserva creada con éxito en Hostaway");
+      // Si está marcado como pagado, lo registramos en el sistema local
+      if (newResForm.isPaid) {
+        const currency = newResForm.useCustomPrice ? newResForm.priceCurrency : selectedListing.currency;
+        await addHotelSale(totalAmount, currency, 'tarjeta');
+      }
+
+      alert("Reserva creada con éxito en Hostaway" + (newResForm.isPaid ? " y registrada como Pagada." : ""));
       setShowNewResModal(false);
       // Recargar checkins
       getUpcomingCheckins().then(setUpcomingCheckins);
@@ -524,8 +613,6 @@ export default function App() {
     }
   }, [currentView, selectedTableId, adminSubView]);
   const [mesaTab, setMesaTab] = useState<'orden' | 'menu'>('orden');
-  const [menuCategory, setMenuCategory] = useState(CATEGORIES[0]);
-  const [menuSearch, setMenuSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta'>('tarjeta');
   const [mesasConCuentaActivada, setMesasConCuentaActivada] = useState<Set<number>>(new Set());
 
@@ -561,6 +648,102 @@ export default function App() {
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff' | 'Encargado'>('Staff');
 
+  const openTable = (id: number) => {
+    setSelectedTableId(id);
+    setCurrentView('mesa');
+  };
+
+  const openEditUser = (user: UserRow) => {
+    setEditingUserId(user.id);
+    setEditUserName(user.name);
+    setEditUserRole(user.role);
+    setIsEditUserModalOpen(true);
+  };
+
+  const handleAddItem = (item: MenuItem, variant?: MenuVariant) => {
+    if (!selectedTableId) return;
+    if (['PIZZAS', 'PASTAS', 'ENSALADAS'].includes(item.category)) {
+      setItemToConfirm(item);
+      setItemVariantToConfirm(variant);
+      setItemNotesToConfirm('');
+      setItemExtrasSelected([]);
+      return;
+    }
+    addItemToOrder(selectedTableId, item, variant);
+  };
+
+  const handleConfirmOpenTable = async () => {
+    if (tableConfirmModal.tableId) {
+      await createOrderForTable(tableConfirmModal.tableId);
+    }
+    setTableConfirmModal({ ...tableConfirmModal, isOpen: false });
+    setCurrentView('mesa');
+  };
+
+  const handleCancelTable = async () => {
+    if (tableConfirmModal.tableId) {
+      await cancelTable(tableConfirmModal.tableId);
+    }
+    setTableConfirmModal({ ...tableConfirmModal, isOpen: false });
+    setCurrentView('salon');
+  };
+
+  const executePayment = async () => {
+    await handleConfirmPayment();
+    setTableConfirmModal({ ...tableConfirmModal, isOpen: false });
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedTableId) return;
+    
+    const items = activeItems.filter(i => i.table_id === selectedTableId);
+    const subtotal = items.reduce((s, i) => s + (i.price * i.qty), 0);
+    
+    // Calculate final total with discount
+    let totalToPay = subtotal;
+    const dVal = parseFloat(discountValue) || 0;
+    if (discountType === 'percentage') totalToPay = subtotal * (1 - dVal / 100);
+    else if (discountType === 'amount') totalToPay = Math.max(0, subtotal - dVal);
+
+    // Tip calculation
+    let tipVal = 0;
+    if (tipPercent === 'Otro') {
+      tipVal = parseFloat(customTip) || 0;
+    } else if (tipPercent !== 'none') {
+      const p = parseFloat(tipPercent);
+      // For cash, fixed values are used (20, 50, 100) instead of percentages sometimes?
+      // Wait, let's check the UI logic for tips.
+      // Line 2666: {t === 'none' ? 'Sin propina' : t === 'Otro' ? 'Otro' : `${t}%`}
+      // It says % for non-cash.
+      // For cash (line 2630): {t === 'none' ? 'Sin propina' : t === 'Otro' ? 'Otro' : `$${t}`}
+      // Ah! Cash uses fixed amounts, Card uses percentages.
+      
+      if (paymentMethod === 'efectivo') {
+        tipVal = p; // It's a dollar/peso amount
+      } else {
+        tipVal = (p / 100) * subtotal;
+      }
+    }
+
+    await confirmPayment(
+      selectedTableId, 
+      paymentMethod, 
+      totalToPay, 
+      tipVal, 
+      discountReason
+    );
+    
+    // Reset payment states
+    setPaymentMethod('tarjeta');
+    setTipPercent('none');
+    setCustomTip('');
+    setDiscountType('none');
+    setDiscountValue('');
+    setDiscountReason('');
+    setCashReceived('');
+    setCurrentView('salon');
+  };
+
 
 
 
@@ -571,25 +754,59 @@ export default function App() {
     tableId: number | null;
   }>({ isOpen: false, type: 'open', tableId: null });
 
-  const [printCuentaModal, setPrintCuentaModal] = useState<{isOpen: boolean, tableId: number | null}>({isOpen: false, tableId: null});
+  const [printCuentaModal, setPrintCuentaModal] = useState<{isOpen: boolean, tableId: number | null, isFinalBill?: boolean}>({isOpen: false, tableId: null, isFinalBill: false});
   const [ticketToPrint, setTicketToPrint] = useState<any>(null);
 
   const handleSendToPrinter = async () => {
     if (printCuentaModal.tableId) {
-      const items = activeItems.filter(i => i.table_id === printCuentaModal.tableId);
-      const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
-      const summary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
-      await logPrintedTicket(printCuentaModal.tableId, currentUser?.name || 'Unknown', total, summary);
+      const isFinal = printCuentaModal.isFinalBill;
+      // If final bill, get all items. If kitchen order, get only unprinted items.
+      const items = activeItems.filter(i => i.table_id === printCuentaModal.tableId && (isFinal || !i.is_printed));
       
-      setMesasConCuentaActivada(prev => {
-        const next = new Set(prev);
-        next.add(printCuentaModal.tableId!);
-        return next;
-      });
+      if (items.length === 0) {
+        alert('No hay items para imprimir.');
+        setPrintCuentaModal({isOpen: false, tableId: null, isFinalBill: false});
+        return;
+      }
+      
+      const total = items.reduce((s, i) => s + (i.price * i.qty), 0);
+      let summary = '';
+      if (isFinal) {
+         // Formato para ticket de cuenta (con precios)
+         summary = items.map(i => `${i.qty}x ${i.name} - $${i.price * i.qty}`).join('\n');
+      } else {
+         // Formato para ticket de cocina (con variantes y notas, sin precios)
+         summary = items.map(i => `${i.qty}x ${i.name}${i.variant_label ? ` (${i.variant_label})` : ''}${i.notes ? ` [${i.notes}]` : ''}`).join('\n');
+      }
+      
+      if (!isFinal) {
+        // Marcar los items como impresos solo si es comanda de cocina
+        const itemIds = items.map(i => i.id);
+        await markItemsPrinted(itemIds);
 
-      alert('Ticket enviado a la caja para imprimir.');
+        // Actualizar estado local optimista para evitar re-impresiones
+        activeItems.forEach(i => {
+          if (itemIds.includes(i.id)) i.is_printed = true;
+        });
+      }
+      
+      // No registramos la cuenta en pendingTickets, solo se envía a imprimir
+      
+      // Generar ticket para imprimir
+      const ticket = {
+        table_id: printCuentaModal.tableId,
+        printed_by: currentUser?.name || 'Unknown',
+        created_at: new Date().toISOString(),
+        items_summary: summary,
+        total: total,
+        is_pedido: !isFinal // Bandera para formato de cocina
+      };
+
+      setPrintCuentaModal({isOpen: false, tableId: null, isFinalBill: false});
+      dispatchPrintOnly(ticket);
+    } else {
+      setPrintCuentaModal({isOpen: false, tableId: null, isFinalBill: false});
     }
-    setPrintCuentaModal({isOpen: false, tableId: null});
   };
 
   const dispatchPrintOnly = (ticket: any) => {
@@ -614,6 +831,27 @@ export default function App() {
   const openEditVariant = (v: MenuVariant) => { setEditTarget({ type: 'variant', id: v.id, label: v.label, price: v.price }); setEditName(v.label); setEditPrice(String(v.price)); };
   const openEditCategory = (id: string, name: string) => { setEditTarget({ type: 'category', id, name }); setEditName(name); setEditPrice(''); };
 
+  const handleAdminAddTable = async () => {
+    const nextId = tables.length > 0 ? Math.max(...tables.map(t => t.id)) + 1 : 1;
+    await addTable(nextId);
+  };
+
+  const handleAdminDeleteTable = async (id: number) => {
+    if (window.confirm(`¿Estás seguro de eliminar la Mesa ${id}?`)) {
+      await deleteTable(id);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este usuario?')) {
+      await deleteUser(id);
+    }
+  };
+  
+  const handleEditUser = (user: UserRow) => {
+    openEditUser(user);
+  };
+
   const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTarget) return;
@@ -636,7 +874,46 @@ export default function App() {
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
   const [deliveryCustomerName, setDeliveryCustomerName] = useState('');
 
+  const handleCreateDelivery = async () => {
+    if (!deliveryCustomerName.trim()) return;
+    const tableId = await createDeliveryOrder(deliveryCustomerName.trim());
+    if (tableId) {
+      setSelectedTableId(tableId);
+      setDeliveryCustomerName('');
+      setIsDeliveryModalOpen(false);
+    }
+  };
+
+  const handleExpenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expenseAmount || !expenseConcept) return;
+    await addExpense(Number(expenseAmount), expenseConcept, expenseDetail);
+    setIsExpenseModalOpen(false);
+    setExpenseAmount('');
+    setExpenseConcept('Pago a proveedores');
+    setExpenseDetail('');
+  };
+
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserRole) return;
+    await addUser(newUserName, newUserRole, INITIAL_PASSWORD);
+    setIsAddUserModalOpen(false);
+    setNewUserName('');
+    setNewUserRole('Staff');
+  };
+
+  const handleEditUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUserName.trim() || !editUserRole || !editingUserId) return;
+    await updateUser(editingUserId, editUserName, editUserRole);
+    setIsEditUserModalOpen(false);
+    setEditUserName('');
+    setEditUserRole('Staff');
+  };
+
   const handleAddItemModalOpen = () => {
+
     setIsAddItemModalOpen(true);
     setNewItemName('');
     setNewItemType('fixed');
@@ -691,17 +968,11 @@ export default function App() {
   const [notesModal, setNotesModal] = useState<{ itemId: string; current: string } | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
 
-  // Quick-confirm modal
-  type ConfirmPending = { item: MenuItem; variant?: MenuVariant };
-  const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null);
-  const [showExtras, setShowExtras] = useState(false);
-  const [confirmNotes, setConfirmNotes] = useState('');
-  const [selectedExtras, setSelectedExtras] = useState<Set<string>>(new Set());
+
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deliveryConfirm, setDeliveryConfirm] = useState<string | null>(null);
-  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 
   const [expandedSubCats, setExpandedSubCats] = useState<Set<string>>(new Set());
   const toggleSubCat = (subCat: string) => {
@@ -734,20 +1005,39 @@ export default function App() {
     return (
       <div className="fade-in admin-main">
         <div className="admin-header-card">
-          <div className="admin-welcome">
-            <h2>Panel de Administración</h2>
-            <p>{mexicoDate} • {mexicoTime}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="admin-welcome">
+              <h1>Panel de Administración</h1>
+              <p>{mexicoDate} • {mexicoTime}</p>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '14px', fontSize: '14px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '16px' }}>🇺🇸</span> 1 USD = {exchangeRate.toFixed(2)} MXN
+            </div>
           </div>
           <div className="admin-stats-summary">
             <div className="admin-stat-pill">
-              <span className="label">Ventas Hoy</span>
+              <span className="label">Ventas restaurante</span>
               <span className="value">{formatCurrency(todayIncome)}</span>
             </div>
             <div className="admin-stat-pill">
-              <span className="label">Gastos Hoy</span>
+              <span className="label">Ventas hotel</span>
+              <span className="value">{formatCurrency(hotelCardSales + hotelCashSales)}</span>
+            </div>
+            <div className="admin-stat-pill">
+              <span className="label">Fondo (caja chica)</span>
+              <span className="value">{formatCurrency(pettyCashInitial - todayExpenses)}</span>
+            </div>
+            <div className="admin-stat-pill">
+              <span className="label">Gastos</span>
               <span className="value">{formatCurrency(todayExpenses)}</span>
             </div>
           </div>
+        </div>
+
+        <div className="admin-footer-actions" style={{ marginTop: 0, marginBottom: 24 }}>
+          <button className="btn-cierre-premium" onClick={() => setIsCierreModalOpen(true)}>
+            <Lock size={20} /> Realizar Cierre de Turno
+          </button>
         </div>
 
         <div className="admin-grid">
@@ -788,11 +1078,6 @@ export default function App() {
           </button>
         </div>
 
-        <div className="admin-footer-actions">
-          <button className="btn-cierre-premium" onClick={() => setIsCierreModalOpen(true)}>
-            <Lock size={20} /> Realizar Cierre de Turno
-          </button>
-        </div>
       </div>
     );
   };
@@ -800,35 +1085,104 @@ export default function App() {
   const renderImpresora = () => {
     return (
       <div className="fade-in printer-view">
-        <div className="section-header">
-          <h2>Cuentas Pendientes</h2>
-          <p>Tickets generados para cobro en caja</p>
-        </div>
-        <div className="tickets-grid">
-          {pendingTickets.length === 0 ? (
+        <div className="tickets-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {todayClosedOrders.length === 0 ? (
             <div className="empty-state">
               <Printer size={48} />
-              <p>No hay cuentas pendientes de impresión</p>
+              <p>No hay cuentas cerradas registradas aún</p>
             </div>
           ) : (
-            pendingTickets.map((ticket: any) => (
-              <div key={ticket.id} className="ticket-card">
-                <div className="ticket-header">
-                  <div className="ticket-table">Mesa {tables.find(t => t.id === ticket.table_id)?.name || ticket.table_id}</div>
-                  <div className="ticket-total">{formatCurrency(ticket.total)}</div>
+            todayClosedOrders.slice().reverse().map((order: any) => {
+              const tableName = tables.find(t => t.id === order.table_id)?.name || order.table_id;
+              
+              // Extraer descuento del items_summary si existe
+              let summaryText = order.items_summary || '';
+              let descText = 'Ninguno';
+              if (summaryText.includes('| Desc:')) {
+                const parts = summaryText.split('| Desc:');
+                summaryText = parts[0].trim();
+                descText = parts[1].trim();
+              }
+
+              const consumo = order.total || 0;
+              const propina = order.tip || 0;
+              const totalPagado = consumo + propina;
+
+              return (
+                <div key={order.id} className="ticket-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)', border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ padding: '4px 10px', background: '#f1f5f9', color: '#475569', borderRadius: '8px', fontSize: '13px', fontWeight: 800 }}>Mesa {tableName}</div>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px', fontWeight: 500 }}>
+                        {new Date(order.closed_at || order.created_at || Date.now()).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Pagado</div>
+                      <div style={{ fontSize: '24px', fontWeight: 900, color: '#10b981', lineHeight: '1.2' }}>{formatCurrency(totalPagado)}</div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '12px', fontSize: '13px' }}>
+                    <div>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '2px' }}>Consumo</span>
+                      <span style={{ fontWeight: 700, color: '#334155' }}>{formatCurrency(consumo)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '2px' }}>Propina</span>
+                      <span style={{ fontWeight: 700, color: '#334155' }}>{propina > 0 ? formatCurrency(propina) : 'Ninguna'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '2px' }}>Método</span>
+                      <span style={{ fontWeight: 700, color: '#334155', textTransform: 'capitalize' }}>{order.payment_method || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '2px' }}>Descuento</span>
+                      <span style={{ fontWeight: 700, color: '#334155' }}>{descText}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                    <button 
+                      onClick={() => {
+                        setPreviewTicket({
+                           id: order.id,
+                           table_id: order.table_id,
+                           total: order.total,
+                           items_summary: order.items_summary,
+                           created_at: order.closed_at || order.created_at,
+                           printed_by: 'Cajero'
+                        });
+                      }}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569'; }}
+                    >
+                      <Eye size={16} strokeWidth={2.5} /> Detalles
+                    </button>
+                    <button 
+                      onClick={() => {
+                        dispatchPrintOnly({
+                           id: order.id,
+                           table_id: order.table_id,
+                           total: order.total,
+                           items_summary: order.items_summary,
+                           created_at: order.closed_at || order.created_at,
+                           printed_by: 'Cajero'
+                        });
+                      }}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#eff6ff', color: '#3b82f6', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.color = '#2563eb'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#3b82f6'; }}
+                    >
+                      <Printer size={16} strokeWidth={2.5} /> Imprimir
+                    </button>
+                  </div>
                 </div>
-                <div className="ticket-summary">{ticket.items_summary}</div>
-                <div className="ticket-meta">
-                  <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span>{ticket.printed_by}</span>
-                </div>
-                <div className="ticket-actions">
-                  <button className="btn-icon" onClick={() => setPreviewTicket(ticket)}><Eye size={18} /> Ver</button>
-                  <button className="btn-icon primary" onClick={() => dispatchPrintOnly(ticket)}><Printer size={18} /> Imprimir</button>
-                  <button className="btn-icon danger" onClick={() => { if(window.confirm('¿Eliminar registro?')) deleteTicket(ticket.id); }}><Trash2 size={18} /></button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -1023,10 +1377,10 @@ export default function App() {
         ) : (
           <div className="header-title-container">
             <span className="header-title">
-              {currentView === 'home' && 'Inicio'}
-              {currentView === 'salon' && 'Salón'}
+              {currentView === 'home' && 'Gallo Azul Ops'}
+              {currentView === 'salon' && 'POS Restaurante'}
               {currentView === 'pedidos' && 'Comandas'}
-              {currentView === 'impresora' && 'Cuentas'}
+              {currentView === 'impresora' && 'Cuentas cerradas'}
               {currentView === 'admin' && 'Admin'}
               {currentView === 'checkin' && 'Hotel'}
               {currentView === 'registros' && 'Registros Hotel'}
@@ -1134,28 +1488,15 @@ export default function App() {
         <div className="home-actions-grid">
           <div className="home-action-btn pos" onClick={() => navTo('salon')}>
             <div className="home-action-icon-wrap">
-              <ShoppingBag size={24} />
+              <Utensils size={24} />
             </div>
-            <span className="home-action-label">Punto de venta</span>
+            <span className="home-action-label">Restaurante</span>
           </div>
           <div className="home-action-btn checkin" onClick={() => navTo('checkin')}>
             <div className="home-action-icon-wrap">
-              <Globe size={24} />
+              <Building size={24} />
             </div>
-            <span className="home-action-label">Check-in online</span>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        <div className="home-stats-grid">
-          <div className="home-stat-card tables">
-            <div className="home-stat-icon">🪑</div>
-            <div className="home-stat-value">{freeTables}</div>
-            <div className="home-stat-label">Mesas disponibles</div>
-          </div>
-          <div className="hero-time-card">
-            <Clock size={16} />
-            <span>{timeStr}</span>
+            <span className="home-action-label">Hotel</span>
           </div>
         </div>
       </div>
@@ -1306,9 +1647,24 @@ export default function App() {
                                     Hospedado en {reg.room_name}
                                   </div>
                                 </div>
-                                <span style={{ background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #dcfce7' }}>
-                                  EN CASA
-                                </span>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  {(() => {
+                                    const res = upcomingCheckins.find(r => r.id === reg.hostaway_reservation_id);
+                                    const isPaid = res?.isPaid || res?.paymentStatus === 'Pagado';
+                                    return isPaid ? (
+                                      <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Check size={12} strokeWidth={3} /> Pagado
+                                      </span>
+                                    ) : (
+                                      <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <AlertCircle size={12} strokeWidth={3} /> Pendiente de pago
+                                      </span>
+                                    );
+                                  })()}
+                                  <span style={{ background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #dcfce7' }}>
+                                    EN CASA
+                                  </span>
+                                </div>
                               </div>
 
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
@@ -1383,7 +1739,7 @@ export default function App() {
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                                   <button 
-                                    onClick={() => handleNoShow(res)}
+                                    onClick={(e) => { e.stopPropagation(); handleNoShow(res); }}
                                     style={{ 
                                       background: '#fff1f2',
                                       color: '#e11d48',
@@ -1403,7 +1759,7 @@ export default function App() {
                                     No-show
                                   </button>
                                   <button 
-                                    onClick={() => handleCancelRes(res)}
+                                    onClick={(e) => { e.stopPropagation(); handleCancelRes(res); }}
                                     style={{ 
                                       background: 'white',
                                       color: '#64748b',
@@ -1420,7 +1776,7 @@ export default function App() {
                                     }}
                                   >
                                     <Trash2 size={16} />
-                                    Eliminar
+                                    Eliminar reserva
                                   </button>
                                 </div>
                                 <button 
@@ -1531,9 +1887,20 @@ export default function App() {
                     <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>{reg.name}</h3>
                     <div style={{ fontSize: 13, color: '#3b82f6', fontWeight: 600, marginTop: 4 }}>{reg.room_name}</div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>
-                    <div>{new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</div>
-                    <div style={{ fontSize: 10, opacity: 0.7 }}>{new Date(reg.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>
+                      <div>{new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</div>
+                      <div style={{ fontSize: 10, opacity: 0.7 }}>{new Date(reg.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setDeleteRegistrationId(reg.id);
+                      }}
+                      className="btn-icon danger" 
+                      style={{ padding: 6, background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
 
@@ -1610,12 +1977,40 @@ export default function App() {
             </div>
             <div className="form-group-premium">
               <label>Teléfono</label>
-              <input 
-                type="text" 
-                value={newResForm.guestPhone} 
-                onChange={e => setNewResForm({...newResForm, guestPhone: e.target.value})}
-                placeholder="+52 123..."
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select 
+                  value={(() => {
+                    const prefixMatch = COUNTRY_CODES.find(c => newResForm.guestPhone.startsWith(c.code));
+                    return prefixMatch?.code || '+52';
+                  })()}
+                  onChange={e => {
+                    const newPrefix = e.target.value;
+                    const currentPhone = newResForm.guestPhone;
+                    const prefixMatch = COUNTRY_CODES.find(c => currentPhone.startsWith(c.code));
+                    const numberOnly = prefixMatch ? currentPhone.substring(prefixMatch.code.length).trim() : currentPhone.trim();
+                    setNewResForm({...newResForm, guestPhone: `${newPrefix} ${numberOnly}`.trim()});
+                  }}
+                  style={{ width: '110px', height: 48, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', fontWeight: 600 }}
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+                <input 
+                  type="text" 
+                  value={(() => {
+                    const prefixMatch = COUNTRY_CODES.find(c => newResForm.guestPhone.startsWith(c.code));
+                    return prefixMatch ? newResForm.guestPhone.substring(prefixMatch.code.length).trim() : newResForm.guestPhone;
+                  })()}
+                  onChange={e => {
+                    const prefixMatch = COUNTRY_CODES.find(c => newResForm.guestPhone.startsWith(c.code));
+                    const prefix = prefixMatch?.code || '+52';
+                    const val = e.target.value.replace(/^\s+/, '');
+                    setNewResForm({...newResForm, guestPhone: `${prefix} ${val}`});
+                  }}
+                  placeholder="123456789"
+                />
+              </div>
             </div>
             <div className="form-group-premium">
               <label>Nacionalidad</label>
@@ -1731,6 +2126,21 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                <div style={{ height: 1, background: '#e2e8f0', margin: '20px 0' }} />
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', background: newResForm.isPaid ? '#ecfdf5' : 'white', padding: '12px 16px', borderRadius: 12, border: `1px solid ${newResForm.isPaid ? '#10b981' : '#e2e8f0'}`, transition: 'all 0.2s' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={newResForm.isPaid}
+                    onChange={e => setNewResForm({...newResForm, isPaid: e.target.checked})}
+                    style={{ width: 18, height: 18, accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: newResForm.isPaid ? '#065f46' : '#334155', display: 'block' }}>Marcar como Pagado</span>
+                    <span style={{ fontSize: 12, color: newResForm.isPaid ? '#059669' : '#64748b' }}>Registrará la reserva como cobrada en Hostaway</span>
+                  </div>
+                </label>
               </div>
             )}
 
@@ -2138,30 +2548,22 @@ export default function App() {
     const safeTables = tables || [];
     const safeActiveItems = activeItems || [];
     const filteredTablesForCounts = safeTables.filter(t => ['Salón', 'Terraza', 'Jardín'].includes(t.category || ''));
-    const occupiedCount = filteredTablesForCounts.filter(t => getEffectiveStatus(t.id) !== 'free').length;
+    const occupiedCount = filteredTablesForCounts.filter(t => getEffectiveStatus(t.id) === 'occupied-pending').length;
+    const payingCount = filteredTablesForCounts.filter(t => getEffectiveStatus(t.id) === 'occupied-done').length;
     const freeCount = filteredTablesForCounts.filter(t => getEffectiveStatus(t.id) === 'free').length;
 
     return (
       <div className="salon-view fade-in">
-        <div className="salon-summary-bar">
-          <div className="salon-stat ocp">
-            <span className="salon-stat-count">{occupied}</span>
-            <span className="salon-stat-label">Ocupadas</span>
-          </div>
-          <div className="salon-stat pay">
-            <span className="salon-stat-count">{paying}</span>
-            <span className="salon-stat-label">Pagando</span>
-          </div>
-          <div className="salon-stat free">
-            <span className="salon-stat-count">{free}</span>
-            <span className="salon-stat-label">Libres</span>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 24 }}>
+          <button className="btn-primary" onClick={() => setShowPosExpenseModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Plus size={18} /> Registrar una compra
+          </button>
         </div>
 
         <div className="salon-legend">
-           <div className="salon-legend-item free"><div className="salon-legend-pip"></div> LIBRE</div>
-           <div className="salon-legend-item occupied"><div className="salon-legend-pip"></div> OCUPADA</div>
-           <div className="salon-legend-item paying"><div className="salon-legend-pip"></div> CUENTA</div>
+           <div className="salon-legend-item free"><div className="salon-legend-pip"></div> LIBRES</div>
+           <div className="salon-legend-item occupied-pending"><div className="salon-legend-pip"></div> CON PENDIENTES</div>
+           <div className="salon-legend-item occupied-done"><div className="salon-legend-pip"></div> SIN PENDIENTES</div>
         </div>
 
         {/* Table grid grouped by category */}
@@ -2290,7 +2692,7 @@ export default function App() {
         <div className="mesa-header-premium">
           <button className="back-btn-pill" onClick={() => setCurrentView('salon')}>
             <ChevronLeft size={20} />
-            <span>Salón</span>
+            <span>Restaurante</span>
           </button>
           <div className="mesa-title-wrap">
              <h2>{table?.name}</h2>
@@ -2352,11 +2754,17 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div className="order-actions-grid" style={{ marginTop: 'auto', paddingTop: 20 }}>
-                     <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}>
-                       <Printer size={18} />
-                       Imprimir
-                     </button>
+                  <div className="order-actions-grid" style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                       <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId, isFinalBill: false})} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '12px 8px' }}>
+                         <Printer size={20} />
+                         <span style={{ fontSize: 12, fontWeight: 600 }}>Imprimir comanda</span>
+                       </button>
+                       <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId, isFinalBill: true})} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '12px 8px' }}>
+                         <Printer size={20} />
+                         <span style={{ fontSize: 12, fontWeight: 600 }}>Imprimir cuenta</span>
+                       </button>
+                    </div>
                      <button className="order-btn-pri" onClick={() => setCurrentView('checkout')}>
                        Cobrar Mesa
                      </button>
@@ -2463,6 +2871,111 @@ export default function App() {
               </div>
             </div>
           )}
+        </div>
+        {renderItemConfirmModal()}
+      </div>
+    );
+  };
+
+  const renderItemConfirmModal = () => {
+    if (!itemToConfirm) return null;
+    
+    const allExtras = menuItems.filter(i => i.category.startsWith('EXTRAS:'));
+
+    return (
+      <div className="variants-modal-p" onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setItemToConfirm(null);
+          setItemVariantToConfirm(undefined);
+          setItemNotesToConfirm('');
+          setItemExtrasSelected([]);
+        }
+      }}>
+        <div className="variants-modal-content">
+          <div className="vm-header">
+            <h3 className="vm-title">Añadir al pedido</h3>
+            <button className="vm-close" onClick={() => {
+              setItemToConfirm(null);
+              setItemVariantToConfirm(undefined);
+              setItemNotesToConfirm('');
+              setItemExtrasSelected([]);
+            }}>
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <h4 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{itemToConfirm.name}</h4>
+            {itemVariantToConfirm && <div style={{ color: '#64748b', fontWeight: 600 }}>Variante: {itemVariantToConfirm.label}</div>}
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>Notas especiales</label>
+            <textarea
+              style={{ width: '100%', padding: 12, borderRadius: 12, border: '1px solid #e2e8f0', fontFamily: 'Outfit', fontSize: 15 }}
+              placeholder="Ej. Sin cebolla, término medio..."
+              rows={2}
+              value={itemNotesToConfirm}
+              onChange={e => setItemNotesToConfirm(e.target.value)}
+            />
+          </div>
+
+          <div style={{ marginBottom: 24, maxHeight: '35vh', overflowY: 'auto' }}>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#64748b', marginBottom: 12 }}>Ingredientes Extra</label>
+            
+            {['EXTRAS: CARNES', 'EXTRAS: VEGETALES', 'EXTRAS: QUESOS'].map(category => {
+              const categoryExtras = allExtras.filter(e => e.category === category);
+              if (categoryExtras.length === 0) return null;
+              
+              return (
+                <div key={category} style={{ marginBottom: 16 }}>
+                  <h5 style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px 4px' }}>
+                    {category.replace('EXTRAS: ', '')}
+                  </h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {categoryExtras.map(extra => {
+                      const isSelected = itemExtrasSelected.some(e => e.id === extra.id);
+                      return (
+                        <label key={extra.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: `1px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`, borderRadius: 12, background: isSelected ? '#eff6ff' : 'white', cursor: 'pointer', transition: 'all 0.2s' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) setItemExtrasSelected([...itemExtrasSelected, extra]);
+                              else setItemExtrasSelected(itemExtrasSelected.filter(ex => ex.id !== extra.id));
+                            }}
+                            style={{ width: 18, height: 18, accentColor: '#3b82f6' }}
+                          />
+                          <div style={{ flex: 1, fontWeight: 700, color: isSelected ? '#1e3a8a' : '#0f172a' }}>{extra.name}</div>
+                          <div style={{ fontWeight: 800, color: '#3b82f6' }}>+${extra.price}</div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button className="btn-premium" style={{ width: '100%', padding: 16 }} onClick={() => {
+            let finalPrice = itemVariantToConfirm ? itemVariantToConfirm.price : itemToConfirm.price;
+            let finalNotes = itemNotesToConfirm.trim();
+            
+            if (itemExtrasSelected.length > 0) {
+              const extrasText = itemExtrasSelected.map(e => e.name).join(', ');
+              finalNotes = finalNotes ? `${finalNotes} | EXTRAS: ${extrasText}` : `EXTRAS: ${extrasText}`;
+              finalPrice += itemExtrasSelected.reduce((sum, e) => sum + e.price, 0);
+            }
+
+            addItemToOrder(selectedTableId!, itemToConfirm, itemVariantToConfirm, finalNotes || undefined, finalPrice);
+            
+            setItemToConfirm(null);
+            setItemVariantToConfirm(undefined);
+            setItemNotesToConfirm('');
+            setItemExtrasSelected([]);
+          }}>
+            Agregar a la orden
+          </button>
         </div>
       </div>
     );
@@ -2687,7 +3200,7 @@ export default function App() {
 
     return (
       <div className="fade-in pedidos-view">
-        {tableIds.length === 0 ? (
+        {tableIds.length === 0 && todayClosedOrders.length === 0 ? (
           <div className="empty-pedidos">
             <div style={{ fontSize: 64, marginBottom: 20 }}>👩‍🍳</div>
             <h2>Tu cocina está al día</h2>
@@ -2697,7 +3210,7 @@ export default function App() {
           <div className="pedidos-list">
             {tableIds.map(tableId => {
               const tableItems = itemsByTable[tableId].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-              const isCollapsed = expandedPedidos.includes(tableId);
+              const isCollapsed = !expandedPedidos.includes(tableId);
               const toggleCollapse = () => {
                 setExpandedPedidos(prev => prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]);
               };
@@ -2722,7 +3235,7 @@ export default function App() {
                   <div 
                     className="qa-header" 
                     onClick={toggleCollapse} 
-                    style={{ padding: '16px', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9', margin: 0 }}
+                    style={{ padding: '16px', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div className="qa-table-badge">Mesa {(tables || []).find(t => t.id === tableId)?.name || tableId}</div>
@@ -2737,6 +3250,9 @@ export default function App() {
                           Completado
                         </div>
                       )}
+                    </div>
+                    <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                      {isCollapsed ? <ChevronDown size={20} strokeWidth={2.5} /> : <ChevronUp size={20} strokeWidth={2.5} />}
                     </div>
                   </div>
 
@@ -2805,8 +3321,76 @@ export default function App() {
                 </div>
               );
             })}
+            
+            {/* Mostrar mesas que ya fueron cobradas y cerradas en el día actual */}
+            {todayClosedOrders.map((order: any) => {
+              const tableName = (tables || []).find(t => t.id === order.table_id)?.name || order.table_id;
+              return (
+                <div className="qa-card" key={`closed-order-${order.id}`} style={{ padding: 0, overflow: 'hidden', opacity: 0.7 }}>
+                  <div 
+                    className="qa-header" 
+                    style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="qa-table-badge" style={{ opacity: 0.7 }}>Mesa {tableName}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+                        <Check size={14} strokeWidth={3} />
+                        Completado
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
+
+        {/* Modal de Confirmación de Entrega */}
+        {deliveryConfirm && (
+          <div className="variants-modal-p" onClick={() => setDeliveryConfirm(null)} style={{ zIndex: 9999 }}>
+            <div className="variants-modal-content scale-in" onClick={e => e.stopPropagation()} style={{ padding: 0, overflow: 'hidden', maxWidth: '400px' }}>
+              <div style={{ background: '#f8fafc', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '18px' }}>Confirmar entrega</h3>
+                <button 
+                  onClick={() => setDeliveryConfirm(null)}
+                  style={{ background: 'white', border: '1px solid #e2e8f0', color: '#94a3b8', padding: '6px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#475569'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div style={{ padding: '24px', textAlign: 'center' }}>
+                <div style={{ margin: '0 auto 16px', width: '64px', height: '64px', background: '#eff6ff', color: '#3b82f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={32} strokeWidth={3} />
+                </div>
+                <p style={{ color: '#475569', marginBottom: '24px', fontWeight: 600, fontSize: '16px' }}>¿Marcar esta comanda como entregada / completada?</p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    onClick={() => setDeliveryConfirm(null)}
+                    style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 700, padding: '12px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      await markItemDone(deliveryConfirm);
+                      setDeliveryConfirm(null);
+                    }}
+                    style={{ flex: 1, background: '#2563eb', border: 'none', color: 'white', fontWeight: 700, padding: '12px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#1d4ed8'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#2563eb'}
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   };
@@ -2820,8 +3404,7 @@ export default function App() {
       setIsLoadingCheckins(true);
       await updateReservationStatus(res.id, undefined, true);
       alert('Reserva marcada como No-show correctamente');
-      const updated = await getUpcomingCheckins();
-      setUpcomingCheckins(updated);
+      setUpcomingCheckins(prev => prev.filter(r => r.id !== res.id));
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     } finally {
@@ -2836,8 +3419,7 @@ export default function App() {
       setIsLoadingCheckins(true);
       await updateReservationStatus(res.id, 'cancelled');
       alert('Reserva eliminada/cancelada correctamente');
-      const updated = await getUpcomingCheckins();
-      setUpcomingCheckins(updated);
+      setUpcomingCheckins(prev => prev.filter(r => r.id !== res.id));
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     } finally {
@@ -2875,7 +3457,7 @@ export default function App() {
           {[
             { view: 'home', icon: <HomeIcon className="nav-icon" />, label: 'Inicio' },
             { view: 'checkin', icon: <Globe className="nav-icon" />, label: 'Hotel' },
-            { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Salón' },
+            { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Restaurante' },
             { view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Comandas' },
             { view: 'impresora', icon: <Printer className="nav-icon" />, label: 'Cuentas' },
             ...(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado'
@@ -2889,88 +3471,6 @@ export default function App() {
         </div>
       )}
 
-      {confirmPending && (
-        <div className="confirm-overlay" onClick={() => setConfirmPending(null)}>
-          <div className="confirm-sheet fade-in-up" onClick={e => e.stopPropagation()}>
-            <div className="confirm-header">
-              <div className="confirm-item-icon">🍽️</div>
-              <div className="confirm-item-info">
-                <h3>{confirmPending.item.name}</h3>
-                {confirmPending.variant && <span className="confirm-variant-badge">{confirmPending.variant.label}</span>}
-              </div>
-              <button className="confirm-close-btn" onClick={() => setConfirmPending(null)}><X size={20} /></button>
-            </div>
-            
-            <div className="confirm-price">
-              {confirmPending.variant ? confirmPending.variant.price : confirmPending.item.price}
-            </div>
-            {/* Extras Section */}
-            {['ENSALADAS', 'PASTAS', 'PIZZAS'].includes(confirmPending.item.category) && (
-              <div className="confirm-extras-wrap">
-                <button 
-                  className={`extras-toggle-btn ${showExtras ? 'active' : ''}`}
-                  onClick={() => setShowExtras(!showExtras)}
-                >
-                  <Plus size={18} />
-                  <span>AGREGAR INGREDIENTES EXTRA</span>
-                  <ChevronDown size={18} style={{ transform: showExtras ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s', marginLeft: 'auto' }} />
-                </button>
-
-                {showExtras && (
-                  <div className="confirm-extras-container fade-in">
-                    {CATEGORY_MAPPING['INGREDIENTES EXTRA'].map(subCat => {
-                      const items = menuItems.filter(m => m.category === subCat && m.active);
-                      if (items.length === 0) return null;
-                      return (
-                        <div key={subCat} className="confirm-extra-group">
-                          <div className="confirm-extra-group-title">{subCat.replace('EXTRAS: ', '')}</div>
-                          <div className="confirm-extra-chips">
-                            {items.map(extra => (
-                              <button
-                                key={extra.id}
-                                className={`extra-chip ${selectedExtras.has(extra.id) ? 'active' : ''}`}
-                                onClick={() => {
-                                  const next = new Set(selectedExtras);
-                                  if (next.has(extra.id)) next.delete(extra.id);
-                                  else next.add(extra.id);
-                                  setSelectedExtras(next);
-                                }}
-                              >
-                                {extra.name} (+${extra.price})
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Notes input */}
-            <div className="confirm-notes-wrap">
-              <label className="confirm-notes-label">
-                📝 Notas especiales <span>(opcional)</span>
-              </label>
-              <textarea
-                className="confirm-notes-input"
-                placeholder="Ej: sin cebolla, extra picante, leche vegana..."
-                value={confirmNotes}
-                onChange={e => setConfirmNotes(e.target.value)}
-                rows={2}
-                maxLength={150}
-              />
-            </div>
-            <div className="confirm-actions">
-              <button className="confirm-cancel" onClick={() => setConfirmPending(null)}>Cancelar</button>
-              <button className="confirm-ok" onClick={confirmAddItem}>
-                <Plus size={16} /> Agregar a la orden
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Table Actions Confirm Modal (Open / Pay) */}
       {tableConfirmModal.isOpen && (
@@ -3110,7 +3610,7 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '13px' }}>
                           <span>Fondo (Caja chica final):</span>
-                          <span>{formatCurrency(pettyCashInitial)}</span>
+                          <span>{formatCurrency(pettyCashInitial - todayExpenses)}</span>
                         </div>
                       </div>
                     </div>
@@ -3637,9 +4137,9 @@ export default function App() {
 
       {/* Modal Imprimir Cuenta */}
       {printCuentaModal.isOpen && printCuentaModal.tableId && (
-        <div className="modal-overlay print-hide" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>
+        <div className="modal-overlay print-hide" onClick={() => setPrintCuentaModal({isOpen: false, tableId: null, isFinalBill: false})}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 24, maxWidth: 400 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>Cuenta - Mesa {printCuentaModal.tableId}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>{printCuentaModal.isFinalBill ? 'Cuenta' : 'Pedido'} - Mesa {printCuentaModal.tableId}</h3>
             <div className="ticket-print-area">
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
@@ -3650,21 +4150,28 @@ export default function App() {
                 </div>
               </div>
               <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0' }}>
-                {activeItems.filter(i => i.table_id === printCuentaModal.tableId).map(i => (
+                {activeItems.filter(i => i.table_id === printCuentaModal.tableId && (printCuentaModal.isFinalBill || !i.is_printed)).map(i => (
                   <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-                     <div style={{ flex: 1, paddingRight: 8 }}>x{i.qty} {i.name}</div>
-                     <div style={{ fontWeight: 600 }}>${(i.price * i.qty).toFixed(0)}</div>
+                     <div style={{ flex: 1, paddingRight: 8 }}>
+                       x{i.qty} {i.name} {i.variant_label ? `(${i.variant_label})` : ''}
+                       {i.notes && <div style={{ fontSize: 12, color: '#d97706', fontStyle: 'italic' }}>Nota: {i.notes}</div>}
+                     </div>
+                     {printCuentaModal.isFinalBill && <div style={{ fontWeight: 600 }}>${i.price * i.qty}</div>}
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
-                 <span>Total:</span>
-                 <span>${activeItems.filter(i => i.table_id === printCuentaModal.tableId).reduce((s, i) => s + (i.price * i.qty), 0).toFixed(0)}</span>
-              </div>
+              {printCuentaModal.isFinalBill && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 20 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700 }}>Total a pagar:</span>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>
+                    ${activeItems.filter(i => i.table_id === printCuentaModal.tableId).reduce((s, i) => s + (i.price * i.qty), 0)}
+                  </span>
+                </div>
+              )}
             </div>
             
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }} className="print-hide">
-              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setPrintCuentaModal({isOpen: false, tableId: null})}>Cancelar</button>
+              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setPrintCuentaModal({isOpen: false, tableId: null, isFinalBill: false})}>Cancelar</button>
               <button className="btn-primary" style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'center' }} onClick={handleSendToPrinter}>
                  <Printer size={18} /> Enviar a Imprimir
               </button>
@@ -3798,6 +4305,40 @@ export default function App() {
         </div>
       )}
 
+      {/* Modal Confirmación Eliminar Registro */}
+      {deleteRegistrationId && (
+        <div className="modal-overlay" onClick={() => setDeleteRegistrationId(null)} style={{ zIndex: 9999 }}>
+          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, padding: 32, borderRadius: 28, textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, background: '#fee2e2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#ef4444' }}>
+              <Trash2 size={32} />
+            </div>
+            <h3 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0' }}>¿Eliminar Registro?</h3>
+            <p style={{ fontSize: 15, color: '#64748b', margin: '0 0 24px 0', lineHeight: 1.5 }}>
+              Esta acción eliminará permanentemente el registro de la base de datos interna. <strong>Esto no afecta la reserva en Hostaway.</strong>
+            </p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button 
+                onClick={() => setDeleteRegistrationId(null)}
+                className="btn-secondary" 
+                style={{ flex: 1, padding: '14px', borderRadius: 14, fontWeight: 600 }}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => {
+                  deleteRegistration(deleteRegistrationId);
+                  setDeleteRegistrationId(null);
+                }}
+                className="btn-primary" 
+                style={{ flex: 1, padding: '14px', borderRadius: 14, fontWeight: 600, background: '#ef4444', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }}
+              >
+                Sí, Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Registro Pedidos para llevar */}
       {isDeliveryModalOpen && (
         <div className="modal-overlay" onClick={() => setIsDeliveryModalOpen(false)}>
@@ -3845,20 +4386,110 @@ export default function App() {
       {ticketToPrint && (
         <div className="ticket-print-area">
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
-             <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
-             <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {ticketToPrint.printed_by}</div>
-             <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {ticketToPrint.table_id}</div>
+             <h2 style={{ margin: 0, fontSize: 20 }}>{ticketToPrint.is_pedido ? 'TICKET DE PEDIDO' : 'Gallo Azul Resto'}</h2>
+             {ticketToPrint.is_pedido && <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>COCINA / BAR</div>}
+             {!ticketToPrint.is_pedido && <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {ticketToPrint.printed_by}</div>}
+             <div style={{ fontSize: 16, fontWeight: 700, margin: '8px 0' }}>Mesa: {ticketToPrint.table_id}</div>
              <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
                 Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mazatlan', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
              </div>
           </div>
 
           <div style={{ borderTop: '2px dashed #cbd5e1', borderBottom: '2px dashed #cbd5e1', padding: '12px 0', margin: '16px 0' }}>
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{ticketToPrint.items_summary}</div>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 16, fontWeight: 600, lineHeight: 1.6 }}>{ticketToPrint.items_summary}</div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
-             <span>Total:</span>
-             <span>${Number(ticketToPrint.total).toFixed(0)}</span>
+          {!ticketToPrint.is_pedido && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, marginTop: 8 }}>
+               <span>Total:</span>
+               <span>${Number(ticketToPrint.total).toFixed(0)}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Ver Detalles de Cuenta */}
+      {previewTicket && (
+        <div className="modal-overlay" onClick={() => setPreviewTicket(null)}>
+          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#0f172a' }}>Detalle de cuenta</h2>
+              <button className="btn-icon" style={{ width: 36, height: 36, borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, margin: 0, border: 'none', cursor: 'pointer' }} onClick={() => setPreviewTicket(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 12 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Mesa: {previewTicket.table_id}</div>
+                <div style={{ fontSize: 14, color: '#475569', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewTicket.items_summary}</div>
+              </div>
+
+              <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                  <span>Total:</span>
+                  <span style={{ color: '#10b981' }}>{formatCurrency(previewTicket.total)}</span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 12 }}>
+                {new Date(previewTicket.created_at).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Compra (POS) */}
+      {showPosExpenseModal && (
+        <div className="modal-overlay" onClick={() => setShowPosExpenseModal(false)}>
+          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#0f172a' }}>Registrar una compra</h2>
+              <button className="btn-icon" style={{ width: 36, height: 36, borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, margin: 0, border: 'none', cursor: 'pointer' }} onClick={() => setShowPosExpenseModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className="form-group">
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 6, display: 'block' }}>Descripción de la compra</label>
+                <input 
+                  type="text" 
+                  value={posExpenseDesc} 
+                  onChange={e => setPosExpenseDesc(e.target.value)}
+                  placeholder="Ej. Limones, Servilletas, Hielo..."
+                  style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 15 }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 6, display: 'block' }}>Monto (MXN)</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: 16, fontWeight: 600 }}>$</span>
+                  <input 
+                    type="number" 
+                    value={posExpenseAmount} 
+                    onChange={e => setPosExpenseAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', padding: '14px 14px 14px 36px', borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 16, fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  if (!posExpenseAmount || !posExpenseDesc) return;
+                  await addExpense(Number(posExpenseAmount), "Compra de insumos", posExpenseDesc);
+                  setShowPosExpenseModal(false);
+                  setPosExpenseDesc('');
+                  setPosExpenseAmount('');
+                }}
+                className="btn-primary" 
+                style={{ width: '100%', padding: '16px', borderRadius: 14, fontWeight: 800, fontSize: 15, marginTop: 10, background: '#ef4444', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }}
+              >
+                Registrar Gasto
+              </button>
+            </div>
           </div>
         </div>
       )}

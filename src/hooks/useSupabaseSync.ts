@@ -40,7 +40,7 @@ export function useSupabaseSync() {
   const [todayCashIncome, setTodayCashIncome] = useState(0);
   const [todayTransferIncome, setTodayTransferIncome] = useState(0);
   const [todayTransferTips, setTodayTransferTips] = useState(0);
-  const [pettyCashInitial, setPettyCashInitial] = useState(5000);
+  const [pettyCashInitial] = useState(5000);
   const [hotelCardSales, setHotelCardSales] = useState(0);
   const [hotelCashSales, setHotelCashSales] = useState(0);
   const [hotelSalesList, setHotelSalesList] = useState<any[]>([]);
@@ -191,7 +191,7 @@ export function useSupabaseSync() {
         setHotelSalesList(hotelRes.data);
         let hCard = 0;
         let hCash = 0;
-        hotelRes.data.forEach(sale => {
+        hotelRes.data.forEach((sale: any) => {
           const rate = sale.exchange_rate || exchangeRate;
           const amountInMXN = sale.currency === 'USD' ? Number(sale.amount) * rate : Number(sale.amount);
           if (sale.payment_method === 'tarjeta') hCard += amountInMXN;
@@ -209,25 +209,25 @@ export function useSupabaseSync() {
         setTodayClosedOrders(closedOrdersRes.data);
         
         const cashBase = closedOrdersRes.data
-          .filter(o => o.payment_method === 'efectivo')
-          .reduce((sum, o) => sum + (o.total || 0), 0);
+          .filter((o: any) => o.payment_method === 'efectivo')
+          .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
         const cashTips = closedOrdersRes.data
-          .filter(o => o.payment_method === 'efectivo')
-          .reduce((sum, o) => sum + (o.tip || 0), 0);
+          .filter((o: any) => o.payment_method === 'efectivo')
+          .reduce((sum: number, o: any) => sum + (o.tip || 0), 0);
         
         const transferBase = closedOrdersRes.data
-          .filter(o => o.payment_method === 'transferencia')
-          .reduce((sum, o) => sum + (o.total || 0), 0);
+          .filter((o: any) => o.payment_method === 'transferencia')
+          .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
         const transferTips = closedOrdersRes.data
-          .filter(o => o.payment_method === 'transferencia')
-          .reduce((sum, o) => sum + (o.tip || 0), 0);
+          .filter((o: any) => o.payment_method === 'transferencia')
+          .reduce((sum: number, o: any) => sum + (o.tip || 0), 0);
 
         const cardBase = closedOrdersRes.data
-          .filter(o => o.payment_method === 'tarjeta')
-          .reduce((sum, o) => sum + (o.total || 0), 0);
+          .filter((o: any) => o.payment_method === 'tarjeta')
+          .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
         const cardTips = closedOrdersRes.data
-          .filter(o => o.payment_method === 'tarjeta')
-          .reduce((sum, o) => sum + (o.tip || 0), 0);
+          .filter((o: any) => o.payment_method === 'tarjeta')
+          .reduce((sum: number, o: any) => sum + (o.tip || 0), 0);
 
         const totalTips = cashTips + transferTips + cardTips;
 
@@ -282,6 +282,11 @@ export function useSupabaseSync() {
       .order('created_at', { ascending: false });
     if (data) setRegistrations(data);
   }, []);
+
+  const deleteRegistration = useCallback(async (id: string) => {
+    const { error } = await supabase.from('guest_registrations').delete().eq('id', id);
+    if (!error) await fetchRegistrations();
+  }, [fetchRegistrations]);
 
   const fetchAll = useCallback(async () => {
     if (fetching.current) return;
@@ -379,6 +384,11 @@ export function useSupabaseSync() {
 
   const updateItemNotes = useCallback(async (itemId: string, notes: string) => {
     await dbOrderItems.updateNotes(itemId, notes);
+  }, []);
+
+  const markItemsPrinted = useCallback(async (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+    await dbOrderItems.markPrinted(itemIds);
   }, []);
 
   const checkoutTable = useCallback(async (tableId: number) => {
@@ -553,7 +563,7 @@ export function useSupabaseSync() {
   }, [fetchMenu]);
 
   const addTable = useCallback(async (id: number) => {
-    await dbTables.insert(id);
+    await dbTables.insert(id, `Mesa ${id}`, 'Terraza');
   }, []);
 
   const deleteTable = useCallback(async (id: number) => {
@@ -760,14 +770,28 @@ export function useSupabaseSync() {
     await fetchTodayTickets();
   }, [fetchTodayTickets]);
 
+  const deleteClosedOrder = useCallback(async (id: string) => {
+    await dbOrders.delete(id);
+    await fetchTodayTotals();
+  }, [fetchTodayTotals]);
+
   const addHotelSale = async (amount: number, currency: string, paymentMethod: string) => {
+    let finalAmount = amount;
+    let finalCurrency = currency;
+
+    if (currency === 'USD') {
+      finalAmount = amount * exchangeRate;
+      finalCurrency = 'MXN';
+    }
+
     const { error } = await supabase
       .from('hotel_sales')
       .insert([{
-        amount,
-        currency,
+        amount: finalAmount,
+        currency: finalCurrency,
         payment_method: paymentMethod,
-        exchange_rate: exchangeRate
+        exchange_rate: exchangeRate,
+        status: 'closed'
       }]);
     if (error) console.error('Error adding hotel sale:', error);
     else fetchTodayTotals();
@@ -828,6 +852,7 @@ export function useSupabaseSync() {
     removeItem,
     markItemDone,
     updateItemNotes,
+    markItemsPrinted,
     checkoutTable,
     confirmPayment,
     cancelTable,
@@ -852,5 +877,7 @@ export function useSupabaseSync() {
     markTicketPrinted,
     deleteTicket,
     fetchRegistrations,
+    deleteRegistration,
+    deleteClosedOrder,
   };
 }

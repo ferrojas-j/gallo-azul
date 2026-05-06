@@ -33,6 +33,7 @@ export type OrderItemRow = {
   variant_label: string | null;
   notes: string | null;
   status: 'pending' | 'done' | 'cancelled';
+  is_printed?: boolean;
   created_at: string;
 };
 
@@ -139,6 +140,8 @@ export const dbOrders = {
       status: 'cancelled',
       updated_at: new Date().toISOString()
     }).eq('table_id', tableId).in('status', ['open', 'paying']),
+  delete: (id: string) =>
+    supabase.from('orders').delete().eq('id', id)
 };
 
 export const dbOrderItems = {
@@ -151,6 +154,8 @@ export const dbOrderItems = {
           .in('order_id', orderIds)
           .neq('status', 'cancelled')
           .order('created_at'),
+  markPrinted: (itemIds: string[]) => 
+    supabase.from('order_items').update({ is_printed: true }).in('id', itemIds),
   insert: (item: {
     order_id: string;
     menu_item_id?: string;
