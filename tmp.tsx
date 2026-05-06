@@ -396,54 +396,10 @@ export default function App() {
         m.category.toLowerCase().includes(s)
       );
     } else {
-      list = list.filter(m => {
-        if (m.category === menuCategory) return true;
-        const subCats = CATEGORY_MAPPING[menuCategory];
-        if (subCats && (subCats.includes(m.category) || m.category.startsWith(`${menuCategory}:`) || m.category.startsWith(`${menuCategory} `))) return true;
-        return false;
-      });
+      list = list.filter(m => m.category === menuCategory);
     }
     return list;
   }, [menuItems, menuCategory, menuSearch]);
-
-  const adminMenuItems = useMemo(() => {
-    let list = menuItems;
-    if (menuSearch.trim()) {
-      const s = menuSearch.toLowerCase().trim();
-      list = list.filter(m => 
-        m.name.toLowerCase().includes(s) || 
-        m.category.toLowerCase().includes(s)
-      );
-    }
-    return list;
-  }, [menuItems, menuSearch]);
-
-  const dynamicCategories = useMemo(() => {
-    const set = new Set<string>();
-    menuItems.forEach(m => {
-      if (m.active && m.category) {
-        let isSub = false;
-        for (const [parent, subs] of Object.entries(CATEGORY_MAPPING)) {
-          if (subs.includes(m.category) || m.category.startsWith(`${parent}:`) || m.category.startsWith(`${parent} `)) {
-            set.add(parent);
-            isSub = true;
-            break;
-          }
-        }
-        if (!isSub) {
-          set.add(m.category);
-        }
-      }
-    });
-    const list = Array.from(set);
-    list.sort((a, b) => {
-      const idxA = CATEGORIES.indexOf(a) === -1 ? 999 : CATEGORIES.indexOf(a);
-      const idxB = CATEGORIES.indexOf(b) === -1 ? 999 : CATEGORIES.indexOf(b);
-      if (idxA !== idxB) return idxA - idxB;
-      return a.localeCompare(b);
-    });
-    return list.length > 0 ? list : CATEGORIES;
-  }, [menuItems]);
 
   const ranking = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -1243,90 +1199,62 @@ export default function App() {
   const renderAdminMenu = () => {
     return (
       <div className="fade-in admin-menu-view">
-        <div className="admin-menu-header" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div className="search-box" style={{ flex: 1, display: 'flex', height: '48px', alignItems: 'center', background: 'white', borderRadius: '14px', padding: '0 16px', gap: '12px', border: '1px solid var(--border-strong)' }}>
-            <Search size={18} color="var(--text-muted)" />
-            <input 
-              type="text" 
-              placeholder="Buscar en el menú..." 
-              value={menuSearch} 
-              onChange={e => setMenuSearch(e.target.value)} 
-              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '16px', background: 'transparent', width: '100%', minWidth: 0 }}
-            />
+        <div className="admin-menu-header">
+          <div className="search-box">
+            <Search size={18} />
+            <input type="text" placeholder="Buscar en el menú..." value={menuSearch} onChange={e => setMenuSearch(e.target.value)} />
           </div>
-          <button className="btn-primary" style={{ width: 'auto', padding: '0 20px', height: '48px', whiteSpace: 'nowrap', borderRadius: '14px' }} onClick={handleAddItemModalOpen}>
+          <button className="btn-primary" onClick={handleAddItemModalOpen}>
             <Plus size={18} /> Nuevo Item
           </button>
         </div>
         
-        <div className="menu-items-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '32px' }}>
-          {adminMenuItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-              <div style={{ background: 'white', display: 'inline-flex', padding: '16px', borderRadius: '50%', marginBottom: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <Search size={32} color="var(--text-muted)" />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-dark)' }}>No se encontraron platillos</h3>
-              <p style={{ marginTop: '8px', fontSize: '15px' }}>Intenta con otro término de búsqueda o agrega un nuevo item.</p>
-            </div>
-          ) : (
-            adminMenuItems.map(item => {
-              const isExpanded = expandedItems.has(item.id);
-              return (
-                <div key={item.id} style={{ 
-                  background: 'white', 
-                  border: '1px solid var(--border-strong)', 
-                  borderRadius: '16px', 
-                  overflow: 'hidden',
-                  opacity: item.active ? 1 : 0.6,
-                  filter: item.active ? 'none' : 'grayscale(100%)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                }}>
-                  <div className="item-main" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
-                    <div className="item-info" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span className="category-tag" style={{ 
-                        fontSize: '11px', fontWeight: 700, color: 'var(--primary-dark)', 
-                        background: 'var(--success-bg)', padding: '4px 10px', borderRadius: '12px', 
-                        width: 'fit-content', textTransform: 'uppercase', letterSpacing: '0.5px' 
-                      }}>{item.category}</span>
-                      <h4 className="item-name" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-dark)', letterSpacing: '-0.3px' }}>{item.name}</h4>
-                      {!item.hasVariants && <span className="item-price" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--success-dot)' }}>{formatCurrency(item.price)}</span>}
-                    </div>
-                    <div className="item-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditItem(item)}><Pencil size={18} color="var(--text-dark)" /></button>
-                      {item.hasVariants && (
-                        <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => toggleExpanded(item.id)}>
-                          {isExpanded ? <ChevronUp size={20} color="var(--text-dark)" /> : <ChevronDown size={20} color="var(--text-dark)" />}
-                        </button>
-                      )}
-                      <label className="toggle-switch">
-                        <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                        <span className="toggle-slider" />
-                      </label>
-                    </div>
+        <div className="menu-items-list">
+          {filteredMenuItems.map(item => {
+            const isExpanded = expandedItems.has(item.id);
+            return (
+              <div key={item.id} className={`admin-menu-card ${!item.active ? 'inactive' : ''}`}>
+                <div className="item-main">
+                  <div className="item-info">
+                    <span className="category-tag">{item.category}</span>
+                    <h4 className="item-name">{item.name}</h4>
+                    {!item.hasVariants && <span className="item-price">{formatCurrency(item.price)}</span>}
                   </div>
-                  {item.hasVariants && isExpanded && (
-                    <div className="variants-list" style={{ background: '#f8fafc', borderTop: '1px solid var(--border-strong)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {item.variants?.map(v => (
-                        <div key={v.id} className="variant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="variant-info" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span className="variant-label" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-dark)' }}>{v.label}</span>
-                            <span className="variant-price" style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-muted)' }}>{formatCurrency(v.price)}</span>
-                          </div>
-                          <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <button className="btn-icon" style={{ background: 'white', border: '1px solid var(--border-strong)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditVariant(v)}><Pencil size={14} color="var(--text-dark)" /></button>
-                            <label className="toggle-switch small">
-                              <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
-                              <span className="toggle-slider" />
-                            </label>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="item-controls">
+                    <button className="btn-icon" onClick={() => openEditItem(item)}><Pencil size={16} /></button>
+                    {item.hasVariants && (
+                      <button className="btn-icon" onClick={() => toggleExpanded(item.id)}>
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    )}
+                    <label className="toggle-switch">
+                      <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
+                      <span className="toggle-slider" />
+                    </label>
+                  </div>
                 </div>
-              );
-            })
-          )}
+                {item.hasVariants && isExpanded && (
+                  <div className="variants-list">
+                    {item.variants?.map(v => (
+                      <div key={v.id} className="variant-row">
+                        <div className="variant-info">
+                          <span className="variant-label">{v.label}</span>
+                          <span className="variant-price">{formatCurrency(v.price)}</span>
+                        </div>
+                        <div className="variant-controls">
+                          <button className="btn-icon" onClick={() => openEditVariant(v)}><Pencil size={14} /></button>
+                          <label className="toggle-switch small">
+                            <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
+                            <span className="toggle-slider" />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -2864,7 +2792,7 @@ export default function App() {
               </div>
               {!menuSearch && (
                 <div className="category-chips-wrap">
-                  {dynamicCategories.map(cat => (
+                  {CATEGORIES.map(cat => (
                     <button
                       key={cat}
                       className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
