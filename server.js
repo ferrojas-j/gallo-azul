@@ -12,7 +12,17 @@ const PORT = process.env.PORT || 3000;
 const DIST = join(__dirname, 'dist');
 
 // Serve pre-built static files from dist/
-app.use(express.static(DIST, { maxAge: '1d', etag: true }));
+app.use(express.static(DIST, { 
+  maxAge: '0', 
+  etag: true,
+  setHeaders: (res, path) => {
+    if (path.endsWith('.html') || path.endsWith('sw.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Health check
 app.get('/_health', (req, res) => {
