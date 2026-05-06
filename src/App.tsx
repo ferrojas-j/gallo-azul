@@ -1033,7 +1033,7 @@ export default function App() {
   const subTitles: Record<string, string> = {
     main: 'Dashboard',
     menu: 'Menú',
-    users: 'Personal',
+
     tables: 'Mesas',
     stats: 'Historial de Cierres'
   };
@@ -1271,63 +1271,72 @@ export default function App() {
               <p style={{ marginTop: '8px', fontSize: '15px' }}>Intenta con otro término de búsqueda o agrega un nuevo item.</p>
             </div>
           ) : (
-            adminMenuItems.map(item => {
-              const isExpanded = expandedItems.has(item.id);
-              return (
-                <div key={item.id} style={{ 
-                  background: 'white', 
-                  border: '1px solid var(--border-strong)', 
-                  borderRadius: '16px', 
-                  overflow: 'hidden',
-                  opacity: item.active ? 1 : 0.6,
-                  filter: item.active ? 'none' : 'grayscale(100%)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                }}>
-                  <div className="item-main" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
-                    <div className="item-info" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span className="category-tag" style={{ 
-                        fontSize: '11px', fontWeight: 700, color: 'var(--primary-dark)', 
-                        background: 'var(--success-bg)', padding: '4px 10px', borderRadius: '12px', 
-                        width: 'fit-content', textTransform: 'uppercase', letterSpacing: '0.5px' 
-                      }}>{item.category}</span>
-                      <h4 className="item-name" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-dark)', letterSpacing: '-0.3px' }}>{item.name}</h4>
-                      {!item.hasVariants && <span className="item-price" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--success-dot)' }}>{formatCurrency(item.price)}</span>}
-                    </div>
-                    <div className="item-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditItem(item)}><Pencil size={18} color="var(--text-dark)" /></button>
-                      {item.hasVariants && (
-                        <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => toggleExpanded(item.id)}>
-                          {isExpanded ? <ChevronUp size={20} color="var(--text-dark)" /> : <ChevronDown size={20} color="var(--text-dark)" />}
-                        </button>
-                      )}
-                      <label className="toggle-switch">
-                        <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                        <span className="toggle-slider" />
-                      </label>
-                    </div>
-                  </div>
-                  {item.hasVariants && isExpanded && (
-                    <div className="variants-list" style={{ background: '#f8fafc', borderTop: '1px solid var(--border-strong)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {item.variants?.map(v => (
-                        <div key={v.id} className="variant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="variant-info" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span className="variant-label" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-dark)' }}>{v.label}</span>
-                            <span className="variant-price" style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-muted)' }}>{formatCurrency(v.price)}</span>
+            Object.entries(
+              adminMenuItems.reduce((acc, item) => {
+                const cat = item.category || 'Sin Categoría';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(item);
+                return acc;
+              }, {} as Record<string, MenuItem[]>)
+            ).sort((a, b) => a[0].localeCompare(b[0])).map(([category, items]) => (
+              <div key={category} style={{ marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary-dark)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>{category}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {items.map(item => {
+                    const isExpanded = expandedItems.has(item.id);
+                    return (
+                      <div key={item.id} style={{ 
+                        background: 'white', 
+                        border: '1px solid var(--border-strong)', 
+                        borderRadius: '16px', 
+                        overflow: 'hidden',
+                        opacity: item.active ? 1 : 0.6,
+                        filter: item.active ? 'none' : 'grayscale(100%)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                      }}>
+                        <div className="item-main" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
+                          <div className="item-info" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <h4 className="item-name" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-dark)', letterSpacing: '-0.3px' }}>{item.name}</h4>
+                            {!item.hasVariants && <span className="item-price" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--success-dot)' }}>{formatCurrency(item.price)}</span>}
                           </div>
-                          <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <button className="btn-icon" style={{ background: 'white', border: '1px solid var(--border-strong)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditVariant(v)}><Pencil size={14} color="var(--text-dark)" /></button>
-                            <label className="toggle-switch small">
-                              <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
+                          <div className="item-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditItem(item)}><Pencil size={18} color="var(--text-dark)" /></button>
+                            {item.hasVariants && (
+                              <button className="btn-icon" style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => toggleExpanded(item.id)}>
+                                {isExpanded ? <ChevronUp size={20} color="var(--text-dark)" /> : <ChevronDown size={20} color="var(--text-dark)" />}
+                              </button>
+                            )}
+                            <label className="toggle-switch">
+                              <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
                               <span className="toggle-slider" />
                             </label>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {item.hasVariants && isExpanded && (
+                          <div className="variants-list" style={{ background: '#f8fafc', borderTop: '1px solid var(--border-strong)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {item.variants?.map(v => (
+                              <div key={v.id} className="variant-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="variant-info" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className="variant-label" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-dark)' }}>{v.label}</span>
+                                  <span className="variant-price" style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-muted)' }}>{formatCurrency(v.price)}</span>
+                                </div>
+                                <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                  <button className="btn-icon" style={{ background: 'white', border: '1px solid var(--border-strong)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => openEditVariant(v)}><Pencil size={14} color="var(--text-dark)" /></button>
+                                  <label className="toggle-switch small">
+                                    <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
+                                    <span className="toggle-slider" />
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -2922,7 +2931,7 @@ export default function App() {
                   return subCats.map(subCat => {
                     const itemsInSub = filteredMenuItems.filter(m => m.category === subCat);
                     if (itemsInSub.length === 0) return null;
-                    const isExpanded = expandedSubCats.has(subCat);
+                    const isExpanded = !expandedSubCats.has(subCat);
                     const displayName = subCat.split(': ').pop();
 
                     return (
@@ -2939,8 +2948,7 @@ export default function App() {
                             textTransform: 'uppercase', letterSpacing: 1.5, display: 'flex', alignItems: 'center', gap: 6,
                             whiteSpace: 'nowrap'
                           }}>
-                            {displayName}
-                            {isExpanded ? <ChevronUp size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
+                            {displayName} {isExpanded ? <ChevronDown size={14} color="#4f46e5" /> : <ChevronRight size={14} />}
                           </h4>
                           <div style={{ height: 1, flex: 1, background: '#f1f5f9' }} />
                         </button>
