@@ -2,9 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutGrid, ClipboardCheck, Settings, ChevronLeft, Users, Check, X,
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
-  LogOut, FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, EyeOff, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
+  FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
+
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
   UserMinus, ExternalLink, CheckCircle2, AlertCircle
+
 } from 'lucide-react';
 import './index.css';
 import { CATEGORIES, CATEGORY_MAPPING } from './data/menu';
@@ -303,11 +305,8 @@ export default function App() {
     id: 'default-admin', name: 'Administrador', role: 'Administrador'
   });
 
-  const [loginName, setLoginName] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
+
 
   const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
@@ -550,88 +549,7 @@ export default function App() {
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff' | 'Encargado'>('Staff');
 
-  // Login handler
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    setLoginLoading(true);
 
-    try {
-      const normalizedInput = loginName.trim().toLowerCase();
-      const user = users.find(u => u.name.toLowerCase() === normalizedInput);
-      
-      if (!user) {
-        setLoginError('Usuario no encontrado');
-        return;
-      }
-
-      if (user.password !== loginPassword) {
-        setLoginError('Contraseña incorrecta');
-        return;
-      }
-
-      // Mark session as active in Supabase
-      await supabase.from('users').update({ session_active: true }).eq('id', user.id);
-      
-      const sessionData = { id: user.id, name: user.name, role: user.role };
-      localStorage.setItem('mora_session', JSON.stringify(sessionData));
-      setCurrentUser(sessionData);
-      setLoginName('');
-      setLoginPassword('');
-    } catch (error) {
-      setLoginError('Error de conexión');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-  
-  const renderLogin = () => (
-    <div className="login-screen">
-      <div className="login-logo">🏨</div>
-      <h1 className="login-title">Gallo Azul</h1>
-      <p className="login-subtitle">Sistema de Control Operativo</p>
-      
-      <form onSubmit={handleLogin} className="login-form">
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label>Usuario</label>
-          <input 
-            type="text" 
-            placeholder="Tu nombre" 
-            value={loginName}
-            onChange={e => setLoginName(e.target.value)}
-            required 
-            className="input-large"
-          />
-        </div>
-        
-        <div style={{ display: 'grid', gap: 6, position: 'relative' }}>
-          <label>Contraseña</label>
-          <input 
-            type={showPassword ? "text" : "password"} 
-            placeholder="Contraseña" 
-            value={loginPassword}
-            onChange={e => setLoginPassword(e.target.value)}
-            required 
-            className="input-large"
-          />
-          <button 
-            type="button" 
-            onClick={() => setShowPassword(!showPassword)}
-            style={{ position: 'absolute', right: 12, top: 32, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        </div>
-
-        {loginError && <div className="login-error">{loginError}</div>}
-
-        <button type="submit" className="btn-primary" disabled={loginLoading} style={{ marginTop: 12 }}>
-          {loginLoading ? 'Iniciando...' : 'Entrar al Sistema'}
-        </button>
-      </form>
-      <div className="login-hint">Gestión centralizada de <strong>Hotel & Restaurante</strong></div>
-    </div>
-  );
 
 
   // Unified Custom Confirm Modal for tables (opening accounts and confirming payments)
@@ -1139,25 +1057,8 @@ export default function App() {
                 Instalar
               </button>
             )}
-            <div className="header-user-chip">
               <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
-              <button
-                className="header-logout-btn"
-                title="Cerrar sesión"
-                onClick={async () => {
-                  if (currentUser?.id) {
-                    await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
-                  }
-                  localStorage.removeItem('mora_session');
-                  setCurrentUser(null);
-                  setLoginName('');
-                  setLoginPassword('');
-                  setCurrentView('home');
-                }}
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
+
           </div>
         )}
       </div>
@@ -2934,7 +2835,7 @@ export default function App() {
 
   // ── Render ───────────────────────────────────────────
 
-  if (!currentUser) return renderLogin();
+
 
   return (
     <>
