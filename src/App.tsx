@@ -1065,15 +1065,7 @@ export default function App() {
             <ChevronRight size={20} />
           </button>
           
-          <button className="admin-nav-card" onClick={() => setAdminSubView('users')}>
-            <div className="card-icon"><Users size={24} /></div>
-            <div className="card-info">
-              <h3>Personal</h3>
-              <p>Administrar usuarios y permisos del sistema</p>
-            </div>
-            <ChevronRight size={20} />
-          </button>
-          
+
           <button className="admin-nav-card" onClick={() => setAdminSubView('tables')}>
             <div className="card-icon"><LayoutGrid size={24} /></div>
             <div className="card-info">
