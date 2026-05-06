@@ -547,6 +547,41 @@ export default function App() {
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<'Administrador' | 'Staff' | 'Encargado'>('Staff');
 
+  // Login handler
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+
+    try {
+      const normalizedInput = loginName.trim().toLowerCase();
+      const user = users.find(u => u.name.toLowerCase() === normalizedInput);
+      
+      if (!user) {
+        setLoginError('Usuario no encontrado');
+        return;
+      }
+
+      if (user.password !== loginPassword) {
+        setLoginError('Contraseña incorrecta');
+        return;
+      }
+
+      // Mark session as active in Supabase
+      await supabase.from('users').update({ session_active: true }).eq('id', user.id);
+      
+      const sessionData = { id: user.id, name: user.name, role: user.role };
+      localStorage.setItem('mora_session', JSON.stringify(sessionData));
+      setCurrentUser(sessionData);
+      setLoginName('');
+      setLoginPassword('');
+    } catch (error) {
+      setLoginError('Error de conexión');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   // Unified Custom Confirm Modal for tables (opening accounts and confirming payments)
   const [tableConfirmModal, setTableConfirmModal] = useState<{
     isOpen: boolean;
@@ -696,341 +731,385 @@ export default function App() {
     });
   };
 
-  // Checkout extended states
-  const [discountType, setDiscountType] = useState<'none' | 'amount' | 'percentage'>('none');
-  const [discountValue, setDiscountValue] = useState<string>('');
-  const [discountReason, setDiscountReason] = useState<string>('');
-  const [cashReceived, setCashReceived] = useState<string>('');
-  const [tipPercent, setTipPercent] = useState<'none' | '10' | '15' | '20' | 'Otro'>('none');
-  const [customTip, setCustomTip] = useState<string>('');
-
-  const [expandedPedidos, setExpandedPedidos] = useState<number[]>([]);
-
-  // PWA Install Prompt
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  
-  // iOS manual setup (no beforeinstallprompt fired here)
-  const isIosDevice = () => {
-    return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-  };
-  const [isIosPromptVisible, setIsIosPromptVisible] = useState(false);
-  const [showIosButton, setShowIosButton] = useState(false);
-
-  useEffect(() => {
-    const isStandalone = ('standalone' in window.navigator) && (window.navigator as any).standalone;
-    if (isIosDevice() && !isStandalone && !window.matchMedia('(display-mode: standalone)').matches) {
-      setShowIosButton(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallPWA = async () => {
-    if (!deferredPrompt) {
-      alert("La aplicación no está lista para instalarse. Intente recargar.");
-      return;
-    }
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    } catch (err: any) {
-      alert("Error al instalar: " + err.message);
-    }
+  const subTitles: Record<string, string> = {
+    main: 'Dashboard',
+    menu: 'Menú',
+    users: 'Personal',
+    tables: 'Mesas',
+    stats: 'Historial de Cierres'
   };
 
-  useEffect(() => {
+  const isSubView = ['mesa', 'checkout', 'registros'].includes(currentView) || (currentView === 'admin' && adminSubView !== 'main');
 
-    const t = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Stats / Analytics hooks — must be at top level (Rules of Hooks)
-  const [statsSubView, setStatsSubView] = useState<'history' | 'analytics'>('history');
-  const [analyticsFilter, setAnalyticsFilter] = useState<'day' | 'month' | 'total'>('total');
-  const [ranking, setRanking] = useState<{name: string, count: number}[]>([]);
-
-  useEffect(() => {
-    if (statsSubView === 'analytics') {
-      const now = new Date();
-      const allItems: string[] = [];
-
-      dailySummaries.forEach(s => {
-        const d = new Date(s.created_at);
-        let match = false;
-        if (analyticsFilter === 'day') match = d.toDateString() === now.toDateString();
-        else if (analyticsFilter === 'month') match = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        else match = true;
-        if (match && s.items_summary) {
-          s.items_summary.split(', ').forEach((p: string) => {
-            const m = p.match(/(\d+)x (.+)/);
-            if (m) { const qty = parseInt(m[1]); for(let i=0;i<qty;i++) allItems.push(m[2]); }
-          });
-        }
-      });
-
-      todayClosedOrders.forEach(o => {
-        const d = new Date(o.closed_at || '');
-        let match = false;
-        if (analyticsFilter === 'day') match = d.toDateString() === now.toDateString();
-        else if (analyticsFilter === 'month') match = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        else match = true;
-        if (match && o.items_summary) {
-          o.items_summary.split(', ').forEach((p: string) => {
-            const m = p.match(/(\d+)x (.+)/);
-            if (m) { const qty = parseInt(m[1]); for(let i=0;i<qty;i++) allItems.push(m[2]); }
-          });
-        }
-      });
-
-      const counts = allItems.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {} as Record<string, number>);
-      setRanking(Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count).slice(0, 10));
-    }
-  }, [statsSubView, analyticsFilter, dailySummaries, todayClosedOrders]);
-
-  // ── Computed ─────────────────────────────────────────
-  const activeOrder = selectedTableId ? tableOrders[selectedTableId] : null;
-  const orderItems = selectedTableId ? activeItems.filter(i => i.table_id === selectedTableId) : [];
-  const orderTotal = orderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-
-  const selectedTableItems = useMemo(
-    () => (activeItems || []).filter(i => i.table_id === selectedTableId),
-    [activeItems, selectedTableId]
-  );
-
-  const currentTableTotal = useMemo(
-    () => (selectedTableItems || []).reduce((acc, i) => acc + i.price * i.qty, 0),
-    [selectedTableItems]
-  );
-
-  const pendingItems = useMemo(
-    () => (activeItems || []).filter(i => i.status === 'pending'),
-    [activeItems]
-  );
-
-  const filteredMenuItems = useMemo(() => {
-    const isVisible = (m: MenuItem) => {
-      if (!m.active) return false;
-      // Exclude items that are meant to be extras only
-      const extraCategories = CATEGORY_MAPPING['INGREDIENTES EXTRA'] || [];
-      if (extraCategories.includes(m.category)) return false;
-      
-      if (m.hasVariants) return (m.variants?.some(v => v.active)) ?? false;
-      return true;
-    };
-    
-    const subCategories = CATEGORY_MAPPING[menuCategory];
-    const base = menuItems.filter(m => {
-      if (!isVisible(m)) return false;
-      if (subCategories) return subCategories.includes(m.category);
-      return m.category === menuCategory;
+  const renderAdminMain = () => {
+    const mexicoDate = currentTime.toLocaleDateString('es-MX', {
+      timeZone: 'America/Mazatlan', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const mexicoTime = currentTime.toLocaleTimeString('es-MX', {
+      timeZone: 'America/Mazatlan', hour: '2-digit', minute: '2-digit',
     });
 
-    if (!menuSearch.trim()) return base;
-    return menuItems.filter(m => isVisible(m) && m.name.toLowerCase().includes(menuSearch.toLowerCase()));
-  }, [menuItems, menuCategory, menuSearch]);
+    return (
+      <div className="fade-in admin-main">
+        <div className="admin-header-card">
+          <div className="admin-welcome">
+            <h2>Panel de Administración</h2>
+            <p>{mexicoDate} • {mexicoTime}</p>
+          </div>
+          <div className="admin-stats-summary">
+            <div className="admin-stat-pill">
+              <span className="label">Ventas Hoy</span>
+              <span className="value">{formatCurrency(todayIncome)}</span>
+            </div>
+            <div className="admin-stat-pill">
+              <span className="label">Gastos Hoy</span>
+              <span className="value">{formatCurrency(todayExpenses)}</span>
+            </div>
+          </div>
+        </div>
 
-  // ── Handlers ─────────────────────────────────────────
+        <div className="admin-grid">
+          <button className="admin-nav-card" onClick={() => setAdminSubView('menu')}>
+            <div className="card-icon"><Package size={24} /></div>
+            <div className="card-info">
+              <h3>Gestión de Menú</h3>
+              <p>Actualizar platos, precios y disponibilidad</p>
+            </div>
+            <ChevronRight size={20} />
+          </button>
+          
+          <button className="admin-nav-card" onClick={() => setAdminSubView('users')}>
+            <div className="card-icon"><Users size={24} /></div>
+            <div className="card-info">
+              <h3>Personal</h3>
+              <p>Administrar usuarios y permisos del sistema</p>
+            </div>
+            <ChevronRight size={20} />
+          </button>
+          
+          <button className="admin-nav-card" onClick={() => setAdminSubView('tables')}>
+            <div className="card-icon"><LayoutGrid size={24} /></div>
+            <div className="card-info">
+              <h3>Mesas</h3>
+              <p>Configurar el diseño y número de mesas</p>
+            </div>
+            <ChevronRight size={20} />
+          </button>
+          
+          <button className="admin-nav-card" onClick={() => setAdminSubView('stats')}>
+            <div className="card-icon"><FileText size={24} /></div>
+            <div className="card-info">
+              <h3>Reportes</h3>
+              <p>Ver historial de cierres y analíticas</p>
+            </div>
+            <ChevronRight size={20} />
+          </button>
+        </div>
 
-  const navTo = (view: 'home' | 'salon' | 'pedidos' | 'impresora' | 'admin') => {
-    setCurrentView(view);
-    setSelectedTableId(null);
-    if (view === 'admin') setAdminSubView('main');
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-  };
-
-  const handleConfirmOpenTable = async () => {
-    if (tableConfirmModal.tableId) {
-      await createOrderForTable(tableConfirmModal.tableId);
-      setSelectedTableId(tableConfirmModal.tableId);
-      setCurrentView('mesa');
-      setMesaTab('orden');
-      setMenuCategory(CATEGORIES[0]);
-      setMenuSearch('');
-    }
-    setTableConfirmModal({ isOpen: false, type: 'open', tableId: null });
-  };
-
-  const handleCreateDelivery = async () => {
-    if (!deliveryCustomerName.trim()) return;
-    const tableId = await createDeliveryOrder(deliveryCustomerName.trim());
-    if (tableId) {
-      setSelectedTableId(tableId);
-      setCurrentView('mesa');
-      setMesaTab('orden');
-      setMenuCategory(CATEGORIES[0]);
-      setMenuSearch('');
-    }
-    setIsDeliveryModalOpen(false);
-    setDeliveryCustomerName('');
-  };
-
-  const handleAddItem = (item: MenuItem, variant?: MenuVariant) => {
-    if (!selectedTableId) return;
-    setConfirmNotes('');
-    setConfirmPending({ item, variant });
-    setSelectedExtras(new Set());
-    setShowExtras(false);
-  };
-
-  const confirmAddItem = async () => {
-    if (!confirmPending || !selectedTableId) return;
-    
-    // 1. Calculate consolidated price and build extra description
-    let totalPrice = confirmPending.variant ? confirmPending.variant.price : confirmPending.item.price;
-    const extraNames: string[] = [];
-    
-    for (const extraId of selectedExtras) {
-      const extraItem = menuItems.find(m => m.id === extraId);
-      if (extraItem) {
-        totalPrice += extraItem.price;
-        extraNames.push(extraItem.name);
-      }
-    }
-    
-    const combinedNotes = [
-      confirmNotes.trim(),
-      extraNames.length > 0 ? `EXTRAS: ${extraNames.join(', ')}` : ''
-    ].filter(Boolean).join(' | ');
-
-    // 2. Add as single item with bundled price and notes
-    await addItemToOrder(
-      selectedTableId, 
-      confirmPending.item, 
-      confirmPending.variant, 
-      combinedNotes,
-      totalPrice
+        <div className="admin-footer-actions">
+          <button className="btn-cierre-premium" onClick={() => setIsCierreModalOpen(true)}>
+            <Lock size={20} /> Realizar Cierre de Turno
+          </button>
+        </div>
+      </div>
     );
+  };
+
+  const renderImpresora = () => {
+    return (
+      <div className="fade-in printer-view">
+        <div className="section-header">
+          <h2>Cuentas Pendientes</h2>
+          <p>Tickets generados para cobro en caja</p>
+        </div>
+        <div className="tickets-grid">
+          {pendingTickets.length === 0 ? (
+            <div className="empty-state">
+              <Printer size={48} />
+              <p>No hay cuentas pendientes de impresión</p>
+            </div>
+          ) : (
+            pendingTickets.map((ticket: any) => (
+              <div key={ticket.id} className="ticket-card">
+                <div className="ticket-header">
+                  <div className="ticket-table">Mesa {tables.find(t => t.id === ticket.table_id)?.name || ticket.table_id}</div>
+                  <div className="ticket-total">{formatCurrency(ticket.total)}</div>
+                </div>
+                <div className="ticket-summary">{ticket.items_summary}</div>
+                <div className="ticket-meta">
+                  <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>{ticket.printed_by}</span>
+                </div>
+                <div className="ticket-actions">
+                  <button className="btn-icon" onClick={() => setPreviewTicket(ticket)}><Eye size={18} /> Ver</button>
+                  <button className="btn-icon primary" onClick={() => dispatchPrintOnly(ticket)}><Printer size={18} /> Imprimir</button>
+                  <button className="btn-icon danger" onClick={() => { if(window.confirm('¿Eliminar registro?')) deleteTicket(ticket.id); }}><Trash2 size={18} /></button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminMenu = () => {
+    return (
+      <div className="fade-in admin-menu-view">
+        <div className="admin-menu-header">
+          <div className="search-box">
+            <Search size={18} />
+            <input type="text" placeholder="Buscar en el menú..." value={menuSearch} onChange={e => setMenuSearch(e.target.value)} />
+          </div>
+          <button className="btn-primary" onClick={handleAddItemModalOpen}>
+            <Plus size={18} /> Nuevo Item
+          </button>
+        </div>
+        
+        <div className="menu-items-list">
+          {filteredMenuItems.map(item => {
+            const isExpanded = expandedItems.has(item.id);
+            return (
+              <div key={item.id} className={`admin-menu-card ${!item.active ? 'inactive' : ''}`}>
+                <div className="item-main">
+                  <div className="item-info">
+                    <span className="category-tag">{item.category}</span>
+                    <h4 className="item-name">{item.name}</h4>
+                    {!item.hasVariants && <span className="item-price">{formatCurrency(item.price)}</span>}
+                  </div>
+                  <div className="item-controls">
+                    <button className="btn-icon" onClick={() => openEditItem(item)}><Pencil size={16} /></button>
+                    {item.hasVariants && (
+                      <button className="btn-icon" onClick={() => toggleExpanded(item.id)}>
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    )}
+                    <label className="toggle-switch">
+                      <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
+                      <span className="toggle-slider" />
+                    </label>
+                  </div>
+                </div>
+                {item.hasVariants && isExpanded && (
+                  <div className="variants-list">
+                    {item.variants?.map(v => (
+                      <div key={v.id} className="variant-row">
+                        <div className="variant-info">
+                          <span className="variant-label">{v.label}</span>
+                          <span className="variant-price">{formatCurrency(v.price)}</span>
+                        </div>
+                        <div className="variant-controls">
+                          <button className="btn-icon" onClick={() => openEditVariant(v)}><Pencil size={14} /></button>
+                          <label className="toggle-switch small">
+                            <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
+                            <span className="toggle-slider" />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminUsers = () => {
+    return (
+      <div className="fade-in admin-users-view">
+        <div className="section-title-row">
+          <h3>Personal Autorizado</h3>
+          <button className="btn-primary" onClick={() => setIsAddUserModalOpen(true)}>
+            <Plus size={18} /> Nuevo Usuario
+          </button>
+        </div>
+        <div className="users-list-p">
+          {users.map(user => (
+            <div key={user.id} className="user-card-p">
+              <div className="user-avatar-p">{user.name[0].toUpperCase()}</div>
+              <div className="user-info-p">
+                <span className="user-name-p">{user.name}</span>
+                <span className="user-role-p">{user.role}</span>
+              </div>
+              <div className="user-actions-p">
+                <div className={`user-session-p ${user.session_active ? 'active' : ''}`}>
+                   {user.session_active ? 'Online' : 'Offline'}
+                </div>
+                <button className="user-edit-btn-p" onClick={() => openEditUser(user)}>
+                  <Pencil size={14} />
+                </button>
+                <button className="user-del-btn-p" onClick={() => { if(window.confirm('¿Eliminar usuario?')) deleteUser(user.id); }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminTables = () => (
+    <div className="fade-in admin-tables-view">
+      <div className="section-title-row">
+        <h3>Configuración de Mesas</h3>
+        <button className="btn-primary" onClick={handleAdminAddTable}>
+          <Plus size={18} /> Agregar Mesa
+        </button>
+      </div>
+      <div className="tables-admin-grid">
+        {tables.map(table => (
+          <div key={table.id} className="table-admin-card">
+            <div className="table-admin-info">
+              <div className="table-icon">🪑</div>
+              <div className="table-name">Mesa {table.name || table.id}</div>
+            </div>
+            <button className="btn-icon danger" onClick={() => handleAdminDeleteTable(table.id)}>
+              <Trash2 size={18} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAdminStats = () => (
+    <div className="fade-in admin-stats-view">
+      <div className="stats-header-tabs">
+        <button className={`stats-tab ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
+        <button className={`stats-tab ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Análisis</button>
+      </div>
+
+      {statsSubView === 'history' ? (
+        <div className="history-section">
+          <div className="stats-header">
+            <h3>Historial de Cierres</h3>
+            <span className="stats-count">{dailySummaries.length} reportes</span>
+          </div>
+          <div className="reports-list">
+            {dailySummaries.map(report => (
+              <HistoryReportCard 
+                key={report.id} 
+                report={report} 
+                formatCurrency={formatCurrency} 
+                onDelete={(id: string) => setDeleteReportId(id)} 
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="analytics-section">
+          <div className="analytics-controls">
+             <button className={analyticsFilter === 'day' ? 'active' : ''} onClick={() => setAnalyticsFilter('day')}>Hoy</button>
+             <button className={analyticsFilter === 'month' ? 'active' : ''} onClick={() => setAnalyticsFilter('month')}>Este Mes</button>
+             <button className={analyticsFilter === 'total' ? 'active' : ''} onClick={() => setAnalyticsFilter('total')}>Todo</button>
+          </div>
+          <div className="ranking-card">
+            <h3>Top 10 Productos Más Vendidos</h3>
+            <div className="ranking-list">
+              {ranking.map((item, i) => (
+                <div key={i} className="ranking-item">
+                  <span className="rank">#{i+1}</span>
+                  <span className="name">{item.name}</span>
+                  <span className="count">{item.count} vendidos</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderHeader = () => {
+    if (!currentUser) return null;
     
-    setConfirmPending(null);
-    setConfirmNotes('');
-    setSelectedExtras(new Set());
-    setMesaTab('orden');
-  };
-
-  const handleProceedToCheckout = async () => {
-    if (!selectedTableId) return;
-
-    const pendingItems = activeItems.filter(i => i.table_id === selectedTableId && i.status === 'pending');
-    if (pendingItems.length > 0) {
-      alert('⚠️ Aún hay platillos pendientes de entrega en esta mesa. Debes entregarlos (tacharlos) para proceder al pago.');
-      return;
-    }
-
-    await checkoutTable(selectedTableId);
-    setDiscountType('none');
-    setDiscountValue('');
-    setDiscountReason('');
-    setCashReceived('');
-    setTipPercent('none');
-    setCustomTip('');
-    setCurrentView('checkout');
-    setPaymentMethod('efectivo');
-  };
-
-  const handleConfirmPayment = async () => {
-    if (!selectedTableId) return;
-    setTableConfirmModal({ isOpen: true, type: 'pay', tableId: selectedTableId });
-  };
-
-  const executePayment = async () => {
-    if (!tableConfirmModal.tableId) return;
-    
-    // Calculate final total again here
-    const items = activeItems.filter(i => i.table_id === tableConfirmModal.tableId);
-    let finalTotal = items.reduce((s, i) => s + (i.price * i.qty), 0);
-    const dVal = parseFloat(discountValue) || 0;
-    if (discountType === 'amount') {
-      finalTotal = Math.max(0, finalTotal - dVal);
-    } else if (discountType === 'percentage') {
-      finalTotal = Math.max(0, finalTotal * (1 - dVal / 100));
-    }
-
-    let tipAmount = 0;
-    if (tipPercent === 'Otro') {
-      tipAmount = parseFloat(customTip) || 0;
-    } else if (tipPercent !== 'none') {
-      tipAmount = finalTotal * (parseFloat(tipPercent) / 100);
-    }
-
-    await confirmPayment(tableConfirmModal.tableId, paymentMethod, finalTotal, tipAmount, discountReason);
-    setTableConfirmModal({ isOpen: false, type: 'pay', tableId: null });
-    navTo('salon');
-  };
-
-  const handleCancelTable = async () => {
-    if (!tableConfirmModal.tableId) return;
-    await cancelTable(tableConfirmModal.tableId);
-    setTableConfirmModal({ isOpen: false, type: 'closeEmpty', tableId: null });
-    navTo('salon');
-  };
-
-  const handleExpenseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = parseFloat(expenseAmount);
-    if (!isNaN(amount) && amount > 0) {
-      await addExpense(amount, expenseConcept, expenseDetail);
-      setIsExpenseModalOpen(false);
-      setExpenseAmount(''); setExpenseDetail(''); setExpenseConcept('Pago a proveedores');
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    if (!notesModal) return;
-    await updateItemNotes(notesModal.itemId, notesDraft);
-    setNotesModal(null);
-  };
-
-  const handleAdminAddTable = async () => {
-    const n = prompt('Número de la nueva mesa:');
-    if (!n) return;
-    const id = parseInt(n, 10);
-    if (isNaN(id)) return alert('Número inválido');
-    if (tables.find(t => t.id === id)) return alert('Esa mesa ya existe');
-    await addTable(id);
-  };
-
-  const handleAdminDeleteTable = async (id: number) => {
-    if (confirm(`¿Eliminar Mesa ${id}?`)) await deleteTable(id);
-  };
-
-  const handleAddUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserName.trim()) return;
-    const { error } = await addUser(newUserName.trim(), newUserRole, INITIAL_PASSWORD);
-    if (error) {
-      alert(`Error al crear usuario: ${error.message}`);
-      return;
-    }
-    setIsAddUserModalOpen(false);
-    setNewUserName('');
-    setNewUserRole('Staff');
-  };
-
-  const openEditUser = (user: UserRow) => {
-    setEditingUserId(user.id);
-    setEditUserName(user.name);
-    setEditUserRole(user.role);
-    setIsEditUserModalOpen(true);
-  };
-
-  const handleEditUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUserId || !editUserName.trim()) return;
-    await updateUser(editingUserId, editUserName.trim(), editUserRole);
-    setIsEditUserModalOpen(false);
+    return (
+      <div className="header">
+        {isSubView ? (
+          <button className="icon-button" onClick={() => {
+            if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
+            else if (currentView === 'checkout') setCurrentView('mesa');
+            else if (currentView === 'registros') setCurrentView('checkin');
+            else setCurrentView('salon');
+          }}>
+            <ChevronLeft size={24} />
+          </button>
+        ) : (
+          <div className="header-title-container">
+            <span className="header-title">
+              {currentView === 'home' && 'Inicio'}
+              {currentView === 'salon' && 'Salón'}
+              {currentView === 'pedidos' && 'Comandas'}
+              {currentView === 'impresora' && 'Cuentas'}
+              {currentView === 'admin' && 'Admin'}
+              {currentView === 'checkin' && 'Hotel'}
+              {currentView === 'registros' && 'Registros Hotel'}
+            </span>
+          </div>
+        )}
+        {currentView === 'mesa' && (
+          <div className="header-title-container" style={{ alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -4 }}>Atendiendo</span>
+            <span className="header-title" style={{ fontSize: 26, fontWeight: 800 }}>
+              Mesa {tables.find(t => t.id === selectedTableId)?.name || selectedTableId}
+            </span>
+          </div>
+        )}
+        {currentView === 'checkout' && (
+          <div className="header-title-container" style={{ alignItems: 'center' }}>
+            <span className="header-title" style={{ fontSize: 22, fontWeight: 600 }}>Cobrar</span>
+          </div>
+        )}
+        {currentView === 'admin' && adminSubView !== 'main' && (
+          <div className="header-title-container" style={{ alignItems: 'center' }}>
+            <span className="header-title" style={{ fontSize: 20, fontWeight: 600 }}>{subTitles[adminSubView] || ''}</span>
+          </div>
+        )}
+        {currentView === 'mesa' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 800 }}>
+            <Users size={15} color="#64748b" /> {tables.find(t => t.id === selectedTableId)?.capacity ?? 4}
+          </div>
+        ) : isSubView ? (
+          <div style={{ width: 44 }} />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {showIosButton && (
+              <button 
+                className="btn-premium" 
+                style={{ width: 'auto', padding: '10px 16px', background: '#3b82f6', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: 'none' }}
+                onClick={() => setIsIosPromptVisible(true)}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Instalar
+              </button>
+            )}
+            <div className="header-user-chip">
+              <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
+              <button
+                className="header-logout-btn"
+                title="Cerrar sesión"
+                onClick={async () => {
+                  if (currentUser?.id) {
+                    await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
+                  }
+                  localStorage.removeItem('mora_session');
+                  setCurrentUser(null);
+                  setLoginName('');
+                  setLoginPassword('');
+                  setCurrentView('home');
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // ── Loading screen ───────────────────────────────────
@@ -2278,126 +2357,143 @@ export default function App() {
                     Ver Menú
                   </button>
                 </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <div className="order-items-list" style={{ flex: 1, overflowY: 'auto' }}>
+                    {selectedTableItems.map(item => (
+                      <div className="order-item-row" key={item.id}>
+                        <button className="order-item-remove" onClick={async () => await removeItem(item.id)}>
+                          <X size={14} />
+                        </button>
+                        <div className="order-item-info">
+                          <div className={`order-item-name ${item.status === 'done' ? 'item-done' : ''}`}>{item.name}</div>
+                          {item.variant_label && (
+                            <span className={`variant-chip ${item.variant_label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}>
+                              {item.variant_label}
+                            </span>
+                          )}
+                          {item.notes && (
+                            <div className={`order-item-notes ${item.notes.includes('EXTRAS:') ? 'has-extras' : ''}`}>
+                              {item.notes.includes('EXTRAS:') && <span style={{ fontWeight: 800, color: '#b45309', marginRight: 4 }}>🚨</span>}
+                              {item.notes}
+                            </div>
+                          )}
+                        </div>
+                        <div className="order-item-price">
+                           ${item.price * item.qty}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="order-actions-grid" style={{ marginTop: 'auto', paddingTop: 20 }}>
+                     <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}>
+                       <Printer size={18} />
+                       Imprimir
+                     </button>
+                     <button className="order-btn-pri" onClick={() => setCurrentView('checkout')}>
+                       Cobrar Mesa
+                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="menu-selection-p fade-in">
+              <div className="menu-search-wrap">
+                <Search size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar platillo..." 
+                  value={menuSearch}
+                  onChange={e => setMenuSearch(e.target.value)}
+                />
               </div>
-            ) : (
-              <div className="order-items-list">
-                {selectedTableItems.map(item => (
-                  <div className="order-item-row" key={item.id}>
-                    <button className="order-item-remove" onClick={async () => await removeItem(item.id)}>
-                      <X size={14} />
+              {!menuSearch && (
+                <div className="category-chips-wrap">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
+                      onClick={() => setMenuCategory(cat)}
+                    >
+                      {cat}
                     </button>
-                    <div className="order-item-info">
-                      <div className={`order-item-name ${item.status === 'done' ? 'item-done' : ''}`}>{item.name}</div>
-                      {item.variant_label && (
-                        <span className={`variant-chip ${item.variant_label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}>
-                          {item.variant_label}
-                        </span>
-                      )}
-                      {item.notes && (
-                        <div className={`order-item-notes ${item.notes.includes('EXTRAS:') ? 'has-extras' : ''}`}>
-                          {item.notes.includes('EXTRAS:') && <span style={{ fontWeight: 800, color: '#b45309', marginRight: 4 }}>🚨</span>}
-                          {item.notes}
+                  ))}
+                </div>
+              )}
+              <div className="menu-items-list">
+                {filteredMenuItems.length === 0 && (
+                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: 48 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                    No se encontraron resultados
+                  </div>
+                )}
+                {(() => {
+                  const subCats = CATEGORY_MAPPING[menuCategory];
+                  const renderItem = (item: MenuItem) => (
+                    <div key={item.id} className="menu-order-item">
+                      <div className="menu-order-item-header">
+                        <div className="menu-order-item-name">{item.name}</div>
+                        {!item.hasVariants && (
+                          <button className="single-add-btn" onClick={() => handleAddItem(item)}>
+                            <span>${item.price}</span>
+                            <Plus size={15} />
+                          </button>
+                        )}
+                      </div>
+                      {item.hasVariants && (
+                        <div className="variant-btns">
+                          {item.variants?.filter(v => v.active).map(v => (
+                            <button
+                              key={v.id}
+                              className={`variant-add-btn ${v.label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}
+                              onClick={() => handleAddItem(item, v)}
+                            >
+                              <span className="variant-label">{v.label}</span>
+                              <span className="variant-price">${v.price}</span>
+                              <span className="variant-tap">Agregar</span>
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
-                    <div className="order-actions-grid">
-                       <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId})}>
-                         <Printer size={18} />
-                         Imprimir
-                       </button>
-                       <button className="order-btn-pri" onClick={() => setCurrentView('checkout')}>
-                         Cobrar Mesa
-                       </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            {!menuSearch && (
-              <div className="category-chips-wrap">
-                {CATEGORIES.map(cat => (
-                  <button
-                    key={cat}
-                    className={`category-chip ${menuCategory === cat ? 'active' : ''}`}
-                    onClick={() => setMenuCategory(cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="menu-items-list">
-              {filteredMenuItems.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#94a3b8', padding: 48 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                  No se encontraron resultados
-                </div>
-              )}
-              {(() => {
-                const subCats = CATEGORY_MAPPING[menuCategory];
-                const renderItem = (item: MenuItem) => (
-                  <div key={item.id} className="menu-order-item">
-                    <div className="menu-order-item-header">
-                      <div className="menu-order-item-name">{item.name}</div>
-                      {!item.hasVariants && (
-                        <button className="single-add-btn" onClick={() => handleAddItem(item)}>
-                          <span>${item.price}</span>
-                          <Plus size={15} />
-                        </button>
-                      )}
-                    </div>
-                    {item.hasVariants && (
-                      <div className="variant-btns">
-                        {item.variants?.filter(v => v.active).map(v => (
-                          <button
-                            key={v.id}
-                            className={`variant-add-btn ${v.label.toLowerCase().includes('integral') ? 'integral' : 'blanco'}`}
-                            onClick={() => handleAddItem(item, v)}
-                          >
-                            <span className="variant-label">{v.label}</span>
-                            <span className="variant-price">${v.price}</span>
-                            <span className="variant-tap">Agregar</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-
-                if (!subCats || menuSearch.trim()) {
-                  return filteredMenuItems.map(renderItem);
-                }
-
-                return subCats.map(subCat => {
-                  const itemsInSub = filteredMenuItems.filter(m => m.category === subCat);
-                  if (itemsInSub.length === 0) return null;
-                  const isExpanded = expandedSubCats.has(subCat);
-                  const displayName = subCat.split(': ').pop();
-
-                  return (
-                    <div key={subCat} style={{ width: '100%', marginBottom: 12 }}>
-                      <button 
-                        onClick={() => toggleSubCat(subCat)}
-                        style={{ 
-                          width: '100%', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 10px 4px'
-                        }}
-                      >
-                        <h4 style={{ 
-                          fontSize: 11, fontWeight: 800, color: isExpanded ? '#4f46e5' : '#94a3b8', 
-                          textTransform: 'uppercase', letterSpacing: 1.5, display: 'flex', alignItems: 'center', gap: 6,
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {displayName}
-                          {isExpanded ? <ChevronUp size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
-                        </h4>
-                        <div style={{ height: 1, flex: 1, background: '#f1f5f9' }} />
-                      </button>
-                      {isExpanded && itemsInSub.map(renderItem)}
-                    </div>
                   );
-                });
-              })()}
+
+                  if (!subCats || menuSearch.trim()) {
+                    return filteredMenuItems.map(renderItem);
+                  }
+
+                  return subCats.map(subCat => {
+                    const itemsInSub = filteredMenuItems.filter(m => m.category === subCat);
+                    if (itemsInSub.length === 0) return null;
+                    const isExpanded = expandedSubCats.has(subCat);
+                    const displayName = subCat.split(': ').pop();
+
+                    return (
+                      <div key={subCat} style={{ width: '100%', marginBottom: 12 }}>
+                        <button 
+                          onClick={() => toggleSubCat(subCat)}
+                          style={{ 
+                            width: '100%', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 10px 4px'
+                          }}
+                        >
+                          <h4 style={{ 
+                            fontSize: 11, fontWeight: 800, color: isExpanded ? '#4f46e5' : '#94a3b8', 
+                            textTransform: 'uppercase', letterSpacing: 1.5, display: 'flex', alignItems: 'center', gap: 6,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {displayName}
+                            {isExpanded ? <ChevronUp size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
+                          </h4>
+                          <div style={{ height: 1, flex: 1, background: '#f1f5f9' }} />
+                        </button>
+                        {isExpanded && itemsInSub.map(renderItem)}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
             </div>
           )}
         </div>
@@ -2612,18 +2708,16 @@ export default function App() {
   };
 
   const renderPedidos = () => {
-    // Group activeItems by table
-    const itemsByTable = (activeItems || []).reduce((acc, item) => {
-      if (!acc[item.table_id]) acc[item.table_id] = [];
-      acc[item.table_id].push(item);
-      return acc;
-    }, {} as Record<number, typeof activeItems>);
+    const itemsByTable = (activeItems || [])
+      .filter(i => i.status === 'pending' || i.status === 'done')
+      .reduce((acc, item) => {
+        if (!acc[item.table_id]) acc[item.table_id] = [];
+        acc[item.table_id].push(item);
+        return acc;
+      }, {} as Record<number, any[]>);
 
-    const tableIds = Object.keys(itemsByTable)
-      .map(Number)
-      .filter(id => itemsByTable[id].some(i => i.status === 'pending'))
-      .sort((a,b) => a - b);
-    
+    const tableIds = Object.keys(itemsByTable).map(Number).sort((a, b) => a - b);
+
     return (
       <div className="fade-in pedidos-view">
         {tableIds.length === 0 ? (
@@ -2641,26 +2735,23 @@ export default function App() {
                 setExpandedPedidos(prev => prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]);
               };
 
-              // Oldest pending item to calculate time
               const pendingTableItems = tableItems.filter(i => i.status === 'pending');
               const oldestPending = pendingTableItems[0];
               
               let elapsedMinutes = 0;
-              let isDelayed = false;
-              let isWarning = false;
               let timeColor = '#10b981';
 
               if (oldestPending) {
                 elapsedMinutes = Math.floor((currentTime.getTime() - new Date(oldestPending.created_at).getTime()) / 60000);
-                isDelayed = elapsedMinutes >= 15;
-                isWarning = elapsedMinutes >= 10 && !isDelayed;
+                const isDelayed = elapsedMinutes >= 15;
+                const isWarning = elapsedMinutes >= 10 && !isDelayed;
                 timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
               } else if (tableItems.length > 0) {
-                timeColor = '#64748b'; // All done
+                timeColor = '#64748b';
               }
 
               return (
-                <div className={`qa-card ${isDelayed ? 'delayed-alert' : ''}`} key={`pedidos-table-${tableId}`} style={{ ...(isDelayed ? { borderColor: '#fecaca', background: '#fef2f2' } : {}), padding: 0, overflow: 'hidden' }}>
+                <div className="qa-card" key={`pedidos-table-${tableId}`} style={{ padding: 0, overflow: 'hidden' }}>
                   <div 
                     className="qa-header" 
                     onClick={toggleCollapse} 
@@ -2679,10 +2770,6 @@ export default function App() {
                           Completado
                         </div>
                       )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{pendingTableItems.length} pendientes</span>
-                      <ChevronRight size={20} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s' }} />
                     </div>
                   </div>
 
@@ -2723,30 +2810,9 @@ export default function App() {
                               <div className="qa-name" style={{ fontWeight: 700, fontSize: 16 }}>{item.name}</div>
                               {item.variant_label && <div className="qa-variant" style={{ fontSize: 13, marginTop: 2, color: '#64748b' }}>{item.variant_label}</div>}
                               {item.notes && (
-                                <div 
-                                  className="qa-notes-box" 
-                                  style={{ 
-                                    marginTop: 6, 
-                                    background: item.notes.includes('EXTRAS:') ? '#fffbeb' : '#fef3c7', 
-                                    color: '#d97706', 
-                                    border: item.notes.includes('EXTRAS:') ? '1.5px dashed #fbbf24' : 'none',
-                                    padding: '8px 12px',
-                                    borderRadius: 10
-                                  }}
-                                >
+                                <div className="qa-notes-box" style={{ marginTop: 6, background: '#fef3c7', color: '#d97706', padding: '8px 12px', borderRadius: 10 }}>
                                   <StickyNote size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                                  <span style={{ fontSize: 13, fontWeight: 600 }}>
-                                    {item.notes.split(' | ').map((part, idx, arr) => (
-                                      <span key={idx}>
-                                        {part.startsWith('EXTRAS:') ? (
-                                          <span style={{ color: '#b45309', fontWeight: 800 }}>
-                                            🚨 {part}
-                                          </span>
-                                        ) : part}
-                                        {idx < arr.length - 1 ? ' | ' : ''}
-                                      </span>
-                                    ))}
-                                  </span>
+                                  <span style={{ fontSize: 13, fontWeight: 600 }}>{item.notes}</span>
                                 </div>
                               )}
                             </div>
@@ -2770,1082 +2836,15 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-
-  const renderAdminMain = () => {
-    const mexicoDate = currentTime.toLocaleDateString('es-MX', {
-      timeZone: 'America/Mazatlan', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-    const mexicoTime = currentTime.toLocaleTimeString('es-MX', {
-      timeZone: 'America/Mazatlan', hour: '2-digit', minute: '2-digit',
-    });
-    return (
-      <div className="fade-in">
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CalendarDays size={14} /> {mexicoDate}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#0f172a' }}>
-              {mexicoTime} <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}>BCS</span>
-            </div>
-            <div style={{ padding: '6px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>USD/MXN</span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#15803d' }}>{(exchangeRate || 20).toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado') && (
-          <>
-            <div className="admin-summary-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="admin-summary-card income">
-                <div className="as-icon"><TrendingUp size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Ventas Restaurante</div>
-                  <div className="as-value" style={{ fontSize: 18 }}>{formatCurrency(todayIncome + todayTotalTips)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 4 }}>
-                    <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>💳 Tarjeta:</span>
-                      <strong style={{ color: '#0f172a' }}>{formatCurrency(todayCardIncome + todayCardTips)}</strong>
-                    </div>
-                    <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>💵 Efectivo:</span>
-                      <strong style={{ color: '#0f172a' }}>{formatCurrency(todayCashIncome + todayCashTips)}</strong>
-                    </div>
-                    <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>🏦 Transf:</span>
-                      <strong style={{ color: '#0f172a' }}>{formatCurrency(todayTransferIncome + todayTransferTips)}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="admin-summary-card expenses">
-                <div className="as-icon"><TrendingDown size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Gastos</div>
-                  <div className="as-value" style={{ fontSize: 18 }}>{formatCurrency(todayExpenses)}</div>
-                  <div className="as-sub">{todayExpensesList.length} regs. activos</div>
-                </div>
-              </div>
-
-              <div className="admin-summary-card petty-cash">
-                <div className="as-icon"><Wallet size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Caja Chica</div>
-                  <div className="as-value" style={{ fontSize: 18 }}>{formatCurrency(pettyCashInitial - todayExpenses)}</div>
-                  <div className="as-sub">Fondo: {formatCurrency(pettyCashInitial)}</div>
-                </div>
-              </div>
-
-              <div className="admin-summary-card loft-sales">
-                <div className="as-icon"><Building size={20} /></div>
-                <div className="as-content">
-                  <div className="as-label">Ventas Hotel</div>
-                  <div className="as-value" style={{ fontSize: 18 }}>{formatCurrency(hotelCardSales + hotelCashSales)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 4 }}>
-                    <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>💳 T:</span>
-                      <strong style={{ color: '#0f172a' }}>{formatCurrency(hotelCardSales)}</strong>
-                    </div>
-                    <div style={{ fontSize: 10, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>💵 E:</span>
-                      <strong style={{ color: '#0f172a' }}>{formatCurrency(hotelCashSales)}</strong>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 32 }}>
-              <button className="btn-primary" onClick={() => setIsExpenseModalOpen(true)} style={{ padding: '14px 8px', fontSize: 13, borderRadius: 16, background: '#fee2e2', color: '#dc2626', border: 'none', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <Plus size={20} /> Gasto
-              </button>
-              <button className="btn-primary" onClick={() => setIsHotelModalOpen(true)} style={{ padding: '14px 8px', fontSize: 13, borderRadius: 16, background: '#e0e7ff', color: '#4f46e5', border: 'none', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <Building size={20} /> Habitación
-              </button>
-              <button className="btn-outline" onClick={() => {
-                fetchTodayTotals();
-                setIsCierreModalOpen(true);
-              }} style={{ padding: '14px 8px', fontSize: 13, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <Lock size={20} /> Cierre
-              </button>
-
-
-            </div>
-         </div>
-
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16 }}>Administración</div>
-        <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
-          <div className="admin-stat-card" style={{ padding: '16px', background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0' }}>
-            <div className="admin-stat-label" style={{ fontSize: 12, color: '#64748b' }}>Tipo de Cambio</div>
-            <div className="admin-stat-value" style={{ fontSize: 20, fontWeight: 800, color: '#6366f1' }}>${(exchangeRate || 17.5).toFixed(2)}</div>
-            <div className="admin-stat-sub" style={{ fontSize: 10, color: '#94a3b8' }}>BBVA Real-time</div>
-          </div>
-          {[
-            { label: 'Gestión de Menú', view: 'menu', icon: <FileEdit size={20} />, bg: '#e0e7ff', color: '#4f46e5' },
-            { label: 'Gestión de Mesas', view: 'tables', icon: <LayoutGrid size={20} />, bg: '#fef9c3', color: '#ca8a04' },
-            { label: 'Estadísticas', view: 'stats', icon: <TrendingUp size={20} />, bg: '#dcfce7', color: '#16a34a' },
-            { label: 'Usuarios Autorizados', view: 'users', icon: <Users size={20} />, bg: '#fce7f3', color: '#db2777' },
-          ]
-          .filter(item => {
-            if (currentUser?.role === 'Encargado') {
-              return item.view === 'menu' || item.view === 'tables';
-            }
-            return true;
-          })
-          .map(({ label, view, icon, bg, color }) => (
-            <div key={view} className="admin-menu-item" onClick={() => setAdminSubView(view as any)}>
-              <div className="admin-menu-icon" style={{ backgroundColor: bg, color }}>{icon}</div>
-              <div className="admin-menu-text">{label}</div>
-              <ChevronRight size={20} color="#94a3b8" />
-            </div>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ClipboardCheck size={20} color="#6366f1" />
-          Cuentas del Turno
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
-          {todayClosedOrders.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', background: '#fff', borderRadius: 16, border: '1px solid var(--border-strong)' }}>
-              Aún no hay cuentas pagadas en este turno.
-            </div>
-          ) : todayClosedOrders.map(order => (
-            <div key={order.id} style={{ backgroundColor: '#fff', padding: '14px 16px', borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>Mesa {tables.find(t => t.id === order.table_id)?.name || order.table_id}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                   <div style={{ fontWeight: 800, fontSize: 16, color: '#059669' }}>${((order.total || 0) + (order.tip_amount || 0)).toFixed(0)}</div>
-                   {order.tip_amount > 0 && (
-                     <div style={{ fontSize: 10, color: '#64748b' }}>Cuenta: ${order.total?.toFixed(0)} + Propina: ${order.tip_amount?.toFixed(0)}</div>
-                   )}
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
-                {order.items_summary || 'Sin detalle'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, borderTop: '1px solid #f1f5f9', paddingTop: 6 }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <CalendarDays size={12} />
-                  {new Date(order.closed_at || '').toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div style={{ 
-                  fontSize: 10, padding: '2px 8px', borderRadius: 8, 
-                  background: order.payment_method === 'efectivo' ? '#ecfdf5' : '#eff6ff', 
-                  color: order.payment_method === 'efectivo' ? '#059669' : '#2563eb', 
-                  fontWeight: 700, textTransform: 'capitalize' 
-                }}>
-                  {order.payment_method || 'Sin método'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-         <div className="checkout-actions">
-            <button 
-              className="confirm-pay-btn" 
-              disabled={(discountType !== 'none' && !discountReason.trim())}
-              onClick={() => {
-                confirmPayment(selectedTableId, paymentMethod, afterDiscount, tip, discountReason);
-                setCurrentView('salon');
-                setSelectedTableId(null);
-                // Reset checkout states
-                setDiscountType('none'); setDiscountValue(''); setDiscountReason('');
-                setTipPercent('none'); setCustomTip(''); setCashReceived('');
-              }}
-            >
-              Confirmar y Cerrar Mesa
-            </button>
-         </div>
-      </div>
-    );
-  };
-
-  const renderImpresora = () => {
-    return (
-      <div className="fade-in">
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Cuentas del día</div>
-        <div className="orders-grid">
-          {pendingTickets.length === 0 ? (
-             <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', gridColumn: '1 / -1' }}>No hay tickets pendientes</div>
-          ) : pendingTickets.map((ticket: any) => (
-             <div key={ticket.id} style={{ background: 'white', borderRadius: 16, padding: '16px', border: '1px solid var(--border-strong)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                   <div style={{ fontWeight: 800 }}>Mesa {tables.find(t => t.id === ticket.table_id)?.name || ticket.table_id}</div>
-                   <div style={{ color: '#059669', fontWeight: 800, fontSize: 18 }}>${ticket.total}</div>
-                </div>
-                <div style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', flex: 1, marginBottom: 12 }}>{ticket.items_summary}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>
-                   <span>{new Date(ticket.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
-                   <span>Pedido por: {ticket.printed_by}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    className="btn-secondary" 
-                    onClick={() => setPreviewTicket(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', fontWeight: 500 }}
-                  >
-                     <Eye size={16} /> Ver cuenta
-                  </button>
-                  <button 
-                    className="btn-primary" 
-                    onClick={() => dispatchPrintOnly(ticket)}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
-                  >
-                     <Printer size={16} /> Imprimir
-                  </button>
-                  <button 
-                    className="btn-primary" 
-                    onClick={() => {
-                      if(window.confirm('¿Eliminar este registro de cuenta?')) {
-                        deleteTicket(ticket.id);
-                      }
-                    }}
-                    style={{ flex: 1, padding: '8px 4px', fontSize: 13, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '9999px', fontWeight: 500, border: 'none' }}
-                  >
-                     <Trash2 size={16} /> Eliminar
-                  </button>
-                </div>
-             </div>
-          ))}
-        </div>
-
-        {/* Modal de Vista Previa Visual */}
-        {previewTicket && (
-          <div className="modal-overlay" onClick={() => setPreviewTicket(null)} style={{zIndex: 9999}}>
-            <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '300px', background: '#fff', borderRadius: 8}}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>GALLO AZUL</h2>
-                <div style={{ fontSize: 12 }}>Restaurante</div>
-              </div>
-              <div style={{ margin: '16px 0', borderTop: '1px dashed #ccc', borderBottom: '1px dashed #ccc', padding: '8px 0', fontSize: 13, lineHeight: 1.4 }}>
-                <div><strong>Mesa:</strong> {tables.find(t => t.id === previewTicket.table_id)?.name || previewTicket.table_id}</div>
-                <div><strong>Atendió:</strong> {previewTicket.printed_by}</div>
-                <div><strong>Fecha:</strong> {new Date(previewTicket.created_at).toLocaleString('es-MX')}</div>
-              </div>
-              <div style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Detalle:</div>
-                <div style={{ whiteSpace: 'pre-line' }}>{previewTicket.items_summary.split(', ').join('\n')}</div>
-              </div>
-              <div style={{ textAlign: 'right', fontSize: 16, borderTop: '2px solid #000', paddingTop: 8, fontWeight: 'bold' }}>
-                TOTAL: ${previewTicket.total}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12 }}>
-                ¡Gracias por su visita!
-              </div>
-              <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
-                <button className="btn-secondary" style={{flex: 1}} onClick={() => setPreviewTicket(null)}>Cerrar</button>
-                <button className="btn-primary" style={{flex: 1, gap: 4, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => { dispatchPrintOnly(previewTicket); setPreviewTicket(null); }}>
-                  <Printer size={16}/> Imprimir
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
     );
   };
 
-  const renderAdminMenu = () => {
-    const uniqueCategories = Array.from(new Set(menuItems.map(m => m.category))).sort();
-    const byCategory = uniqueCategories.map(cat => ({
-      cat,
-      items: menuItems.filter(m => m.category === cat),
-      catId: menuItems.find(m => m.category === cat)?.categoryId,
-    })).filter(g => g.items.length > 0);
 
-    return (
-      <div className="fade-in" style={{ paddingBottom: 40 }}>
-        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
-          <button 
-            onClick={handleAddItemModalOpen} 
-            className="btn-primary" 
-            style={{ width: 'auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 12 }}
-          >
-            <Plus size={18} />
-            Agregar Producto
-          </button>
-        </div>
-        {byCategory.map(({ cat, items, catId }) => (
-          <div key={cat} style={{ marginBottom: 28 }}>
-            {/* Category header with edit */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, margin: 0 }}>{cat}</h3>
-              {catId && (
-                <button onClick={() => openEditCategory(catId, cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
-                  <Pencil size={13} />
-                </button>
-              )}
-            </div>
-
-            <div style={{ backgroundColor: '#fff', borderRadius: 16, border: '1px solid var(--border-strong)', overflow: 'hidden' }}>
-              {items.map((item, idx) => {
-                const isExpanded = expandedItems.has(item.id);
-                return (
-                  <div key={item.id} style={{ borderBottom: idx < items.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                    {/* Item row */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 8 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: item.active ? '#0f172a' : '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {item.name}
-                          {!item.active && <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>INACTIVO</span>}
-                        </div>
-                        {!item.hasVariants && (
-                          <div style={{ fontSize: 12, color: '#64748b' }}>${item.price}</div>
-                        )}
-                        {item.hasVariants && (
-                          <div style={{ fontSize: 12, color: '#64748b' }}>
-                            {item.variants?.map(v => `${v.label}: $${v.price}`).join(' / ')}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Edit item (non-variant only) */}
-                      {!item.hasVariants && (
-                        <button onClick={() => openEditItem(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                          <Pencil size={15} />
-                        </button>
-                      )}
-
-                      {/* Expand for variant items */}
-                      {item.hasVariants && (
-                        <button onClick={() => toggleExpanded(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      )}
-
-                      {/* Toggle for non-variant items */}
-                      {!item.hasVariants && (
-                        <label className="toggle-switch" style={{ transform: 'scale(0.8)', flexShrink: 0 }}>
-                          <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                          <span className="toggle-slider" />
-                        </label>
-                      )}
-
-                      {/* Toggle all for variant items */}
-                      {item.hasVariants && (
-                        <label className="toggle-switch" style={{ transform: 'scale(0.8)', flexShrink: 0 }}>
-                          <input type="checkbox" checked={item.active} onChange={() => toggleMenuItem(item.id, !item.active)} />
-                          <span className="toggle-slider" />
-                        </label>
-                      )}
-                    </div>
-
-                    {/* Variant rows (expanded) */}
-                    {item.hasVariants && isExpanded && (
-                      <div style={{ background: '#fafafa', borderTop: '1px solid #f1f5f9', padding: '8px 16px 12px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Variantes</div>
-                        {item.variants?.map(v => (
-                          <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: v.active ? '#0f172a' : '#94a3b8' }}>{v.label}</div>
-                              <div style={{ fontSize: 12, color: '#64748b' }}>${v.price}</div>
-                            </div>
-                            <button onClick={() => openEditVariant(v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}>
-                              <Pencil size={14} />
-                            </button>
-                            <label className="toggle-switch" style={{ transform: 'scale(0.75)', flexShrink: 0 }}>
-                              <input type="checkbox" checked={v.active} onChange={() => toggleMenuVariant(v.id, !v.active)} />
-                              <span className="toggle-slider" />
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-
-  const renderAdminStats = () => (
-    <div className="fade-in admin-stats-view">
-      <div className="stats-header-tabs">
-        <button className={`stats-tab ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
-        <button className={`stats-tab ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Análisis</button>
-      </div>
-
-      {statsSubView === 'history' ? (
-        <>
-          <div className="stats-header">
-            <h3>Historial de Cierres</h3>
-            <span className="stats-count">{dailySummaries.length} reportes registrados</span>
-          </div>
-          
-          <div className="reports-list">
-            {dailySummaries.map(report => (
-              <HistoryReportCard 
-                key={report.id} 
-                report={report} 
-                formatCurrency={formatCurrency} 
-                onDelete={(id: string) => setDeleteReportId(id)} 
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderCheckin = () => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    const enCasa = upcomingCheckins.filter(res => {
-      const arr = new Date(res.arrivalDate + 'T12:00:00');
-      const dep = new Date(res.departureDate + 'T12:00:00');
-      return today >= arr && today <= dep && res.status !== 'cancelled' && res.status !== 'declined';
-    });
-
-    const proximas = upcomingCheckins.filter(res => {
-      const arr = new Date(res.arrivalDate + 'T12:00:00');
-      return arr > today && res.status !== 'cancelled' && res.status !== 'declined';
-    });
-
-    return (
-      <div className="checkin-view fade-in">
-        <div className="view-header">
-          <h2 className="view-title-premium">Hotel / Check-in</h2>
-          <p className="view-subtitle-premium">Gestión de huéspedes y registros online</p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-          <button className="action-btn-premium" onClick={() => setCurrentView('registros')}>
-            <ClipboardList size={20} />
-            Ver registros
-          </button>
-          <button className="action-btn-premium highlight" onClick={() => setShowNewResModal(true)}>
-            <PlusCircle size={20} />
-            Crear nueva reserva
-          </button>
-        </div>
-
-        {checkinsError && (
-          <div className="error-notice">
-            <AlertCircle size={20} />
-            <span>{checkinsError}</span>
-          </div>
-        )}
-
-          {(() => {
-            const now = new Date();
-            const filtered = dailySummaries.filter(s => {
-              const d = new Date(s.created_at);
-              if (analyticsFilter === 'day') return d.toDateString() === now.toDateString();
-              if (analyticsFilter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-              return true;
-            });
-
-            const totalInc = filtered.reduce((sum, s) => sum + s.income, 0);
-            const totalExp = filtered.reduce((sum, s) => sum + s.expenses, 0);
-            const totalAcc = filtered.reduce((sum, s) => sum + s.accounts_count, 0);
-            const totalTips = filtered.reduce((sum, s) => sum + (s.transfer_tips || 0), 0);
-
-            return (
-              <div className="analytics-content">
-                <div className="analytics-summary">
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalInc.toFixed(0)}</div>
-                    <div className="as-m-lab">Ingresos</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalExp.toFixed(0)}</div>
-                    <div className="as-m-lab">Gastos</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">{totalAcc}</div>
-                    <div className="as-m-lab">Cuentas</div>
-                  </div>
-                  <div className="as-metric">
-                    <div className="as-m-val">${totalTips.toFixed(0)}</div>
-                    <div className="as-m-lab">Propinas Tr.</div>
-                  </div>
-                </div>
-
-                <div className="analytics-ranking-box">
-                  <h4><Zap size={16} /> Ranking de Comandas (Top 10)</h4>
-                  <div className="ranking-list">
-                    {ranking.length === 0 ? (
-                      <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
-                        No hay datos suficientes para generar el ranking.
-                      </p>
-                    ) : (
-                      ranking.map((item, idx) => (
-                        <div key={idx} className="ranking-item">
-                          <div className="ri-idx">#{idx + 1}</div>
-                          <div className="ri-content">
-                            <div className="ri-top">
-                              <span className="ri-name">{item.name}</span>
-                              <span className="ri-count">{item.count} vendidos</span>
-                            </div>
-                            <div className="ri-progress-bg">
-                              <div className="ri-progress-fill" style={{ width: `${(item.count / ranking[0].count) * 100}%` }} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="res-room">
-                        <span className="room-label">HABITACIÓN</span>
-                        <span className="room-val">{res.roomName}</span>
-                      </div>
-                    </div>
-                    <div className="res-dates">
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
-                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
-                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {res.arrivalDate === todayStr && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <button 
-                            onClick={() => handleNoShow(res)}
-                            style={{ 
-                              background: '#fff1f2',
-                              color: '#e11d48',
-                              border: '1.5px solid #fecdd3',
-                              padding: '10px',
-                              borderRadius: 12,
-                              fontWeight: 700,
-                              fontSize: 13,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <UserMinus size={16} />
-                            No-show
-                          </button>
-                          <button 
-                            onClick={() => handleCancelRes(res)}
-                            style={{ 
-                              background: 'white',
-                              color: '#64748b',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '10px',
-                              borderRadius: 12,
-                              fontWeight: 700,
-                              fontSize: 13,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 size={16} />
-                            Eliminar
-                          </button>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setSelectedReservation(res);
-                            const cleanResPhone = (res.guestPhone || "").replace(/\D/g, "");
-                            const phonePrefix = COUNTRY_CODES.find(c => {
-                              const cleanCode = c.code.replace(/\D/g, "");
-                              return cleanResPhone.length > 0 && cleanResPhone.startsWith(cleanCode);
-                            });
-                            const initialCountry = findCountryWithFlag(res.guestCountry || phonePrefix?.name || "");
-                            
-                            setCheckinForm({
-                              name: res.guestName || '',
-                              nationality: initialCountry,
-                              homeAddress: res.guestAddress || '',
-                              phone: res.guestPhone || (phonePrefix ? `${phonePrefix.code} ` : ''),
-                              city: res.guestCity || '',
-                              country: initialCountry,
-                              email: res.guestEmail || '',
-                              roomName: res.roomName || '',
-                              arrivalDate: res.arrivalDate || '',
-                              departureDate: res.departureDate || '',
-                              nights: res.nights || 0,
-                              pax: (res.adults || 0) + (res.children || 0) || 1,
-                              price: res.totalAmount || 0,
-                              currency: res.currency || 'USD',
-                              paymentStatus: res.paymentStatus || 'Por Pagar',
-                              source: res.sourceName || '',
-                              signature: ''
-                            });
-                            setShowCheckinModal(true);
-                          }}
-                          className="btn-premium"
-                          style={{ 
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white', 
-                            border: 'none', 
-                            borderRadius: 12, 
-                            padding: '12px', 
-                            fontWeight: 700, 
-                            fontSize: 14, 
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                            width: '100%',
-                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
-                          }}
-                        >
-                          <UserPlus size={18} />
-                          Registrar ingreso
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-  const renderAdminTables = () => (
-    <div className="fade-in" style={{ paddingBottom: 40 }}>
-      <button className="btn-primary" onClick={handleAdminAddTable} style={{ marginBottom: 24 }}>
-        <PlusCircle size={18} /> Agregar Mesa
-      </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {tables.map(table => (
-          <div key={table.id} style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16, border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 18 }}>🪑</span>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>Mesa {table.name || table.id}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>{table.status === 'free' ? 'Libre' : table.status === 'occupied' ? 'Ocupada' : 'Pagando'}</div>
-              </div>
-            </div>
-            <Trash2 size={18} color="var(--danger)" style={{ cursor: 'pointer' }} onClick={() => handleAdminDeleteTable(table.id)} />
-          </div>
-          
-          {isProximosExpanded && (
-            <div className="res-list-p">
-              {proximas.length === 0 ? (
-                <p className="empty-msg">No hay reservas próximas registradas.</p>
-              ) : (
-                proximas.map(res => (
-                  <div key={res.id} className="res-card-p secondary">
-                    <div className="res-main">
-                      <div className="res-guest">
-                        <div className="res-avatar">{res.guestName?.[0]}</div>
-                        <div className="res-name-wrap">
-                          <span className="res-name">{res.guestName}</span>
-                          <span className="res-phone">{res.guestPhone || 'Sin teléfono'}</span>
-                        </div>
-                      </div>
-                      <div className="res-room">
-                        <span className="room-label">HABITACIÓN</span>
-                        <span className="room-val">{res.roomName}</span>
-                      </div>
-                    </div>
-                    <div className="res-dates">
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Llegada</div>
-                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                          {new Date(res.arrivalDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Salida</div>
-                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                          {new Date(res.departureDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderRegistros = () => {
-    return (
-      <div className="registros-view fade-in">
-        <div className="view-header" style={{ marginBottom: 24 }}>
-          <button className="back-btn-pill" onClick={() => setCurrentView('checkin')} style={{ marginBottom: 12 }}>
-            <ChevronLeft size={20} />
-            <span>Volver</span>
-          </button>
-          <h2 className="view-title-premium">Historial de Registros</h2>
-          <p className="view-subtitle-premium">Base de datos de huéspedes que han completado el check-in online</p>
-        </div>
-
-        {registrations.length === 0 ? (
-          <div className="empty-state-p">
-            <ClipboardList size={48} color="#94a3b8" />
-            <h3>No hay registros</h3>
-            <p>Los datos de huéspedes registrados aparecerán aquí</p>
-          </div>
-        ) : (
-          <div className="registros-list-p">
-            {registrations.map(reg => (
-              <div key={reg.id} className="reg-card-p">
-                <div className="reg-header-p">
-                   <div className="reg-guest-p">
-                     <div className="reg-avatar-p">{reg.name?.[0]}</div>
-                     <div className="reg-info-p">
-                       <span className="reg-name-p">{reg.name}</span>
-                       <span className="reg-meta-p">{reg.email} • {reg.phone}</span>
-                     </div>
-                   </div>
-                   <div className="reg-date-badge-p">
-                     {new Date(reg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                   </div>
-                </div>
-                <div className="reg-body-p">
-                   <div className="reg-detail-grid-p">
-                      <div className="reg-d-item">
-                        <span className="reg-d-label">NACIONALIDAD</span>
-                        <span className="reg-d-val">{reg.nationality}</span>
-                      </div>
-                      <div className="reg-d-item">
-                        <span className="reg-d-label">HABITACIÓN</span>
-                        <span className="reg-d-val">{reg.room_name}</span>
-                      </div>
-                      <div className="reg-d-item">
-                        <span className="reg-d-label">CIUDAD</span>
-                        <span className="reg-d-val">{reg.city}</span>
-                      </div>
-                      <div className="reg-d-item">
-                        <span className="reg-d-label">ESTANCIA</span>
-                        <span className="reg-d-val">{new Date(reg.arrival_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric'})} - {new Date(reg.departure_date + 'T12:00:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'})}</span>
-                      </div>
-                   </div>
-                </div>
-                {reg.signature && (
-                  <div className="reg-sig-p">
-                    <span className="reg-d-label">FIRMA</span>
-                    <img src={reg.signature} alt="Firma del huésped" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderAdmin = () => {
-    return (
-      <div className="admin-view fade-in">
-        <div className="view-header">
-           <h2 className="view-title-premium">Panel de Control</h2>
-           <p className="view-subtitle-premium">Configuración de sistema y analíticas</p>
-        </div>
-
-        <div className="admin-nav-grid">
-           <button className={`admin-nav-btn ${adminSubView === 'stats' ? 'active' : ''}`} onClick={() => setAdminSubView('stats')}>
-             <TrendingUp size={24} />
-             <span>Finanzas</span>
-           </button>
-           <button className={`admin-nav-btn ${adminSubView === 'menu' ? 'active' : ''}`} onClick={() => setAdminSubView('menu')}>
-             <Pencil size={24} />
-             <span>Menú</span>
-           </button>
-           <button className={`admin-nav-btn ${adminSubView === 'users' ? 'active' : ''}`} onClick={() => setAdminSubView('users')}>
-             <Users size={24} />
-             <span>Personal</span>
-           </button>
-           <button className={`admin-nav-btn ${adminSubView === 'tables' ? 'active' : ''}`} onClick={() => setAdminSubView('tables')}>
-             <LayoutGrid size={24} />
-             <span>Mesas</span>
-           </button>
-        </div>
-
-        <div className="admin-content-box">
-          {adminSubView === 'menu' && (
-            <div className="admin-menu-section fade-in">
-              <div className="section-title-row">
-                <h3>Gestión de Menú</h3>
-                <button className="btn-small" onClick={handleAddItemModalOpen}>
-                  <Plus size={14} /> Nuevo Producto
-                </button>
-              </div>
-
-              <div className="admin-menu-list">
-                {CATEGORIES.map(cat => {
-                  const items = menuItems.filter(m => m.category === cat);
-                  const isExpanded = expandedItems.has(cat);
-                  
-                  return (
-                    <div key={cat} className="admin-cat-block">
-                      <div className="admin-cat-header" onClick={() => toggleExpanded(cat)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                          <span className="cat-name">{cat}</span>
-                          <span className="cat-count">{items.length} items</span>
-                        </div>
-                        <button className="cat-edit-btn" onClick={(e) => { e.stopPropagation(); openEditCategory(items[0]?.categoryId || '', cat); }}>
-                           <Pencil size={14} />
-                        </button>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="admin-items-grid fade-in">
-                          {items.map(item => (
-                            <div key={item.id} className={`admin-item-row ${!item.active ? 'inactive' : ''}`}>
-                              <div className="ai-info">
-                                <span className="ai-name">{item.name}</span>
-                                <span className="ai-price">{formatCurrency(item.price)}</span>
-                              </div>
-                              <div className="ai-actions">
-                                <button className="ai-btn edit" onClick={() => openEditItem(item)}><Pencil size={14} /></button>
-                                <button className={`ai-btn toggle ${item.active ? 'on' : 'off'}`} onClick={() => toggleMenuItem(item.id, !item.active)}>
-                                  {item.active ? 'Visible' : 'Oculto'}
-                                </button>
-                              </div>
-                              {item.hasVariants && item.variants && (
-                                <div className="ai-variants-list">
-                                  {item.variants.map(v => (
-                                    <div key={v.id} className="ai-variant-row">
-                                      <span className="av-label">{v.label}</span>
-                                      <span className="av-price">{formatCurrency(v.price)}</span>
-                                      <div className="av-actions">
-                                        <button className="av-btn edit" onClick={() => openEditVariant(v)}><Pencil size={12} /></button>
-                                        <button className={`av-btn toggle ${v.active ? 'on' : 'off'}`} onClick={() => toggleMenuVariant(v.id, !v.active)}>
-                                          {v.active ? <Check size={12} /> : <X size={12} />}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {adminSubView === 'stats' && (
-            <div className="admin-stats-section fade-in">
-              <div className="stats-nav-p">
-                <button className={`stats-nav-btn-p ${statsSubView === 'history' ? 'active' : ''}`} onClick={() => setStatsSubView('history')}>Historial</button>
-                <button className={`stats-nav-btn-p ${statsSubView === 'analytics' ? 'active' : ''}`} onClick={() => setStatsSubView('analytics')}>Analíticas</button>
-              </div>
-
-              {statsSubView === 'history' ? (
-                <div className="history-list-p">
-                  {dailySummaries.length === 0 ? (
-                    <div className="empty-state-p">No hay cierres registrados aún</div>
-                  ) : (
-                    dailySummaries.map(s => (
-                      <HistoryReportCard 
-                        key={s.id} 
-                        report={s} 
-                        formatCurrency={formatCurrency} 
-                        onDelete={(id: string) => setDeleteReportId(id)}
-                      />
-                    ))
-                  )}
-                </div>
-              ) : (
-                <div className="analytics-content-p">
-                   <div className="analytics-filter-p">
-                      {['day', 'month', 'total'].map(f => (
-                        <button key={f} className={`filter-btn-p ${analyticsFilter === f ? 'active' : ''}`} onClick={() => setAnalyticsFilter(f as any)}>
-                          {f === 'day' ? 'Hoy' : (f === 'month' ? 'Mes' : 'Histórico')}
-                        </button>
-                      ))}
-                   </div>
-
-                   <div className="ranking-card-p">
-                     <h4>Top 10 Productos</h4>
-                     <div className="ranking-list-p">
-                        {ranking.map((item, i) => (
-                          <div key={item.name} className="ranking-row-p">
-                            <span className="rank-num">#{i+1}</span>
-                            <span className="rank-name">{item.name}</span>
-                            <span className="rank-qty">{item.count} vendidos</span>
-                          </div>
-                        ))}
-                     </div>
-                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {adminSubView === 'users' && (
-            <div className="admin-users-section fade-in">
-              <div className="section-title-row">
-                <h3>Personal</h3>
-                <button className="btn-small" onClick={() => setIsAddUserModalOpen(true)}>
-                  <Plus size={14} /> Nuevo Usuario
-                </button>
-              </div>
-              <div className="users-list-p">
-                {users.map(user => (
-                  <div key={user.id} className="user-card-p">
-                    <div className="user-avatar-p">{user.name[0].toUpperCase()}</div>
-                    <div className="user-info-p">
-                      <span className="user-name-p">{user.name}</span>
-                      <span className="user-role-p">{user.role}</span>
-                    </div>
-                    <div className="user-actions-p">
-                      <div className={`user-session-p ${user.session_active ? 'active' : ''}`}>
-                         {user.session_active ? 'Online' : 'Offline'}
-                      </div>
-                      <button className="user-edit-btn-p" onClick={() => {
-                        setEditingUserId(user.id);
-                        setEditUserName(user.name);
-                        setEditUserRole(user.role);
-                        setIsEditUserModalOpen(true);
-                      }}>
-                        <Pencil size={14} />
-                      </button>
-                      <button className="user-del-btn-p" onClick={() => deleteUser(user.id)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {adminSubView === 'tables' && (
-            <div className="admin-tables-section fade-in">
-              <div className="section-title-row">
-                <h3>Mesas</h3>
-              </div>
-              <div className="tables-admin-grid">
-                {tables.filter(t => t.category !== 'Pedidos para llevar').map(table => (
-                   <div key={table.id} className="table-admin-card">
-                     <span className="tac-number">{table.id}</span>
-                     <span className="tac-cat">{table.category}</span>
-                     <button className="tac-del-btn" onClick={() => deleteTable(table.id)}>Eliminar</button>
-                   </div>
-                ))}
-                <button className="table-admin-add" onClick={() => {
-                  const id = prompt('Número de la nueva mesa:');
-                  if (id && !isNaN(parseInt(id))) addTable(parseInt(id));
-                }}>
-                  <Plus size={24} />
-                  <span>Añadir Mesa</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderHeader = () => {
-    if (!currentUser) return null;
-    
-    return (
-      <div className="header">
-        {isSubView ? (
-          <button className="icon-button" onClick={() => {
-            if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
-            else if (currentView === 'checkout') setCurrentView('mesa');
-            else setCurrentView('salon');
-          }}>
-            <ChevronLeft size={24} />
-          </button>
-        ) : (
-          <div className="header-title-container">
-            <span className="header-title">
-              {currentView === 'home' && 'Inicio'}
-              {currentView === 'salon' && 'Salón'}
-              {currentView === 'pedidos' && 'Comandas'}
-              {currentView === 'impresora' && 'Cuentas'}
-              {currentView === 'admin' && 'Admin'}
-            </span>
-          </div>
-        )}
-        {currentView === 'mesa' && (
-          <div className="header-title-container" style={{ alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -4 }}>Atendiendo</span>
-            <span className="header-title" style={{ fontSize: 26, fontWeight: 800 }}>
-              Mesa {tables.find(t => t.id === selectedTableId)?.name || selectedTableId}
-            </span>
-          </div>
-        )}
-        {currentView === 'checkout' && (
-          <div className="header-title-container" style={{ alignItems: 'center' }}>
-            <span className="header-title" style={{ fontSize: 22, fontWeight: 600 }}>Cobrar</span>
-          </div>
-        )}
-        {currentView === 'admin' && adminSubView !== 'main' && (
-          <div className="header-title-container" style={{ alignItems: 'center' }}>
-            <span className="header-title" style={{ fontSize: 20, fontWeight: 600 }}>{subTitles[adminSubView] || ''}</span>
-          </div>
-        )}
-        {currentView === 'mesa' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 800 }}>
-            <Users size={15} color="#64748b" /> {tables.find(t => t.id === selectedTableId)?.capacity ?? 4}
-          </div>
-        ) : isSubView ? (
-          <div style={{ width: 44 }} />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {showIosButton && (
-              <button 
-                className="btn-premium" 
-                style={{ width: 'auto', padding: '10px 16px', background: '#3b82f6', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: 'none' }}
-                onClick={() => setIsIosPromptVisible(true)}
-              >
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                Instalar
-              </button>
-            )}
-            <div className="header-user-chip">
-              <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
-              <button
-                className="header-logout-btn"
-                title="Cerrar sesión"
-                onClick={async () => {
-                  if (currentUser?.id) {
-                    await supabase.from('users').update({ session_active: false }).eq('id', currentUser.id);
-                  }
-                  localStorage.removeItem('mora_session');
-                  setCurrentUser(null);
-                  setLoginName('');
-                  setLoginPassword('');
-                  setCurrentView('home');
-                }}
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const handleNoShow = async (res: Reservation) => {
     if (!window.confirm(`¿Marcar la reserva de ${res.guestName} como No-show?`)) return;
@@ -3916,43 +2915,22 @@ export default function App() {
             <div key={view} className={`nav-item ${currentView === view ? 'active' : ''}`} onClick={() => navTo(view as any)}>
               {icon}{label}
             </div>
+          ))}
+        </div>
+      )}
+
+      {confirmPending && (
+        <div className="confirm-overlay" onClick={() => setConfirmPending(null)}>
+          <div className="confirm-sheet fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="confirm-header">
+              <div className="confirm-item-icon">🍽️</div>
+              <div className="confirm-item-info">
+                <h3>{confirmPending.item.name}</h3>
+                {confirmPending.variant && <span className="confirm-variant-badge">{confirmPending.variant.label}</span>}
+              </div>
+              <button className="confirm-close-btn" onClick={() => setConfirmPending(null)}><X size={20} /></button>
+            </div>
             
-            {activeItems.filter(i => i.status === 'pending').length === 0 ? (
-              <div className="empty-pedidos">
-                <h2>¡Cocina al día!</h2>
-                <p>No hay pedidos pendientes en este momento.</p>
-              </div>
-            ) : (
-              <div className="pedidos-list">
-                {activeItems
-                  .filter(i => i.status === 'pending')
-                  .sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                  .map(item => (
-                    <div key={item.id} className="qa-card">
-                      <div className="qa-header">
-                        <span className="qa-table-badge">MESA {item.table_id}</span>
-                        <span className="qa-qty-label">{item.qty} UNIDADES</span>
-                      </div>
-                      <div className="qa-body">
-                         <div className="qa-info">
-                            <div className="qa-name">{item.name}</div>
-                            {item.variant_label && <div className="qa-variant">{item.variant_label}</div>}
-                            {item.notes && (
-                              <div className="qa-notes-box">
-                                <StickyNote size={14} />
-                                <span>{item.notes}</span>
-                              </div>
-                            )}
-                         </div>
-                         <button className="qa-done-btn" onClick={() => markItemDone(item.id)}>
-                            <Check size={28} />
-                         </button>
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-            )}
             <div className="confirm-price">
               {confirmPending.variant ? confirmPending.variant.price : confirmPending.item.price}
             </div>
@@ -4903,27 +3881,6 @@ export default function App() {
              <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
                 Fecha: {new Date(ticketToPrint.created_at).toLocaleDateString('es-MX', { timeZone: 'America/Mazatlan', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
              </div>
-             <form onSubmit={handleLogin}>
-               <div className="login-field">
-                 <User size={18} />
-                 <input 
-                   type="text" 
-                   placeholder="Nombre de usuario" 
-                   value={loginName} 
-                   onChange={(e) => setLoginName(e.target.value)} 
-                   required
-                 />
-               </div>
-               <div className="login-field">
-                 <Lock size={18} />
-                 <input 
-                   type={showPassword ? "text" : "password"} 
-                   placeholder="Contraseña" 
-                   value={loginPassword} 
-                   onChange={(e) => setLoginPassword(e.target.value)} 
-                   required
-                 />
-                 <button type="button" className="pw-toggle" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                  </button>
                </div>

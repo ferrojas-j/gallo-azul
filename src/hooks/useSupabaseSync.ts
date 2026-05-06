@@ -819,8 +819,6 @@ export function useSupabaseSync() {
 
     pendingTickets,
     isLoading,
-    exchangeRate,
-    pendingTickets,
     registrations,
 
     // Actions
@@ -853,7 +851,6 @@ export function useSupabaseSync() {
     logPrintedTicket,
     markTicketPrinted,
     deleteTicket,
-    registrations,
     fetchRegistrations,
   };
 }
