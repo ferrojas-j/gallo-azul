@@ -312,6 +312,9 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
+  const [isIosPromptVisible, setIsIosPromptVisible] = useState(false);
+  const showIosButton = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).standalone;
+
 
   const [upcomingCheckins, setUpcomingCheckins] = useState<Reservation[]>([]);
   const [isLoadingCheckins, setIsLoadingCheckins] = useState(false);
