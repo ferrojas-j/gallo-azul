@@ -934,6 +934,8 @@ export default function App() {
   type EditTarget = { type: 'item'; id: string; name: string; price: number } | { type: 'variant'; id: string; label: string; price: number } | { type: 'category'; id: string; name: string };
   const [isClosingTurn, setIsClosingTurn] = useState(false);
   const [isCierreModalOpen, setIsCierreModalOpen] = useState(false);
+  const [overrideCashTips, setOverrideCashTips] = useState<string>('');
+  const [isEditingCashTips, setIsEditingCashTips] = useState<boolean>(false);
   const [previewTicket, setPreviewTicket] = useState<any>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editName, setEditName] = useState('');
@@ -3872,7 +3874,8 @@ export default function App() {
             <div className="cierre-body">
               {(() => {
                 const ventasRestauranteBase = todayIncome;
-                const propinasTotales = todayTotalTips;
+                const propinasEfectivoAMostrar = overrideCashTips !== '' ? Number(overrideCashTips) : 0;
+                const propinasTotales = todayTotalTips - todayCashTips + propinasEfectivoAMostrar;
                 const ventasHotel = hotelCardSales + hotelCashSales;
                 const ventasTotales = ventasRestauranteBase + ventasHotel;
                 
@@ -3953,9 +3956,31 @@ export default function App() {
                     <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Propinas</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', alignItems: 'center' }}>
                           <span>Propinas en efectivo:</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(todayCashTips)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {isEditingCashTips ? (
+                              <input 
+                                type="number" 
+                                value={overrideCashTips} 
+                                onChange={e => setOverrideCashTips(e.target.value)} 
+                                style={{ width: '80px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', textAlign: 'right' }} 
+                                autoFocus
+                                onBlur={() => setIsEditingCashTips(false)}
+                                onKeyDown={e => { if (e.key === 'Enter') setIsEditingCashTips(false); }}
+                              />
+                            ) : (
+                              <>
+                                <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(propinasEfectivoAMostrar)}</span>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); setIsEditingCashTips(true); }}
+                                  style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Propinas en tarjetas:</span>
@@ -3963,7 +3988,7 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
                           <span>Total propinas:</span>
-                          <span style={{ color: '#16a34a' }}>{formatCurrency(todayTotalTips)}</span>
+                          <span style={{ color: '#16a34a' }}>{formatCurrency(propinasTotales)}</span>
                         </div>
                       </div>
                     </div>
@@ -3978,7 +4003,7 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1e40af' }}>
                           <span>Total propinas:</span>
-                          <span style={{ fontWeight: 600 }}>{formatCurrency(todayTotalTips)}</span>
+                          <span style={{ fontWeight: 600 }}>{formatCurrency(propinasTotales)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1e40af' }}>
                           <span>Gastos:</span>
@@ -4041,7 +4066,7 @@ export default function App() {
                     created_by: currentUser?.name || 'Sistema'
                   };
                   
-                  await closeDay(currentUser?.name || 'Administrador');
+                  await closeDay(currentUser?.name || 'Administrador', overrideCashTips !== '' ? Number(overrideCashTips) : todayCashTips);
                   setIsCierreModalOpen(false);
                   alert('✅ Cierre general completado con éxito. Los datos se han archivado y los resúmenes se han reseteado.');
                 } catch (err) {

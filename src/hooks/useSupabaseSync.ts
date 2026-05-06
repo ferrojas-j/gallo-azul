@@ -603,9 +603,12 @@ export function useSupabaseSync() {
     await fetchUsers();
   }, [fetchUsers]);
 
-  const closeDay = useCallback(async (adminName: string) => {
+  const closeDay = useCallback(async (adminName: string, overrideCashTips?: number) => {
     try {
       console.log('Starting shift closure process...');
+      const finalCashTips = overrideCashTips !== undefined ? overrideCashTips : todayCashTips;
+      const finalTotalTips = todayTotalTips - todayCashTips + finalCashTips;
+
       // 1. Calculate handover values exactly as shown in UI
       const totalEfectivoPesos = todayCashIncome + hotelCashSales;
       
@@ -627,7 +630,7 @@ export function useSupabaseSync() {
       const { error } = await dbShiftSummaries.insert({
         income: todayIncome,
         cash_income: todayCashIncome,
-        cash_tips: todayCashTips,
+        cash_tips: finalCashTips,
         debit_income: todayDebitIncome,
         debit_tips: todayDebitTips,
         credit_income: todayCreditIncome,
@@ -643,6 +646,8 @@ export function useSupabaseSync() {
         hotel_card_income: hotelCardSales,
         hotel_cash_income: hotelCashSales,
         closed_by: adminName,
+        total_income: todayIncome + hotelCardSales + hotelCashSales, // Base income without tips
+        total_tips: finalTotalTips,
         // Handover fields
         handover_cash: handoverCash,
         handover_dollars: handoverDollars,
