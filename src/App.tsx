@@ -368,7 +368,15 @@ export default function App() {
     }
   }, [checkinForm.phone, showCheckinModal]);
 
+  const navTo = (view: typeof currentView) => {
+    setCurrentView(view);
+    if (view !== 'mesa' && view !== 'checkout') {
+      setSelectedTableId(null);
+    }
+  };
+
   // === Routing History API Sync ===
+
   useEffect(() => {
     const handlePopState = () => {
       const hash = window.location.hash.replace('#', '');
