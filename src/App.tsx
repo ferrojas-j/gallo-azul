@@ -674,7 +674,7 @@ export default function App() {
       currency: currency,
       minimumFractionDigits: currency === 'USD' ? 2 : 0,
       maximumFractionDigits: 2
-    }).format(val);
+    }).format(val).replace('MX', '').replace('US', '').trim();
   };
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseConcept, setExpenseConcept] = useState('Pago a proveedores');
