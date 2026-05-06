@@ -3922,31 +3922,35 @@ export default function App() {
                       <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Corte</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Pesos (Fondo - gastos + efectivo del día):</span>
+                          <span>Pesos:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Dólares convertidos ({formatCurrency(dolaresEfectivoOriginal, 'USD')}):</span>
+                          <span>Dólares convertidos:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(dolaresEfectivoConvertido)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Tarjetas (incluye propina):</span>
+                          <span>Tarjetas:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(totalTarjeta + todayCardTips)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Transferencia (incluye propina):</span>
+                          <span>Transferencias:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(totalTransferencia + todayTransferTips)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Compras:</span>
                           <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatCurrency(todayExpenses)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
-                          <span>Venta total:</span>
-                          <span>{formatCurrency(ventasTotales)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                          <span>Fondo + Propinas en tarjetas:</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency((pettyCashInitial - todayExpenses) + propinasTC)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '13px' }}>
-                          <span>Fondo (Caja chica final):</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                          <span>Propinas en tarjetas:</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(propinasTC)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
+                          <span>Fondo:</span>
                           <span>{formatCurrency(pettyCashInitial - todayExpenses)}</span>
                         </div>
                       </div>
