@@ -1237,7 +1237,7 @@ export default function App() {
           </div>
           <div className="hero-time-card">
             <Clock size={16} />
-            <span>{formatTime(currentTime)}</span>
+            <span>{timeStr}</span>
           </div>
         </div>
       </div>
