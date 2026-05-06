@@ -343,6 +343,8 @@ export default function App() {
   const [isEnCasaExpanded, setIsEnCasaExpanded] = useState(true);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [registroSourceFilter, setRegistroSourceFilter] = useState('Todos');
+  const [registroDateFilter, setRegistroDateFilter] = useState('Todos');
 
   // Estados para Nueva Reserva
   const [showNewResModal, setShowNewResModal] = useState(false);
@@ -1948,13 +1950,48 @@ export default function App() {
   };
 
   const renderRegistros = () => {
+    const filteredRegistrations = registrations.filter(reg => {
+      // Filter by Source
+      if (registroSourceFilter !== 'Todos') {
+        const sourceLower = (reg.source || 'Directa').toLowerCase();
+        const filterLower = registroSourceFilter.toLowerCase();
+        if (filterLower === 'directa') {
+           if (sourceLower.includes('airbnb') || sourceLower.includes('expedia') || sourceLower.includes('booking')) return false;
+        } else {
+           if (!sourceLower.includes(filterLower)) return false;
+        }
+      }
+
+      // Filter by Date
+      if (registroDateFilter !== 'Todos') {
+        const today = new Date();
+        const regDate = new Date(reg.created_at);
+        today.setHours(0,0,0,0);
+        regDate.setHours(0,0,0,0);
+        
+        if (registroDateFilter === 'Hoy') {
+          if (regDate.getTime() !== today.getTime()) return false;
+        } else if (registroDateFilter === 'Esta semana') {
+          const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+          if (regDate < firstDay) return false;
+        } else if (registroDateFilter === 'Este mes') {
+          if (regDate.getMonth() !== new Date().getMonth() || regDate.getFullYear() !== new Date().getFullYear()) return false;
+        } else if (registroDateFilter === 'Este año') {
+          if (regDate.getFullYear() !== new Date().getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+
+    const uniqueSources = ['Todos', 'Airbnb', 'Expedia', 'Booking', 'Directa'];
+
     return (
       <div className="fade-in" style={{ padding: '24px 16px', paddingBottom: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <button onClick={() => setCurrentView('checkin')} style={{ background: '#f1f5f9', border: 'none', padding: 8, borderRadius: 10, cursor: 'pointer', color: '#64748b' }}>
             <ChevronLeft size={20} />
           </button>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
               <ClipboardList size={28} color="#3b82f6" />
               Registros de Check-in
@@ -1963,15 +2000,38 @@ export default function App() {
           </div>
         </div>
 
-        {registrations.length === 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24, background: 'white', padding: 16, borderRadius: 16, border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 200px' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Origen / Plataforma</label>
+            <select 
+              value={registroSourceFilter}
+              onChange={(e) => setRegistroSourceFilter(e.target.value)}
+              style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 14, outline: 'none', backgroundColor: '#f8fafc' }}
+            >
+              {uniqueSources.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 200px' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Rango de Fechas</label>
+            <select 
+              value={registroDateFilter}
+              onChange={(e) => setRegistroDateFilter(e.target.value)}
+              style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 14, outline: 'none', backgroundColor: '#f8fafc' }}
+            >
+              {['Todos', 'Hoy', 'Esta semana', 'Este mes', 'Este año'].map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {filteredRegistrations.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', background: 'white', borderRadius: 24, border: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
-            <h3 style={{ color: '#0f172a', margin: '0 0 8px 0' }}>No hay registros aún</h3>
-            <p style={{ color: '#64748b', margin: 0 }}>Los registros aparecerán aquí cuando los huéspedes completen su check-in.</p>
+            <h3 style={{ color: '#0f172a', margin: '0 0 8px 0' }}>No hay registros que coincidan</h3>
+            <p style={{ color: '#64748b', margin: 0 }}>Intenta ajustar los filtros de búsqueda.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 16 }}>
-            {registrations.map(reg => (
+            {filteredRegistrations.map(reg => (
               <div key={reg.id} style={{ background: 'white', padding: 20, borderRadius: 24, border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                   <div>
@@ -2002,9 +2062,13 @@ export default function App() {
                     <div style={{ fontSize: 13, color: '#64748b' }}>{reg.phone || 'N/A'}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Origen</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Ubicación</div>
                     <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>{reg.city || 'N/A'}, {reg.country || 'N/A'}</div>
                     <div style={{ fontSize: 13, color: '#64748b' }}>{reg.nationality || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Plataforma</div>
+                    <div style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>{reg.source || 'Directa'}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Estancia</div>
