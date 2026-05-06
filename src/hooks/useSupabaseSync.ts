@@ -387,6 +387,12 @@ export function useSupabaseSync() {
     await fetchOrdersAndItems();
   }, [fetchOrdersAndItems]);
 
+  const markTableDone = useCallback(async (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+    await dbOrderItems.markTableDone(itemIds);
+    await fetchOrdersAndItems();
+  }, [fetchOrdersAndItems]);
+
   const updateItemNotes = useCallback(async (itemId: string, notes: string) => {
     await dbOrderItems.updateNotes(itemId, notes);
   }, []);
@@ -865,6 +871,7 @@ export function useSupabaseSync() {
     addItemToOrder,
     removeItem,
     markItemDone,
+    markTableDone,
     updateItemNotes,
     markItemsPrinted,
     checkoutTable,

@@ -179,6 +179,8 @@ export const dbOrderItems = {
     supabase.from('order_items').update({ status: 'cancelled' }).eq('id', id),
   markDone: (id: string) =>
     supabase.from('order_items').update({ status: 'done' }).eq('id', id),
+  markTableDone: (itemIds: string[]) =>
+    supabase.from('order_items').update({ status: 'done' }).in('id', itemIds),
   updateNotes: (id: string, notes: string) =>
     supabase.from('order_items').update({ notes }).eq('id', id),
   getRanking: ({ start, end }: { start?: string, end?: string }) => {

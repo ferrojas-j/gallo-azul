@@ -296,7 +296,7 @@ export default function App() {
     todayIncome, todayCashIncome, todayCashTips, todayTransferIncome, todayTransferTips,
     todayDebitIncome, todayDebitTips, todayCreditIncome, todayCreditTips,
     todayCardIncome, todayCardTips, todayTotalTips, todayAccountsCount, todayExpenses, todayExpensesList, todayClosedOrders, pettyCashInitial, hotelCardSales, hotelCashSales, hotelSalesList, dailySummaries, isLoading,
-    createOrderForTable, addItemToOrder, removeItem, markItemDone, updateItemNotes, markItemsPrinted,
+    createOrderForTable, addItemToOrder, removeItem, markItemDone, markTableDone, updateItemNotes, markItemsPrinted,
     checkoutTable, confirmPayment, cancelTable, addExpense,
     toggleMenuItem, toggleMenuVariant,
     updateMenuItem, updateMenuVariant, updateCategory,
@@ -1085,7 +1085,7 @@ export default function App() {
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [deliveryConfirm, setDeliveryConfirm] = useState<string | null>(null);
+  const [deliveryConfirmTable, setDeliveryConfirmTable] = useState<number | null>(null);
 
   const [expandedSubCats, setExpandedSubCats] = useState<Set<string>>(new Set());
   const toggleSubCat = (subCat: string) => {
@@ -3582,7 +3582,19 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 16 }}>
+                      {oldestPending && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeliveryConfirmTable(tableId); }}
+                          style={{
+                            background: '#10b981', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                            border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
+                          }}
+                        >
+                          <Check size={16} strokeWidth={3} />
+                          Completar
+                        </button>
+                      )}
                       {isCollapsed ? <ChevronDown size={20} strokeWidth={2.5} /> : <ChevronUp size={20} strokeWidth={2.5} />}
                     </div>
                   </div>
@@ -3631,15 +3643,7 @@ export default function App() {
                               )}
                             </div>
                             
-                            {!isDone ? (
-                              <button
-                                className="qa-done-btn"
-                                onClick={(e) => { e.stopPropagation(); setDeliveryConfirm(item.id); }}
-                                style={{ marginLeft: 16 }}
-                              >
-                                <Check size={22} strokeWidth={3} />
-                              </button>
-                            ) : (
+                            {isDone && (
                               <div style={{ padding: '8px', color: '#10b981' }}>
                                 <Check size={20} strokeWidth={3} />
                               </div>
@@ -3677,13 +3681,13 @@ export default function App() {
         )}
 
         {/* Modal de Confirmación de Entrega */}
-        {deliveryConfirm && (
-          <div className="variants-modal-p" onClick={() => setDeliveryConfirm(null)} style={{ zIndex: 9999 }}>
+        {deliveryConfirmTable !== null && (
+          <div className="variants-modal-p" onClick={() => setDeliveryConfirmTable(null)} style={{ zIndex: 9999 }}>
             <div className="variants-modal-content scale-in" onClick={e => e.stopPropagation()} style={{ padding: 0, overflow: 'hidden', maxWidth: '400px' }}>
               <div style={{ background: '#f8fafc', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <h3 style={{ margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '18px' }}>Confirmar entrega</h3>
                 <button 
-                  onClick={() => setDeliveryConfirm(null)}
+                  onClick={() => setDeliveryConfirmTable(null)}
                   style={{ background: 'white', border: '1px solid #e2e8f0', color: '#94a3b8', padding: '6px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#475569'}
                   onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
@@ -3695,10 +3699,10 @@ export default function App() {
                 <div style={{ margin: '0 auto 16px', width: '64px', height: '64px', background: '#eff6ff', color: '#3b82f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Check size={32} strokeWidth={3} />
                 </div>
-                <p style={{ color: '#475569', marginBottom: '24px', fontWeight: 600, fontSize: '16px' }}>¿Marcar esta comanda como entregada / completada?</p>
+                <p style={{ color: '#475569', marginBottom: '24px', fontWeight: 600, fontSize: '16px' }}>¿Marcar la comanda completa de la mesa como entregada?</p>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button 
-                    onClick={() => setDeliveryConfirm(null)}
+                    onClick={() => setDeliveryConfirmTable(null)}
                     style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 700, padding: '12px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
                     onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
@@ -3707,8 +3711,11 @@ export default function App() {
                   </button>
                   <button 
                     onClick={async () => {
-                      await markItemDone(deliveryConfirm);
-                      setDeliveryConfirm(null);
+                      const pendingIds = (activeItems || [])
+                        .filter(i => i.table_id === deliveryConfirmTable && i.status === 'pending')
+                        .map(i => i.id);
+                      await markTableDone(pendingIds);
+                      setDeliveryConfirmTable(null);
                     }}
                     style={{ flex: 1, background: '#2563eb', border: 'none', color: 'white', fontWeight: 700, padding: '12px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1)', transition: 'all 0.2s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#1d4ed8'}
