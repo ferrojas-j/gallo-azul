@@ -1051,10 +1051,10 @@ export default function App() {
     return (
       <div className="fade-in admin-main">
         <div className="admin-header-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div className="admin-welcome">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            <div className="admin-welcome" style={{ margin: 0 }}>
               <h1>Panel de Administración</h1>
-              <p>{mexicoDate} • {mexicoTime}</p>
+              <p style={{ margin: 0 }}>{mexicoDate} • {mexicoTime}</p>
             </div>
             <div style={{ 
               background: 'rgba(255,255,255,0.06)', 
@@ -1069,7 +1069,8 @@ export default function App() {
               border: '1px solid rgba(255,255,255,0.1)',
               whiteSpace: 'nowrap',
               boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-              backdropFilter: 'blur(8px)'
+              backdropFilter: 'blur(8px)',
+              flexShrink: 0
             }}>
               <Globe size={14} style={{ color: '#94a3b8' }} />
               <span>1 USD <span style={{ color: '#64748b', margin: '0 4px', fontWeight: 500 }}>=</span> <span style={{ color: '#10b981' }}>{exchangeRate.toFixed(2)}</span> MXN</span>

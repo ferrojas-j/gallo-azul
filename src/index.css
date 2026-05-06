@@ -2363,14 +2363,14 @@ input:checked + .toggle-slider:before {
 .admin-header-card {
   background: linear-gradient(135deg, #0e122b 0%, #1e293b 100%);
   border-radius: 28px;
-  padding: 32px 24px;
+  padding: clamp(24px, 6vw, 32px) clamp(16px, 5vw, 24px);
   margin-bottom: 24px;
   color: white;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
 }
 
 .admin-welcome h1 {
-  font-size: 28px;
+  font-size: clamp(22px, 6.5vw, 28px);
   font-weight: 900;
   margin-bottom: 4px;
   letter-spacing: -1px;
@@ -2391,13 +2391,14 @@ input:checked + .toggle-slider:before {
 .admin-stat-pill {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
-  padding: 18px 24px;
+  padding: clamp(14px, 4vw, 18px) clamp(16px, 4vw, 24px);
   border-radius: 24px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  overflow: hidden;
 }
 
 .admin-stat-pill .label {
