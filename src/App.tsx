@@ -4,7 +4,8 @@ import {
   Plus, Lock, Home as HomeIcon, UserPlus, Trash2, User, ChevronRight,
   FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
 
-  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
+  Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
+
   UserMinus, ExternalLink, CheckCircle2, AlertCircle
 
 } from 'lucide-react';
