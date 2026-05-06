@@ -348,6 +348,16 @@ export default function App() {
 
   // Estados para Nueva Reserva
   const [showNewResModal, setShowNewResModal] = useState(false);
+  const [showHotelPaymentModal, setShowHotelPaymentModal] = useState(false);
+  const [hotelPaymentForm, setHotelPaymentForm] = useState({
+    reservationId: 0,
+    guestName: '',
+    roomName: '',
+    amount: 0,
+    currency: 'USD',
+    method: 'efectivo',
+    hostaway_reservation_id: null as number | null
+  });
   const [newResForm, setNewResForm] = useState({
     guestFirstName: '',
     guestLastName: '',
@@ -597,6 +607,28 @@ export default function App() {
       fetchAvailableListings(newResForm.arrivalDate, newResForm.departureDate);
     }
   }, [newResForm.arrivalDate, newResForm.departureDate]);
+
+  const handleHotelPaymentSubmit = async () => {
+    try {
+      if (hotelPaymentForm.hostaway_reservation_id) {
+        await updateReservationStatus(
+          hotelPaymentForm.hostaway_reservation_id,
+          undefined,
+          undefined,
+          'host',
+          true
+        );
+      }
+      await addHotelSale(hotelPaymentForm.amount, hotelPaymentForm.currency, hotelPaymentForm.method);
+      alert("Pago registrado correctamente.");
+      setShowHotelPaymentModal(false);
+      fetchRegistrations(); // refresh local db list
+      getUpcomingCheckins().then(setUpcomingCheckins); // refresh hostaway status
+    } catch (error: any) {
+      console.error(error);
+      alert("Error inesperado al registrar pago: " + error.message);
+    }
+  };
 
   const handleCreateReservation = async () => {
     if (!newResForm.listingId) return;
@@ -1749,9 +1781,30 @@ export default function App() {
                                         <Check size={12} strokeWidth={3} /> Pagado
                                       </span>
                                     ) : (
-                                      <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <AlertCircle size={12} strokeWidth={3} /> Pendiente de pago
-                                      </span>
+                                      title === 'En casa / Hospedados' ? (
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setHotelPaymentForm({
+                                              reservationId: reg.id,
+                                              guestName: `${reg.first_name} ${reg.last_name}`,
+                                              roomName: reg.room_name,
+                                              amount: res?.totalAmount || 0,
+                                              currency: res?.currency || 'USD',
+                                              method: 'efectivo',
+                                              hostaway_reservation_id: reg.hostaway_reservation_id
+                                            });
+                                            setShowHotelPaymentModal(true);
+                                          }}
+                                          style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+                                        >
+                                          <AlertCircle size={12} strokeWidth={3} /> Registrar pago
+                                        </button>
+                                      ) : (
+                                        <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <AlertCircle size={12} strokeWidth={3} /> Pendiente de pago
+                                        </span>
+                                      )
                                     );
                                   })()}
                                   <span style={{ background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #dcfce7' }}>
@@ -2082,6 +2135,68 @@ export default function App() {
             ))}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderHotelPaymentModal = () => {
+    if (!showHotelPaymentModal) return null;
+
+    return (
+      <div className="modal-overlay" style={{ zIndex: 3000, padding: 16 }}>
+        <div className="modal-content fade-in" style={{ maxWidth: 450, width: '100%', borderRadius: 28, padding: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#1e293b' }}>Registrar Pago</h2>
+            <button onClick={() => setShowHotelPaymentModal(false)} style={{ background: '#f8fafc', border: '1.5px solid #f1f5f9', padding: 10, borderRadius: '14px', cursor: 'pointer', color: '#64748b' }}>
+              <X size={20} />
+            </button>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ color: '#475569', fontSize: 14, marginBottom: 8, lineHeight: 1.5 }}>
+              Ingresa los detalles de pago para la estadía de <strong>{hotelPaymentForm.guestName}</strong> en <strong>{hotelPaymentForm.roomName}</strong>.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Monto</label>
+                <input
+                  type="number"
+                  value={hotelPaymentForm.amount}
+                  onChange={(e) => setHotelPaymentForm({ ...hotelPaymentForm, amount: Number(e.target.value) })}
+                  style={{ padding: '12px 16px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: 16, fontWeight: 600 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Divisa</label>
+                  <select
+                    value={hotelPaymentForm.currency}
+                    onChange={(e) => setHotelPaymentForm({ ...hotelPaymentForm, currency: e.target.value })}
+                    style={{ padding: '12px 16px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: 16, fontWeight: 600, WebkitAppearance: 'none', background: 'url("data:image/svg+xml;utf8,<svg fill=\'%2364748b\' height=\'24\' viewBox=\'0 0 24 24\' width=\'24\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>") no-repeat right 12px center', backgroundColor: '#f8fafc' }}
+                  >
+                    <option value="USD">Dólar (USD)</option>
+                    <option value="MXN">Peso (MXN)</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Método</label>
+                  <select
+                    value={hotelPaymentForm.method}
+                    onChange={(e) => setHotelPaymentForm({ ...hotelPaymentForm, method: e.target.value })}
+                    style={{ padding: '12px 16px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: 16, fontWeight: 600, WebkitAppearance: 'none', background: 'url("data:image/svg+xml;utf8,<svg fill=\'%2364748b\' height=\'24\' viewBox=\'0 0 24 24\' width=\'24\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>") no-repeat right 12px center', backgroundColor: '#f8fafc' }}
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 16, borderTop: '2px solid #f1f5f9' }}>
+            <button onClick={() => setShowHotelPaymentModal(false)} style={{ padding: '14px', borderRadius: 14, border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={handleHotelPaymentSubmit} style={{ padding: '14px', borderRadius: 14, border: 'none', background: '#1e293b', color: 'white', fontWeight: 600, cursor: 'pointer' }}>Confirmar Pago</button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -4649,6 +4764,7 @@ export default function App() {
       )}
 
       {renderCheckinModal()}
+      {renderHotelPaymentModal()}
       {renderNewResModal()}
       </div>
     </>

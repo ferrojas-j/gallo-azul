@@ -51,7 +51,7 @@ export async function getUpcomingCheckins(): Promise<Reservation[]> {
   }
 }
 
-export async function updateReservationStatus(reservationId: number, status?: string, noShow?: boolean, cancelledBy: string = 'host'): Promise<any> {
+export async function updateReservationStatus(reservationId: number, status?: string, noShow?: boolean, cancelledBy: string = 'host', isPaid?: boolean): Promise<any> {
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/hostaway-proxy`, {
       method: 'POST',
@@ -62,7 +62,7 @@ export async function updateReservationStatus(reservationId: number, status?: st
       },
       body: JSON.stringify({
         action: 'updateReservationStatus',
-        params: { reservationId, status, noShow, cancelledBy }
+        params: { reservationId, status, noShow, cancelledBy, isPaid }
       })
     });
 
