@@ -75,11 +75,26 @@ serve(async (req) => {
       );
 
       const rawResults = resData.result || [];
+
+      // Only confirmed statuses. Hostaway uses: reserved, confirmed, ownerStay.
+      // Exclude: new, inquiry, cancelled, declined, expired, noshow, modified(unconfirmed)
+      const CONFIRMED_STATUSES = new Set(['reserved', 'confirmed', 'ownerStay', 'modified']);
+
+      // Log all statuses coming from API for debugging
+      console.log('Raw Hostaway statuses:', rawResults.map((r: any) => `${r.id}:${r.guestName}:${r.status}`).join(', '));
+
       const uniqueMap = new Map();
+      // Sort by id desc so the most recent reservation for the same room/date wins
       const sortedResults = [...rawResults].sort((a: any, b: any) => b.id - a.id);
 
       sortedResults.forEach((r: any) => {
-        if (r.status === 'cancelled' || r.status === 'declined') return;
+        // Strict whitelist: skip anything not in confirmed statuses
+        if (!CONFIRMED_STATUSES.has(r.status)) {
+          console.log(`Skipping ${r.guestName} (id:${r.id}) — status: ${r.status}`);
+          return;
+        }
+        // Deduplicate by reservation ID (unique per booking)
+        // Use composite key only as fallback uniqueness within the same room+date
         const compositeKey = `${r.listingMapId}_${r.arrivalDate}`;
         if (!uniqueMap.has(compositeKey)) {
           const g = r.guestDetails || {};
@@ -119,6 +134,9 @@ serve(async (req) => {
           });
         }
       });
+
+      console.log(`Returning ${uniqueMap.size} confirmed reservations out of ${rawResults.length} total`);
+
       return new Response(JSON.stringify(Array.from(uniqueMap.values())), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
