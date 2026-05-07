@@ -2387,94 +2387,119 @@ export default function App() {
             </div>
 
             {newResForm.listingId && (
-              <div style={{ gridColumn: 'span 2', background: '#f8fafc', padding: 20, borderRadius: 20, border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 16, fontSize: 15 }}>Configuración de Precio</div>
+              <div style={{ gridColumn: 'span 2', borderRadius: 20, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                    <input 
-                      type="radio" 
-                      name="priceMode"
-                      checked={!newResForm.useCustomPrice} 
-                      onChange={() => setNewResForm({...newResForm, useCustomPrice: false})}
-                    />
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>Precio Hostaway (Base)</span>
-                  </label>
+                {/* Header */}
+                <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <CreditCard size={18} color="rgba(255,255,255,0.9)" />
+                  <span style={{ color: 'white', fontWeight: 800, fontSize: 14, letterSpacing: '0.3px' }}>PRECIO Y PAGO</span>
+                </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                    <input 
-                      type="radio" 
-                      name="priceMode"
-                      checked={newResForm.useCustomPrice} 
-                      onChange={() => setNewResForm({...newResForm, useCustomPrice: true})}
-                    />
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>Personalizar Precio</span>
-                  </label>
+                <div style={{ background: 'white', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  
+                  {/* Precio radios */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[
+                      { label: 'Precio Hostaway', sub: 'Precio base de la plataforma', val: false },
+                      { label: 'Precio Personalizado', sub: 'Definir monto manualmente', val: true }
+                    ].map(opt => (
+                      <label key={String(opt.val)} style={{ 
+                        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                        padding: '12px 16px', borderRadius: 14,
+                        border: `2px solid ${newResForm.useCustomPrice === opt.val ? '#2563eb' : '#e2e8f0'}`,
+                        background: newResForm.useCustomPrice === opt.val ? '#eff6ff' : '#f8fafc', transition: 'all 0.2s'
+                      }}>
+                        <input type="radio" name="priceMode" checked={newResForm.useCustomPrice === opt.val} onChange={() => setNewResForm({...newResForm, useCustomPrice: opt.val})} style={{ accentColor: '#2563eb' }} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: newResForm.useCustomPrice === opt.val ? '#1d4ed8' : '#334155' }}>{opt.label}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{opt.sub}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
 
                   {newResForm.useCustomPrice && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }} className="fade-in">
-                      <select 
+                    <div style={{ display: 'flex', gap: 8 }} className="fade-in">
+                      <select
                         value={newResForm.priceCurrency}
                         onChange={e => setNewResForm({...newResForm, priceCurrency: e.target.value})}
-                        style={{ width: 80, height: 48, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', fontWeight: 700 }}
+                        style={{ width: 90, height: 48, borderRadius: 12, border: '2px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: 14, padding: '0 8px' }}
                       >
                         <option value="USD">USD</option>
                         <option value="MXN">MXN</option>
                       </select>
-                      <input 
+                      <input
                         type="number"
                         value={newResForm.customPrice}
                         onChange={e => setNewResForm({...newResForm, customPrice: e.target.value})}
                         placeholder="Monto"
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, height: 48, borderRadius: 12, border: '2px solid #e2e8f0', padding: '0 16px', fontSize: 15, fontWeight: 600 }}
                       />
                     </div>
                   )}
+
+                  <div style={{ height: 1, background: '#f1f5f9' }} />
+
+                  {/* Toggle Pagado */}
+                  <label style={{ 
+                    display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+                    padding: '14px 18px', borderRadius: 14,
+                    border: `2px solid ${newResForm.isPaid ? '#10b981' : '#e2e8f0'}`,
+                    background: newResForm.isPaid ? '#ecfdf5' : '#f8fafc', transition: 'all 0.2s'
+                  }}>
+                    <div style={{ 
+                      width: 24, height: 24, borderRadius: 8,
+                      border: `2px solid ${newResForm.isPaid ? '#10b981' : '#cbd5e1'}`,
+                      background: newResForm.isPaid ? '#10b981' : 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.2s', flexShrink: 0
+                    }}>
+                      {newResForm.isPaid && <Check size={14} color="white" strokeWidth={3} />}
+                    </div>
+                    <input type="checkbox" checked={newResForm.isPaid} onChange={e => setNewResForm({...newResForm, isPaid: e.target.checked})} style={{ display: 'none' }} />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: newResForm.isPaid ? '#065f46' : '#334155' }}>Marcar como Pagado</div>
+                      <div style={{ fontSize: 12, color: newResForm.isPaid ? '#059669' : '#94a3b8', marginTop: 2 }}>Registrará el pago formalmente en Hostaway</div>
+                    </div>
+                  </label>
+
+                  {/* Detalles Transacción */}
+                  {newResForm.isPaid && (
+                    <div style={{ background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }} className="fade-in">
+                      <div style={{ background: '#f1f5f9', padding: '10px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Wallet size={14} color="#64748b" />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Detalles de la Transacción</span>
+                      </div>
+                      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Método de Pago</label>
+                          <select
+                            value={newResForm.transactionMethod}
+                            onChange={e => setNewResForm({...newResForm, transactionMethod: e.target.value})}
+                            style={{ width: '100%', height: 44, padding: '0 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#0f172a', background: 'white' }}
+                          >
+                            <option value="cash">💵 Efectivo (Cash)</option>
+                            <option value="creditCard">💳 Tarjeta (Credit Card)</option>
+                            <option value="bankTransfer">🏦 Transferencia (Bank Transfer)</option>
+                            <option value="paypal">🔵 PayPal</option>
+                            <option value="otaPayment">🌐 Pago por OTA</option>
+                            <option value="other">📋 Otro</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Descripción (Opcional)</label>
+                          <input
+                            type="text"
+                            value={newResForm.transactionDescription}
+                            onChange={e => setNewResForm({...newResForm, transactionDescription: e.target.value})}
+                            placeholder="Ej. Pago en recepción, Depósito..."
+                            style={{ width: '100%', height: 44, padding: '0 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', background: 'white', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                <div style={{ height: 1, background: '#e2e8f0', margin: '20px 0' }} />
-                
-                <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', background: newResForm.isPaid ? '#ecfdf5' : 'white', padding: '12px 16px', borderRadius: 12, border: `1px solid ${newResForm.isPaid ? '#10b981' : '#e2e8f0'}`, transition: 'all 0.2s' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={newResForm.isPaid}
-                    onChange={e => setNewResForm({...newResForm, isPaid: e.target.checked})}
-                    style={{ width: 18, height: 18, accentColor: '#10b981', cursor: 'pointer' }}
-                  />
-                  <div>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: newResForm.isPaid ? '#065f46' : '#334155', display: 'block' }}>Marcar como Pagado</span>
-                    <span style={{ fontSize: 12, color: newResForm.isPaid ? '#059669' : '#64748b' }}>Registrará un cargo por el total en Hostaway</span>
-                  </div>
-                </label>
-
-                {newResForm.isPaid && (
-                  <div style={{ padding: '16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <h5 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#334155' }}>Detalles de la Transacción</h5>
-                    <div className="form-group-premium">
-                      <label>Método de Pago</label>
-                      <select
-                        value={newResForm.transactionMethod}
-                        onChange={e => setNewResForm({...newResForm, transactionMethod: e.target.value})}
-                      >
-                        <option value="cash">Efectivo (Cash)</option>
-                        <option value="creditCard">Tarjeta (Credit Card)</option>
-                        <option value="bankTransfer">Transferencia (Bank Transfer)</option>
-                        <option value="paypal">PayPal</option>
-                        <option value="otaPayment">Pago por OTA</option>
-                        <option value="other">Otro</option>
-                      </select>
-                    </div>
-                    <div className="form-group-premium">
-                      <label>Descripción (Opcional)</label>
-                      <input 
-                        type="text" 
-                        value={newResForm.transactionDescription} 
-                        onChange={e => setNewResForm({...newResForm, transactionDescription: e.target.value})}
-                        placeholder="Ej. Pago en recepción, Depósito..."
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
