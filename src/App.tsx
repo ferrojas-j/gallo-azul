@@ -4208,18 +4208,20 @@ export default function App() {
                 try {
                   setIsClosingTurn(true);
                   console.log('Iniciando cierre general...');
-                  
-                  const summary = {
-                    total_income: todayIncome,
-                    restaurant_income: todayIncome,
-                    tips: todayTotalTips,
-                    expenses: todayExpenses,
-                    hotel_income: hotelCardSales + hotelCashSales,
-                    petty_cash_final: pettyCashInitial - todayExpenses,
-                    created_by: currentUser?.name || 'Sistema'
-                  };
-                  
-                  await closeDay(currentUser?.name || 'Administrador', overrideCashTips !== '' ? Number(overrideCashTips) : todayCashTips);
+
+                  const result = await closeDay(
+                    currentUser?.name || 'Administrador',
+                    overrideCashTips !== '' ? Number(overrideCashTips) : todayCashTips
+                  );
+
+                  // closeDay returns {success, error} — never throws directly
+                  if (!result.success) {
+                    const errMsg = result.error instanceof Error
+                      ? result.error.message
+                      : JSON.stringify(result.error);
+                    throw new Error(errMsg || 'Error desconocido al ejecutar el cierre');
+                  }
+
                   setIsCierreModalOpen(false);
                   alert('✅ Cierre general completado con éxito. Los datos se han archivado y los resúmenes se han reseteado.');
                 } catch (err) {
