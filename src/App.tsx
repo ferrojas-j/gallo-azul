@@ -1760,7 +1760,8 @@ export default function App() {
                 return res.arrivalDate === todayStr && !isAlreadyRegistered;
               });
               const enCasa = registrations.filter(reg => {
-                // Guests that have checked in and their departure is today or in the future
+                // Exclude guests marked as room cleaned (checked out)
+                if (reg.room_cleaned) return false;
                 return reg.arrival_date <= todayStr && reg.departure_date >= todayStr;
               });
               const proximos = upcomingCheckins.filter(res => res.arrivalDate > todayStr);
@@ -1877,9 +1878,33 @@ export default function App() {
                                   <div style={{ fontSize: 13, color: '#64748b' }}>{reg.nights} noches | {reg.pax} pax</div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        }
+
+                               {/* Checkout today: room cleaning banner + button */}
+                               {reg.departure_date === todayStr && (
+                                 <div style={{ marginTop: 12, padding: '10px 14px', background: '#fff7ed', borderRadius: 12, border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                     <span style={{ fontSize: 16 }}>🛏️</span>
+                                     <div>
+                                       <div style={{ fontSize: 12, fontWeight: 700, color: '#c2410c' }}>Check-out hoy — 12:00</div>
+                                       <div style={{ fontSize: 11, color: '#9a3412' }}>Habitación pendiente de limpieza</div>
+                                     </div>
+                                   </div>
+                                   <button
+                                     onClick={async (e) => {
+                                       e.stopPropagation();
+                                       const { error } = await supabase.from('guest_registrations').update({ room_cleaned: true }).eq('id', reg.id);
+                                       if (error) { alert('Error: ' + error.message); return; }
+                                       await fetchRegistrations();
+                                     }}
+                                     style={{ background: '#16a34a', color: 'white', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+                                   >
+                                     ✔ Habitación limpia
+                                   </button>
+                                 </div>
+                               )}
+                             </div>
+                           );
+                         }
 
                         // Simple card for upcoming checkins
                         const res = item;
