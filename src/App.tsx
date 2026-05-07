@@ -611,18 +611,27 @@ export default function App() {
   }, [newResForm.arrivalDate, newResForm.departureDate]);
 
   const handleHotelPaymentSubmit = async () => {
+    // Step 1: Register locally in hotel_sales (ALWAYS runs, feeds Ventas Hotel in admin panel)
     try {
-      const methodLabel = hotelPaymentForm.method === 'efectivo' ? 'Efectivo'
-        : hotelPaymentForm.method === 'tarjeta' ? 'Tarjeta'
-        : 'Transferencia';
-      const dateStr = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+      await addHotelSale(hotelPaymentForm.amount, hotelPaymentForm.currency, hotelPaymentForm.method);
+    } catch (localErr: any) {
+      alert('❌ Error al registrar el pago localmente: ' + localErr.message);
+      return;
+    }
 
-      let hwMethod = 'cash';
-      if (hotelPaymentForm.method === 'tarjeta') hwMethod = 'creditCard';
-      if (hotelPaymentForm.method === 'transferencia') hwMethod = 'bankTransfer';
+    // Step 2: Register in Hostaway (non-blocking — local payment already saved)
+    let hostawayOk = false;
+    if (hotelPaymentForm.hostaway_reservation_id) {
+      try {
+        const methodLabel = hotelPaymentForm.method === 'efectivo' ? 'Efectivo'
+          : hotelPaymentForm.method === 'tarjeta' ? 'Tarjeta'
+          : 'Transferencia';
+        const dateStr = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
 
-      if (hotelPaymentForm.hostaway_reservation_id) {
-        // 1. Register transaction in Hostaway (Add Transaction)
+        let hwMethod = 'cash';
+        if (hotelPaymentForm.method === 'tarjeta') hwMethod = 'creditCard';
+        if (hotelPaymentForm.method === 'transferencia') hwMethod = 'bankTransfer';
+
         await addTransaction(hotelPaymentForm.hostaway_reservation_id, {
           title: `Pago en Recepción — ${methodLabel}`,
           description: `${hotelPaymentForm.amount} ${hotelPaymentForm.currency} · ${methodLabel} · ${dateStr} · ${hotelPaymentForm.guestName}`,
@@ -631,7 +640,6 @@ export default function App() {
           paymentMethod: hwMethod
         });
 
-        // 2. Mark reservation as paid in Hostaway
         await updateReservationStatus(
           hotelPaymentForm.hostaway_reservation_id,
           undefined,
@@ -639,19 +647,20 @@ export default function App() {
           'host',
           true
         );
+        hostawayOk = true;
+      } catch (hwErr: any) {
+        console.warn('Hostaway sync failed (payment saved locally):', hwErr.message);
       }
-
-      // 3. Record in local hotel_sales → feeds "Ventas Hotel" in admin panel
-      await addHotelSale(hotelPaymentForm.amount, hotelPaymentForm.currency, hotelPaymentForm.method);
-
-      setShowHotelPaymentModal(false);
-      fetchRegistrations();
-      getUpcomingCheckins().then(setUpcomingCheckins);
-      alert(`✅ Pago de ${hotelPaymentForm.amount} ${hotelPaymentForm.currency} registrado correctamente en Hostaway y Ventas Hotel.`);
-    } catch (error: any) {
-      console.error(error);
-      alert('❌ Error al registrar el pago: ' + error.message);
     }
+
+    setShowHotelPaymentModal(false);
+    fetchRegistrations();
+    getUpcomingCheckins().then(setUpcomingCheckins);
+
+    const hostawayNote = hostawayOk
+      ? ' y en Hostaway.'
+      : ' (⚠️ No se pudo sincronizar con Hostaway, pero quedó registrado localmente.)';
+    alert(`✅ Pago de ${hotelPaymentForm.amount} ${hotelPaymentForm.currency} registrado en Ventas Hotel${hostawayNote}`);
   };
 
   const handleCreateReservation = async () => {
