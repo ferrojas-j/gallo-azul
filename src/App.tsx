@@ -627,6 +627,7 @@ export default function App() {
           title: `Pago en Recepción — ${methodLabel}`,
           description: `${hotelPaymentForm.amount} ${hotelPaymentForm.currency} · ${methodLabel} · ${dateStr} · ${hotelPaymentForm.guestName}`,
           amount: hotelPaymentForm.amount,
+          currency: hotelPaymentForm.currency,
           paymentMethod: hwMethod
         });
 

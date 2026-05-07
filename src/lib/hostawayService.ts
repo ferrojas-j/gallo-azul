@@ -105,7 +105,7 @@ export async function createReservation(params: any): Promise<any> {
   }
 }
 
-export async function addTransaction(reservationId: number, params: { title: string; description: string; amount: number; paymentMethod: string; }): Promise<any> {
+export async function addTransaction(reservationId: number, params: { title: string; description: string; amount: number; currency?: string; paymentMethod: string; }): Promise<any> {
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/hostaway-proxy`, {
       method: 'POST',

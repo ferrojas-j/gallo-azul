@@ -241,16 +241,22 @@ serve(async (req) => {
 
     // --- ACTION: addTransaction ---
     if (action === 'addTransaction') {
-      const { reservationId, title, description, amount, paymentMethod } = params;
+      const { reservationId, title, description, amount, currency, paymentMethod } = params;
       if (!reservationId) throw new Error("Missing reservationId");
+
+      const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan' }).format(new Date());
 
       const payload = {
         title: title || 'Pago de reserva',
-        description: description || '',
+        description: description || 'Pago registrado en recepción',
         amount: parseFloat(amount),
+        currency: currency || 'USD',
         paymentMethod: paymentMethod || 'cash',
-        status: 'paid'
+        isPaid: 1,
+        date: todayDate,
       };
+
+      console.log('addTransaction payload:', JSON.stringify(payload));
 
       const resResponse = await fetch(`https://api.hostaway.com/v1/guestPayments/charges/${reservationId}`, {
         method: 'POST',
