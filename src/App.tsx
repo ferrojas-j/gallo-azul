@@ -1087,6 +1087,10 @@ export default function App() {
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [deliveryConfirmTable, setDeliveryConfirmTable] = useState<number | null>(null);
 
   const [expandedSubCats, setExpandedSubCats] = useState<Set<string>>(new Set());
@@ -3602,7 +3606,7 @@ export default function App() {
               let timeColor = '#10b981';
 
               if (oldestPending) {
-                elapsedMinutes = Math.floor((currentTime.getTime() - new Date(oldestPending.created_at).getTime()) / 60000);
+                elapsedMinutes = Math.max(0, Math.floor((currentTime.getTime() - new Date(oldestPending.created_at).getTime()) / 60000));
                 const isDelayed = elapsedMinutes >= 15;
                 const isWarning = elapsedMinutes >= 10 && !isDelayed;
                 timeColor = isDelayed ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
@@ -3709,20 +3713,49 @@ export default function App() {
             {/* Mostrar mesas que ya fueron cobradas y cerradas en el día actual */}
             {todayClosedOrders.map((order: any) => {
               const tableName = (tables || []).find(t => t.id === order.table_id)?.name || order.table_id;
+              const closedKey = `closed-${order.id}`;
+              const isClosedCollapsed = !expandedPedidos.includes(closedKey as any);
+              const toggleClosed = () => setExpandedPedidos(prev =>
+                prev.includes(closedKey as any) ? prev.filter(id => id !== (closedKey as any)) : [...prev, closedKey as any]
+              );
+              const closedItems: any[] = order.items || [];
               return (
-                <div className="qa-card" key={`closed-order-${order.id}`} style={{ padding: 0, overflow: 'hidden', opacity: 0.7 }}>
+                <div className="qa-card" key={`closed-order-${order.id}`} style={{ padding: 0, overflow: 'hidden', opacity: 0.75 }}>
                   <div 
                     className="qa-header" 
-                    style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    onClick={toggleClosed}
+                    style={{ padding: '16px', background: 'rgba(0,0,0,0.02)', borderBottom: isClosedCollapsed ? 'none' : '1px solid #f1f5f9', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div className="qa-table-badge" style={{ opacity: 0.7 }}>Mesa {tableName}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: '#64748b' }}>
                         <Check size={14} strokeWidth={3} />
-                        Completado
+                        Cobrada
                       </div>
                     </div>
+                    <div style={{ color: '#94a3b8' }}>
+                      {isClosedCollapsed ? <ChevronDown size={20} strokeWidth={2.5} /> : <ChevronUp size={20} strokeWidth={2.5} />}
+                    </div>
                   </div>
+                  {!isClosedCollapsed && closedItems.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {closedItems.map((item: any, idx: number) => (
+                        <div key={idx} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.6, background: '#f8fafc' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                              <span style={{ fontWeight: 800, fontSize: 13, color: '#475569' }}>x{item.qty || 1}</span>
+                              <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', textDecoration: 'line-through' }}>{item.name}</span>
+                            </div>
+                            {item.notes && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{item.notes}</div>}
+                          </div>
+                          <Check size={16} color="#10b981" strokeWidth={3} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!isClosedCollapsed && closedItems.length === 0 && (
+                    <div style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>Sin detalle disponible</div>
+                  )}
                 </div>
               );
             })}
