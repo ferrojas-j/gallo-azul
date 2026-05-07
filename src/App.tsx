@@ -2557,8 +2557,9 @@ export default function App() {
         });
 
         if (error) throw error;
+        // Refresh registrations immediately so guest appears in EN CASA list
+        await fetchRegistrations();
         setShowCheckinModal(false);
-        alert('Registro completado con éxito');
       } catch (err: any) {
         alert('Error al guardar: ' + err.message);
       }
