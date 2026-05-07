@@ -3719,7 +3719,12 @@ export default function App() {
               const toggleClosed = () => setExpandedPedidos(prev =>
                 prev.includes(closedKey as any) ? prev.filter(id => id !== (closedKey as any)) : [...prev, closedKey as any]
               );
-              const closedItems: any[] = order.items || [];
+              // Parse items_summary (format: "1x Producto, 2x Otro, ...")
+              const rawSummary: string = order.items_summary || '';
+              // Split by ', ' but avoid splitting within notes like "Desc: ..."
+              const closedItems: string[] = rawSummary
+                ? rawSummary.split(', ').filter((s: string) => s.trim().length > 0 && /^\d+x /.test(s.trim()))
+                : [];
               return (
                 <div className="qa-card" key={`closed-order-${order.id}`} style={{ padding: 0, overflow: 'hidden', opacity: 0.75 }}>
                   <div 
@@ -3740,21 +3745,26 @@ export default function App() {
                   </div>
                   {!isClosedCollapsed && closedItems.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {closedItems.map((item: any, idx: number) => (
-                        <div key={idx} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.6, background: '#f8fafc' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                              <span style={{ fontWeight: 800, fontSize: 13, color: '#475569' }}>x{item.qty || 1}</span>
-                              <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', textDecoration: 'line-through' }}>{item.name}</span>
-                            </div>
-                            {item.notes && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{item.notes}</div>}
+                      {closedItems.map((line: string, idx: number) => (
+                        <div key={idx} style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Check size={14} color="#10b981" strokeWidth={3} />
+                            <span style={{ fontWeight: 600, fontSize: 14, color: '#475569', textDecoration: 'line-through' }}>{line.trim()}</span>
                           </div>
-                          <Check size={16} color="#10b981" strokeWidth={3} />
                         </div>
                       ))}
+                      {order.total > 0 && (
+                        <div style={{ padding: '10px 16px', background: '#f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Total cobrado</span>
+                          <span style={{ fontSize: 15, fontWeight: 900, color: '#0f172a' }}>${order.total}</span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {!isClosedCollapsed && closedItems.length === 0 && (
+                  {!isClosedCollapsed && closedItems.length === 0 && rawSummary && (
+                    <div style={{ padding: '12px 16px', fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap' }}>{rawSummary}</div>
+                  )}
+                  {!isClosedCollapsed && !rawSummary && (
                     <div style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>Sin detalle disponible</div>
                   )}
                 </div>
