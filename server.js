@@ -11,16 +11,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DIST = join(__dirname, 'dist');
 
-// Serve pre-built static files from dist/
-app.use(express.static(DIST, { 
-  maxAge: '0', 
-  etag: true,
-  setHeaders: (res, path) => {
-    if (path.endsWith('.html') || path.endsWith('sw.js')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
+// Serve static files — NO caching at all so updates always show immediately
+app.use(express.static(DIST, {
+  maxAge: 0,
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   }
 }));
 
@@ -31,6 +30,7 @@ app.get('/_health', (req, res) => {
 
 // SPA fallback — all routes → index.html (prevents 403/404)
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(join(DIST, 'index.html'));
 });
 
