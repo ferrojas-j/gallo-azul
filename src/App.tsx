@@ -3113,7 +3113,29 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div className="order-actions-grid" style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Running Total */}
+                  <div style={{
+                    margin: '12px 0 0 0',
+                    padding: '14px 18px',
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+                    borderRadius: 16,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Total acumulado
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                        {selectedTableItems.length} {selectedTableItems.length === 1 ? 'producto' : 'productos'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px' }}>
+                      ${selectedTableItems.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(0)}
+                    </div>
+                  </div>
+                  <div className="order-actions-grid" style={{ marginTop: 12, paddingTop: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                        <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId, isFinalBill: false})} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '12px 8px' }}>
                          <Printer size={20} />
