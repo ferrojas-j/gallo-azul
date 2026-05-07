@@ -4164,7 +4164,7 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #93c5fd', fontWeight: 800, color: '#1e3a8a', fontSize: '16px' }}>
                           <span>Entrega final del día:</span>
-                          <span>{formatCurrency(ventasTotales - todayExpenses)}</span>
+                          <span>{formatCurrency(ventasTotales + propinasTotales - todayExpenses)}</span>
                         </div>
                       </div>
                     </div>
