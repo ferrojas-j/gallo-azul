@@ -28,6 +28,11 @@ app.get('/_health', (req, res) => {
   res.json({ status: 'ok', dist: existsSync(DIST) });
 });
 
+// Redirect root to /login so browsers never serve stale cached root index.html
+app.get('/', (req, res) => {
+  res.redirect(302, '/login');
+});
+
 // SPA fallback — all routes → index.html (prevents 403/404)
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
