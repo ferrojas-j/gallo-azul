@@ -4064,6 +4064,10 @@ export default function App() {
                           <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatCurrency(todayExpenses)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                          <span>Venta Total:</span>
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>− {formatCurrency(ventasTotales + todayExpenses)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                           <span>Fondo + Propinas en tarjetas:</span>
                           <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency((pettyCashInitial - todayExpenses) + propinasTC)}</span>
                         </div>
