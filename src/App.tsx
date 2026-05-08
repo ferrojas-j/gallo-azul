@@ -3268,7 +3268,7 @@ export default function App() {
                   return subCats.map(subCat => {
                     const itemsInSub = filteredMenuItems.filter(m => m.category === subCat);
                     if (itemsInSub.length === 0) return null;
-                    const isExpanded = !expandedSubCats.has(subCat);
+                    const isExpanded = expandedSubCats.has(subCat);
                     const displayName = subCat.split(': ').pop();
 
                     return (
