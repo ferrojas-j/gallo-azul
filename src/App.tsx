@@ -4255,6 +4255,69 @@ export default function App() {
                 </>
               )}
             </button>
+
+            {/* Botón Imprimir Cierre */}
+            <button
+              onClick={() => {
+                const propinasEfectivoAMostrar = overrideCashTips !== '' ? Number(overrideCashTips) : 0;
+                const propinasTotales = todayTotalTips - todayCashTips + propinasEfectivoAMostrar;
+                const ventasHotel = hotelCardSales + hotelCashSales;
+                const ventasTotales = todayIncome + ventasHotel;
+                const efectivoMXNHotel = hotelSalesList.filter((s: any) => s.currency === 'MXN' && s.payment_method === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.amount), 0);
+                const dolaresConv = hotelSalesList.filter((s: any) => s.currency === 'USD' && s.payment_method === 'efectivo').reduce((acc: number, s: any) => acc + (Number(s.amount) * (s.exchange_rate || exchangeRate)), 0);
+                const totalEfectivoPesos = todayCashIncome + efectivoMXNHotel;
+                const totalTarjeta = todayCardIncome + hotelCardSales;
+                const totalTransferencia = todayTransferIncome;
+                const propinasTC = todayCardTips + todayTransferTips;
+                const entregaEfectivo = (pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000;
+                const entregaTotal = entregaEfectivo + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips);
+                const entregaFinal = ventasTotales + propinasTotales - todayExpenses;
+                const fechaImp = new Date().toLocaleString('es-MX', { timeZone: 'America/Mazatlan', dateStyle: 'long', timeStyle: 'short' });
+                const fw = formatCurrency;
+
+                const printWin = window.open('', '_blank', 'width=420,height=750');
+                if (!printWin) { alert('Permite ventanas emergentes para imprimir.'); return; }
+                printWin.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Cierre Gallo Azul</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Courier New',Courier,monospace;font-size:13px;color:#000;padding:16px;max-width:380px;margin:auto;}.logo{text-align:center;font-size:20px;font-weight:bold;letter-spacing:3px;margin-bottom:3px;}.sub{text-align:center;font-size:11px;color:#444;margin-bottom:6px;}.fecha{text-align:center;font-size:11px;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-bottom:14px;}.sec{font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #000;padding-bottom:3px;margin:14px 0 7px;}.row{display:flex;justify-content:space-between;padding:2px 0;font-size:12px;}.row.total{font-weight:bold;border-top:1px dashed #000;margin-top:4px;padding-top:5px;font-size:13px;}.row.grand{font-weight:bold;border-top:2px solid #000;margin-top:7px;padding-top:6px;font-size:15px;}.neg{color:#b00;}.foot{text-align:center;font-size:10px;color:#555;margin-top:20px;border-top:1px dashed #000;padding-top:8px;line-height:1.6;}@media print{body{padding:4px;}}</style></head><body>
+<div class="logo">GALLO AZUL</div>
+<div class="sub">Restaurante &amp; Hotel — Los Barriles, BCS</div>
+<div class="fecha">CIERRE DE JORNADA &nbsp;|&nbsp; ${fechaImp}</div>
+<div class="sec">Reporte Diario</div>
+<div class="row"><span>Ventas restaurante:</span><span>${fw(todayIncome)}</span></div>
+<div class="row"><span>Ventas hotel:</span><span>${fw(ventasHotel)}</span></div>
+<div class="row total"><span>Ingresos totales:</span><span>${fw(ventasTotales)}</span></div>
+<div class="sec">Propinas</div>
+<div class="row"><span>Propinas efectivo:</span><span>${fw(propinasEfectivoAMostrar)}</span></div>
+<div class="row"><span>Propinas tarjetas:</span><span>${fw(propinasTC)}</span></div>
+<div class="row total"><span>Total propinas:</span><span>${fw(propinasTotales)}</span></div>
+<div class="sec">Entrega</div>
+<div class="row"><span>Ventas totales:</span><span>${fw(ventasTotales)}</span></div>
+<div class="row"><span>Total propinas:</span><span>${fw(propinasTotales)}</span></div>
+<div class="row neg"><span>Gastos:</span><span>-${fw(todayExpenses)}</span></div>
+<div class="row grand"><span>Entrega final del día:</span><span>${fw(entregaFinal)}</span></div>
+<div class="sec">Desglose de Entrega</div>
+<div class="row"><span>Efectivo:</span><span>${fw(entregaEfectivo)}</span></div>
+<div class="row"><span>Dólares (conv.):</span><span>${fw(dolaresConv)}</span></div>
+<div class="row"><span>Tarjetas (incl. prop.):</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
+<div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
+<div class="row grand"><span>Entrega total:</span><span>${fw(entregaTotal)}</span></div>
+<div class="sec">Corte</div>
+<div class="row"><span>Pesos:</span><span>${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span></div>
+<div class="row"><span>Dólares (conv.):</span><span>${fw(dolaresConv)}</span></div>
+<div class="row"><span>Tarjetas:</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
+<div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
+<div class="row neg"><span>Compras:</span><span>-${fw(todayExpenses)}</span></div>
+<div class="foot">Impreso por: ${currentUser?.name || 'Administrador'}<br/>Gallo Azul Ops &nbsp;·&nbsp; ${fechaImp}</div>
+</body></html>`);
+                printWin.document.close();
+                printWin.focus();
+                setTimeout(() => { printWin.print(); }, 350);
+              }}
+              style={{ marginTop: 10, height: 50, width: '100%', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f1f5f9', color: '#334155', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s' }}
+              onMouseOver={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+              onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+            >
+              <Printer size={18} strokeWidth={2.5} /> Imprimir cierre
+            </button>
           </div>
         </div>
       )}
