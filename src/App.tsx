@@ -4282,12 +4282,23 @@ export default function App() {
 <div class="sub">Restaurante &amp; Hotel — Los Barriles, BCS</div>
 <div class="fecha">CIERRE DE JORNADA &nbsp;|&nbsp; ${fechaImp}</div>
 <div class="sec">Reporte Diario</div>
-<div class="row"><span>Ventas restaurante:</span><span>${fw(todayIncome)}</span></div>
+<div class="row"><span>Fecha y hora del corte:</span><span>${fechaImp}</span></div>
+<div class="row"><span>Ventas restaurante (Base):</span><span>${fw(todayIncome)}</span></div>
 <div class="row"><span>Ventas hotel:</span><span>${fw(ventasHotel)}</span></div>
 <div class="row total"><span>Ingresos totales:</span><span>${fw(ventasTotales)}</span></div>
+<div class="sec">Corte</div>
+<div class="row"><span>Pesos:</span><span>${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span></div>
+<div class="row"><span>Dólares convertidos:</span><span>${fw(dolaresConv)}</span></div>
+<div class="row"><span>Tarjetas:</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
+<div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
+<div class="row neg"><span>Compras:</span><span>${fw(todayExpenses)}</span></div>
+<div class="row"><span>Venta Total:</span><span>${fw(ventasTotales)}</span></div>
+<div class="row"><span>Fondo + Propinas en tarjetas:</span><span>${fw((pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales)}</span></div>
+<div class="row"><span>Propinas en tarjetas:</span><span>${fw(propinasTC)}</span></div>
+<div class="row total"><span>Fondo:</span><span>${fw((pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales - propinasTC)}</span></div>
 <div class="sec">Propinas</div>
-<div class="row"><span>Propinas efectivo:</span><span>${fw(propinasEfectivoAMostrar)}</span></div>
-<div class="row"><span>Propinas tarjetas:</span><span>${fw(propinasTC)}</span></div>
+<div class="row"><span>Propinas en efectivo:</span><span>${fw(propinasEfectivoAMostrar)}</span></div>
+<div class="row"><span>Propinas en tarjetas:</span><span>${fw(propinasTC)}</span></div>
 <div class="row total"><span>Total propinas:</span><span>${fw(propinasTotales)}</span></div>
 <div class="sec">Entrega</div>
 <div class="row"><span>Ventas totales:</span><span>${fw(ventasTotales)}</span></div>
@@ -4296,16 +4307,10 @@ export default function App() {
 <div class="row grand"><span>Entrega final del día:</span><span>${fw(entregaFinal)}</span></div>
 <div class="sec">Desglose de Entrega</div>
 <div class="row"><span>Efectivo:</span><span>${fw(entregaEfectivo)}</span></div>
-<div class="row"><span>Dólares (conv.):</span><span>${fw(dolaresConv)}</span></div>
-<div class="row"><span>Tarjetas (incl. prop.):</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
+<div class="row"><span>Dólares:</span><span>${fw(dolaresConv)}</span></div>
+<div class="row"><span>Tarjetas (incl. propina):</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
 <div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
-<div class="row grand"><span>Entrega total:</span><span>${fw(entregaTotal)}</span></div>
-<div class="sec">Corte</div>
-<div class="row"><span>Pesos:</span><span>${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span></div>
-<div class="row"><span>Dólares (conv.):</span><span>${fw(dolaresConv)}</span></div>
-<div class="row"><span>Tarjetas:</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
-<div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
-<div class="row neg"><span>Compras:</span><span>-${fw(todayExpenses)}</span></div>
+<div class="row grand"><span>Entrega:</span><span>${fw(entregaTotal)}</span></div>
 <div class="foot">Impreso por: ${currentUser?.name || 'Administrador'}<br/>Gallo Azul Ops &nbsp;·&nbsp; ${fechaImp}</div>
 </body></html>`);
                 printWin.document.close();
