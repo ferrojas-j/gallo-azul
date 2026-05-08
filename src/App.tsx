@@ -306,7 +306,7 @@ export default function App() {
     closeDay, deleteShiftSummary, logPrintedTicket,
     addHotelSale, deleteHotelSale, exchangeRate,
     pendingTickets, markTicketPrinted, deleteTicket, deleteClosedOrder, fetchTodayTotals,
-    createDeliveryOrder, registrations, fetchRegistrations, deleteRegistration
+    createDeliveryOrder, registrations, fetchRegistrations, deleteRegistration, rectificarCuenta
   } = useSupabaseSync();
 
   // UI state
@@ -4934,7 +4934,7 @@ export default function App() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 12 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Mesa: {previewTicket.table_id}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Mesa: {tables.find(t => t.id === previewTicket.table_id)?.name || previewTicket.table_id}</div>
                 <div style={{ fontSize: 14, color: '#475569', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewTicket.items_summary}</div>
               </div>
 
@@ -4945,13 +4945,56 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 12 }}>
+              <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 4 }}>
                 {new Date(previewTicket.created_at).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </div>
+
+              {/* Botón Rectificar cuenta */}
+              <button
+                id="btn-rectificar-cuenta"
+                onClick={async () => {
+                  if (!previewTicket.id || !previewTicket.table_id) return;
+                  const btn = document.getElementById('btn-rectificar-cuenta') as HTMLButtonElement;
+                  if (btn) { btn.disabled = true; btn.textContent = 'Reabriendo…'; }
+                  const result = await rectificarCuenta(previewTicket.id, previewTicket.table_id);
+                  if (result?.success) {
+                    setPreviewTicket(null);
+                    setSelectedTableId(previewTicket.table_id);
+                    setCurrentView('mesa');
+                  } else {
+                    alert('Error al rectificar la cuenta. Intenta de nuevo.');
+                    if (btn) { btn.disabled = false; btn.textContent = '✏️ Rectificar cuenta'; }
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '14px 20px',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)',
+                  transition: 'all 0.2s',
+                  letterSpacing: '-0.2px',
+                }}
+                onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.45)'; }}
+                onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.35)'; }}
+              >
+                <Pencil size={17} strokeWidth={2.5} /> Rectificar cuenta
+              </button>
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* Modal Registrar Compra (POS) */}
       {showPosExpenseModal && (

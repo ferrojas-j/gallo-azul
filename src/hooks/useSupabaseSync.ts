@@ -800,6 +800,41 @@ export function useSupabaseSync() {
     await fetchTodayTotals();
   }, [fetchTodayTotals]);
 
+  const rectificarCuenta = useCallback(async (orderId: string, tableId: number) => {
+    try {
+      // 1. Reabrir la orden: status → open, limpiar campos de pago
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          status: 'open',
+          payment_method: null,
+          tip: 0,
+          closed_at: null,
+        })
+        .eq('id', orderId);
+
+      if (orderError) {
+        console.error('Error al rectificar cuenta:', orderError);
+        return { success: false, error: orderError };
+      }
+
+      // 2. Marcar la mesa como ocupada
+      await dbTables.updateStatus(tableId, 'occupied');
+
+      // 3. Refrescar datos en tiempo real
+      await Promise.all([
+        fetchOrdersAndItems(),
+        fetchTodayTotals(),
+        fetchTables(),
+      ]);
+
+      return { success: true };
+    } catch (err) {
+      console.error('Error crítico al rectificar cuenta:', err);
+      return { success: false, error: err };
+    }
+  }, [fetchOrdersAndItems, fetchTodayTotals, fetchTables]);
+
   const addHotelSale = async (amount: number, currency: string, paymentMethod: string) => {
     let finalAmount = amount;
     let finalCurrency = currency;
@@ -905,5 +940,6 @@ export function useSupabaseSync() {
     fetchRegistrations,
     deleteRegistration,
     deleteClosedOrder,
+    rectificarCuenta,
   };
 }
