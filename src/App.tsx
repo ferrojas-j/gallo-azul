@@ -19,6 +19,9 @@ import type { UserRow } from './lib/supabaseService';
 import { getUpcomingCheckins, updateReservationStatus, createReservation, addTransaction } from './lib/hostawayService';
 import type { Reservation } from './lib/hostawayService';
 
+// BUILD: 2026-05-11T21:00:00Z — cortesia-icon v8
+const _BUILD_VERSION = '2026-05-11T21:00:00Z';
+
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -1219,7 +1222,7 @@ export default function App() {
     }).format(val).replace('MX', '').replace('US', '').trim();
   };
   const [expenseAmount, setExpenseAmount] = useState('');
-  const [expenseConcept, setExpenseConcept] = useState('Pago a proveedores');
+  const [expenseConcept, setExpenseConcept] = useState('Compra de insumos');
   const [expenseDetail, setExpenseDetail] = useState('');
 
   // Add User modal
@@ -1470,7 +1473,7 @@ export default function App() {
     await addExpense(Number(expenseAmount), expenseConcept, expenseDetail);
     setIsExpenseModalOpen(false);
     setExpenseAmount('');
-    setExpenseConcept('Pago a proveedores');
+    setExpenseConcept('Compra de insumos');
     setExpenseDetail('');
   };
 
@@ -6249,9 +6252,13 @@ export default function App() {
               <div className="form-group">
                 <label>Concepto</label>
                 <select value={expenseConcept} onChange={e => setExpenseConcept(e.target.value)}>
-                  <option>Pago a proveedores</option>
                   <option>Compra de insumos</option>
-                  <option>Otro</option>
+                  <option>Pago a proveedores</option>
+                  <option>Gastos fijos</option>
+                  <option>Caja chica</option>
+                  <option>Caja chica jefe</option>
+                  <option>Viáticos</option>
+                  <option>Otros</option>
                 </select>
               </div>
               <div className="form-group">

@@ -386,7 +386,7 @@
       document.getElementById('globalLoader').classList.remove('hidden');
       try {
         const urlRes = `${SUPABASE_URL}/rest/v1/financial_reservations?select=*&status=in.(confirmed,reserved,modified)&arrival_date=gte.${from}&arrival_date=lte.${to}&order=arrival_date.asc`;
-        const urlExp = `${SUPABASE_URL}/rest/v1/expenses?select=*&expense_date=gte.${from}&expense_date=lte.${to}&status=eq.completed`;
+        const urlExp = `${SUPABASE_URL}/rest/v1/expenses?select=*&expense_date=gte.${from}&expense_date=lte.${to}&status=neq.archived`;
         
         const [resResponse, expResponse] = await Promise.all([
           fetch(urlRes, {

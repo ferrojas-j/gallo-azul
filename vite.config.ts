@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
   ],
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
