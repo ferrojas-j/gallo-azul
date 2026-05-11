@@ -247,7 +247,8 @@ export const dbExpenses = {
     return supabase.from('expenses').insert({ amount, concept, detail: detail || null, expense_date: today, status: 'active' });
   },
   getToday: () => {
-    return supabase.from('expenses').select('*').neq('status', 'archived').order('created_at', { ascending: false });
+    const today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Mazatlan'}).format(new Date());
+    return supabase.from('expenses').select('*').eq('expense_date', today).neq('status', 'archived').order('created_at', { ascending: false });
   },
   archiveExpenses: (ids: string[]) =>
     supabase.from('expenses').update({ status: 'archived' }).in('id', ids),
