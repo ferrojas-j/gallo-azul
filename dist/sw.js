@@ -1,5 +1,5 @@
 // Gallo Azul PWA Service Worker
-const CACHE_NAME = 'gallo-azul-v1';
+const CACHE_NAME = 'gallo-azul-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

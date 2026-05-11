@@ -95,7 +95,8 @@ export async function createReservation(params: any): Promise<any> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+      const hwMessage = errorData.errorMessage || errorData.error || JSON.stringify(errorData);
+      throw new Error(hwMessage || `Error del servidor: ${response.status}`);
     }
 
     return await response.json();
@@ -116,7 +117,10 @@ export async function addTransaction(reservationId: number, params: { title: str
       },
       body: JSON.stringify({
         action: 'addTransaction',
-        params: { reservationId, ...params }
+        params: {
+          reservationId,
+          ...params
+        }
       })
     });
 
@@ -127,7 +131,7 @@ export async function addTransaction(reservationId: number, params: { title: str
 
     return await response.json();
   } catch (error: any) {
-    console.error('Hostaway Transaction Error:', error);
-    throw new Error(error.message || 'No se pudo registrar la transacción en Hostaway');
+    console.error('Hostaway Add Transaction Error:', error);
+    throw new Error(error.message || 'No se pudo registrar la transaccion en Hostaway');
   }
 }

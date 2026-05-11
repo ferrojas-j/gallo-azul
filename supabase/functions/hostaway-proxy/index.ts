@@ -76,9 +76,9 @@ serve(async (req) => {
 
       const rawResults = resData.result || [];
 
-      // Only confirmed statuses. Hostaway uses: reserved, confirmed, ownerStay.
-      // Exclude: new, inquiry, cancelled, declined, expired, noshow, modified(unconfirmed)
-      const CONFIRMED_STATUSES = new Set(['reserved', 'confirmed', 'ownerStay', 'modified']);
+      // Only confirmed statuses. Hostaway uses: new, reserved, confirmed, ownerStay, approved, pending.
+      // Exclude: inquiry, cancelled, declined, expired, noshow.
+      const CONFIRMED_STATUSES = new Set(['new', 'reserved', 'confirmed', 'ownerStay', 'modified', 'approved', 'pending']);
 
       // Log all statuses coming from API for debugging
       console.log('Raw Hostaway statuses:', rawResults.map((r: any) => `${r.id}:${r.guestName}:${r.status}`).join(', '));
@@ -110,8 +110,12 @@ serve(async (req) => {
           const paidAmount = parseFloat(r.paidAmount || 0);
           const pStatus = (r.paymentStatus || "").toLowerCase();
           const noteText = ((r.hostNote || "") + " " + (r.guestNote || "")).toUpperCase();
-          const isPaid = pStatus === 'paid' || r.isPaid === true || r.isPaid === 1 || (paidAmount >= (totalAmount - 0.01) && totalAmount > 0) || noteText.includes('PAID');
-
+          const sourceName = (r.sourceName || r.channelName || "").toLowerCase();
+          const channelId = r.channelId;
+          
+          let isPaid = pStatus === 'paid' || r.isPaid === true || r.isPaid === 1 || (paidAmount >= (totalAmount - 0.01) && totalAmount > 0) || noteText.includes('PAID');
+          // Just use Hostaway's native fields and our custom 'PAID' note to determine status.
+          // We no longer force OTAs to be paid, allowing manual overrides and accurate mirroring.
           uniqueMap.set(compositeKey, {
             id: r.id,
             guestName: r.guestName || `${firstName} ${lastName}`.trim(),
@@ -123,6 +127,7 @@ serve(async (req) => {
             totalAmount: totalAmount,
             currency: r.currency || "USD",
             paymentStatus: isPaid ? 'Pagado' : 'Por Pagar',
+            isPaid: isPaid,
             roomName: listingsMap[r.listingMapId] || `Habitación ${r.listingMapId}`,
             arrivalDate: r.arrivalDate,
             departureDate: r.departureDate,
@@ -153,12 +158,18 @@ serve(async (req) => {
       const listingsData = await listingsResponse.json();
       const allListings = listingsData.result || [];
 
-      const resUrl = `https://api.hostaway.com/v1/reservations?arrivalStartDate=${arrivalDate}&arrivalEndDate=${departureDate}&limit=100`;
+      const resUrl = `https://api.hostaway.com/v1/reservations?departureStartDate=${arrivalDate}&limit=200`;
       const resResponse = await fetch(resUrl, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const resData = await resResponse.json();
-      const occupiedListingIds = new Set((resData.result || []).map((r: any) => r.listingMapId));
+      
+      const activeStatuses = ['new', 'modified', 'approved', 'pending', 'reserved', 'confirmed', 'ownerStay'];
+      const overlapping = (resData.result || []).filter((r: any) => {
+        if (!activeStatuses.includes(r.status)) return false;
+        return (r.arrivalDate < departureDate) && (r.departureDate > arrivalDate);
+      });
+      const occupiedListingIds = new Set(overlapping.map((r: any) => r.listingMapId));
 
       const available = allListings.filter((l: any) => !occupiedListingIds.has(l.id))
         .map((l: any) => ({
@@ -213,19 +224,28 @@ serve(async (req) => {
       let paidAmountToUpdate = undefined;
       let paymentStatusToUpdate = undefined;
       
-      if (typeof isPaid === 'boolean' && isPaid) {
-        // Fetch current reservation to append PAID to hostNote without overwriting and get total price
+      if (typeof isPaid === 'boolean') {
         const getRes = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (getRes.ok) {
           const resData = await getRes.json();
-          const currentNote = resData?.result?.hostNote || "";
-          if (!currentNote.includes("PAID")) {
-            hostNoteToUpdate = currentNote ? `${currentNote} | PAID` : "PAID";
+          let currentNote = resData?.result?.hostNote || "";
+          
+          if (isPaid) {
+            if (!currentNote.includes("PAID")) {
+              hostNoteToUpdate = currentNote ? `${currentNote} | PAID` : "PAID";
+            }
+            paidAmountToUpdate = resData?.result?.totalPrice || resData?.result?.totalAmount || 0;
+            paymentStatusToUpdate = 'paid';
+          } else {
+            if (currentNote.includes("PAID")) {
+              currentNote = currentNote.replace(/\s*\|\s*PAID/g, "").replace(/PAID/g, "").trim();
+              hostNoteToUpdate = currentNote;
+            }
+            paidAmountToUpdate = 0;
+            paymentStatusToUpdate = 'unpaid';
           }
-          paidAmountToUpdate = resData?.result?.totalPrice || resData?.result?.totalAmount || 0;
-          paymentStatusToUpdate = 'paid';
         }
       }
 
@@ -236,6 +256,71 @@ serve(async (req) => {
       if (hostNoteToUpdate !== undefined) updatePayload.hostNote = hostNoteToUpdate;
       if (paidAmountToUpdate !== undefined) updatePayload.paidAmount = paidAmountToUpdate;
       if (paymentStatusToUpdate !== undefined) updatePayload.paymentStatus = paymentStatusToUpdate;
+
+      if (status === 'cancelled') {
+        // Fetch reservation first to get listing and dates for unblocking
+        const getRes = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        let listingMapId, arrivalDate, unblockEndDate;
+        if (getRes.ok) {
+          const resData = await getRes.json();
+          if (resData && resData.result) {
+             listingMapId = resData.result.listingMapId;
+             arrivalDate = resData.result.arrivalDate;
+             if (resData.result.departureDate) {
+               const d = new Date(resData.result.departureDate);
+               d.setDate(d.getDate() - 1);
+               unblockEndDate = d.toISOString().split('T')[0];
+             }
+          }
+        }
+
+        const cancelResponse = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}/statuses/cancelled`, {
+          method: 'PUT',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'X-Hostaway-Account-Id': HOSTAWAY_ACCOUNT_ID,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ cancelledBy: params.cancelledBy || 'host' }),
+        });
+        
+        if (!cancelResponse.ok) {
+          const err = await cancelResponse.text();
+          throw new Error(`Hostaway cancel error: ${err}`);
+        }
+
+        // Explicitly unblock the calendar dates
+        if (listingMapId && arrivalDate && unblockEndDate) {
+           const days = [];
+           let curr = new Date(arrivalDate);
+           const end = new Date(unblockEndDate);
+           while (curr <= end) {
+             days.push({
+               date: curr.toISOString().split('T')[0],
+               status: 'available'
+             });
+             curr.setDate(curr.getDate() + 1);
+           }
+           
+           await fetch(`https://api.hostaway.com/v1/listings/${listingMapId}/calendar`, {
+             method: 'PUT',
+             headers: { 
+               'Authorization': `Bearer ${token}`,
+               'Cache-Control': 'no-cache',
+               'Content-Type': 'application/json' 
+             },
+             body: JSON.stringify({ days })
+           });
+        }
+
+        const cancelData = await cancelResponse.json();
+        return new Response(JSON.stringify(cancelData), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const resResponse = await fetch(`https://api.hostaway.com/v1/reservations/${reservationId}`, {
         method: 'PUT',
@@ -270,8 +355,9 @@ serve(async (req) => {
         amount: parseFloat(amount),
         currency: currency || 'USD',
         paymentMethod: paymentMethod || 'cash',
-        isPaid: 1,
-        date: todayDate,
+        type: 'charge',
+        status: 'paid',
+        scheduledDate: `${todayDate} 12:00:00`,
       };
 
       console.log('addTransaction payload:', JSON.stringify(payload));
@@ -298,8 +384,9 @@ serve(async (req) => {
 
     throw new Error(`Unknown action: ${action}`);
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    console.error("PROXY ERROR STACK:", error.stack || error.message || error);
+    return new Response(JSON.stringify({ error: error.message || String(error) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     })

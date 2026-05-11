@@ -80,6 +80,8 @@ export const dbTables = {
     supabase.from('tables').update({ is_active: false }).eq('id', id),
   delete: (id: number) =>
     supabase.from('tables').delete().eq('id', id),
+  update: (id: number, name: string, category: string) =>
+    supabase.from('tables').update({ name, category }).eq('id', id),
 };
 
 export const dbOrders = {
@@ -214,6 +216,8 @@ export const dbMenu = {
     supabase.from('menu_items').insert(item).select().single(),
   insertVariant: (variant: { menu_item_id: string; label: string; price: number; active: boolean; sort_order: number }) =>
     supabase.from('menu_item_variants').insert(variant).select().single(),
+  deleteItem: (id: string) =>
+    supabase.from('menu_items').delete().eq('id', id),
 };
 
 export const dbCategories = {

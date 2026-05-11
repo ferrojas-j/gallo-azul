@@ -199,7 +199,7 @@ export function useSupabaseSync() {
         hotelRes.data.forEach((sale: any) => {
           const rate = sale.exchange_rate || exchangeRate;
           const amountInMXN = sale.currency === 'USD' ? Number(sale.amount) * rate : Number(sale.amount);
-          if (sale.payment_method === 'tarjeta') hCard += amountInMXN;
+          if (sale.payment_method === 'tarjeta' || sale.payment_method === 'creditCard') hCard += amountInMXN;
           else hCash += amountInMXN;
         });
         setHotelCardSales(hCard);
@@ -315,34 +315,75 @@ export function useSupabaseSync() {
     }
   }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchTodayTickets, fetchExchangeRate]);
 
-  // ── Realtime subscriptions ──────────────────────────
+  const fetchTodayTotalsRef = useRef(fetchTodayTotals);
+  fetchTodayTotalsRef.current = fetchTodayTotals;
+
+  // ── Initial Fetch & Polling ──────────────────────────
   useEffect(() => {
     fetchAll();
     
     // Auto-update exchange rate every hour
     const rateInterval = setInterval(fetchExchangeRate, 3600000);
+    return () => clearInterval(rateInterval);
+  }, [fetchAll, fetchExchangeRate]);
 
+  // ── Realtime subscriptions ──────────────────────────
+  useEffect(() => {
     const channel = supabase
       .channel('app-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, fetchTables)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrdersAndItems)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fetchOrdersAndItems)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, fetchTodayTotals)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchUsers)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_variants' }, fetchMenu)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, fetchMenu)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_summaries' }, fetchDailySummaries)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'printed_tickets' }, fetchTodayTickets)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_registrations' }, fetchRegistrations)
-      .subscribe();
-
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        const table = payload.table;
+        
+        // Use a short delay to account for potential PostgREST replication lag 
+        // so that the subsequent select() queries don't return stale data.
+        setTimeout(() => {
+          switch (table) {
+            case 'tables':
+              fetchTables();
+              fetchTodayTotalsRef.current();
+              break;
+            case 'orders':
+            case 'order_items':
+              fetchOrdersAndItems();
+              fetchTodayTotalsRef.current();
+              break;
+            case 'expenses':
+            case 'hotel_sales':
+              fetchTodayTotalsRef.current();
+              break;
+            case 'users':
+              fetchUsers();
+              break;
+            case 'menu_items':
+            case 'menu_item_variants':
+            case 'menu_categories':
+              fetchMenu();
+              break;
+            case 'shift_summaries':
+              fetchDailySummaries();
+              fetchOrdersAndItems();
+              fetchTables();
+              fetchTodayTotalsRef.current();
+              break;
+            case 'printed_tickets':
+              fetchTodayTickets();
+              break;
+            case 'guest_registrations':
+              fetchRegistrations();
+              break;
+            default:
+              break;
+          }
+        }, 800);
+      })
+      .subscribe((status) => {
+        console.log('Realtime status:', status);
+      });
 
     return () => { 
       supabase.removeChannel(channel); 
-      clearInterval(rateInterval);
     };
-  }, [fetchAll, fetchExchangeRate]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchTables, fetchOrdersAndItems, fetchUsers, fetchMenu, fetchDailySummaries, fetchTodayTickets, fetchRegistrations]);
 
   // ── Operations ──────────────────────────────────────
 
@@ -522,6 +563,18 @@ export function useSupabaseSync() {
     await fetchTodayTotals();
   }, [fetchTodayTotals]);
 
+  const updateExpense = useCallback(async (id: string, amount: number, concept: string, detail: string) => {
+    const { error } = await supabase.from('expenses').update({ amount, concept, detail }).eq('id', id);
+    if (error) console.error('Error updating expense:', error);
+    else await fetchTodayTotals();
+  }, [fetchTodayTotals]);
+
+  const deleteExpense = useCallback(async (id: string) => {
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) console.error('Error deleting expense:', error);
+    else await fetchTodayTotals();
+  }, [fetchTodayTotals]);
+
   const toggleMenuItem = useCallback(async (id: string, active: boolean) => {
     // Optimistic update
     setMenuItems(prev => prev.map(m => m.id === id ? { ...m, active } : m));
@@ -555,6 +608,11 @@ export function useSupabaseSync() {
     await dbCategories.updateName(id, name);
   }, []);
 
+  const deleteMenuItem = useCallback(async (id: string) => {
+    setMenuItems(prev => prev.filter(m => m.id !== id));
+    await dbMenu.deleteItem(id);
+  }, []);
+
   const addCategory = useCallback(async (name: string) => {
     const { data, error } = await dbCategories.insert(name);
     if (!error) await fetchMenu();
@@ -579,6 +637,10 @@ export function useSupabaseSync() {
 
   const deleteTable = useCallback(async (id: number) => {
     await dbTables.delete(id);
+  }, []);
+
+  const updateTable = useCallback(async (id: number, name: string, category: string) => {
+    await dbTables.update(id, name, category);
   }, []);
 
   const addUser = useCallback(async (name: string, role: 'Administrador' | 'Staff' | 'Encargado', password: string) => {
@@ -835,7 +897,7 @@ export function useSupabaseSync() {
     }
   }, [fetchOrdersAndItems, fetchTodayTotals, fetchTables]);
 
-  const addHotelSale = async (amount: number, currency: string, paymentMethod: string) => {
+  const addHotelSale = async (amount: number, currency: string, paymentMethod: string, reservationId?: number | null, guestName?: string, roomName?: string, roomNumber?: string) => {
     let finalAmount = amount;
     let finalCurrency = currency;
 
@@ -851,10 +913,27 @@ export function useSupabaseSync() {
         currency: finalCurrency,
         payment_method: paymentMethod,
         exchange_rate: exchangeRate,
-        status: 'closed'
+        status: 'closed',
+        ...(reservationId ? { reservation_id: reservationId } : {}),
+        ...(guestName ? { guest_name: guestName } : {}),
+        ...(roomName ? { room_name: roomName } : {}),
+        ...(roomNumber ? { room_number: roomNumber } : {}),
       }]);
     if (error) console.error('Error adding hotel sale:', error);
     else fetchTodayTotals();
+  };
+
+  const revertHotelSaleByReservation = async (reservationId: number) => {
+    try {
+      const { error } = await supabase
+        .from('hotel_sales')
+        .delete()
+        .eq('reservation_id', reservationId);
+      if (error) throw error;
+      await fetchTodayTotals();
+    } catch (error) {
+      console.error('Error reverting hotel sale by reservation:', error);
+    }
   };
 
   const deleteHotelSale = async (id: string) => {
@@ -864,6 +943,21 @@ export function useSupabaseSync() {
       await fetchTodayTotals();
     } catch (error) {
       console.error('Error deleting hotel sale:', error);
+    }
+  };
+
+  const updateHotelSale = async (id: string, amount: number, currency: string, paymentMethod: string, note?: string) => {
+    try {
+      const { error } = await supabase.from('hotel_sales').update({
+        amount,
+        currency,
+        payment_method: paymentMethod,
+        ...(note !== undefined ? { note } : {})
+      }).eq('id', id);
+      if (error) throw error;
+      await fetchTodayTotals();
+    } catch (error) {
+      console.error('Error updating hotel sale:', error);
     }
   };
 
@@ -896,6 +990,8 @@ export function useSupabaseSync() {
     hotelSalesList,
     addHotelSale,
     deleteHotelSale,
+    updateHotelSale,
+    revertHotelSaleByReservation,
     exchangeRate,
     fetchExchangeRate,
     fetchTodayTotals,
@@ -918,16 +1014,20 @@ export function useSupabaseSync() {
     confirmPayment,
     cancelTable,
     addExpense,
+    updateExpense,
+    deleteExpense,
     toggleMenuItem,
     toggleMenuVariant,
     updateMenuItem,
     updateMenuVariant,
     updateCategory,
+    deleteMenuItem,
     addCategory,
     addMenuItem,
     addMenuVariant,
     addTable,
     deleteTable,
+    updateTable,
     addUser,
     deleteUser,
     updateUser,
