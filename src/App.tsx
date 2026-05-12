@@ -3072,6 +3072,18 @@ export default function App() {
                                 </div>
                               </div>
                               {(() => {
+                                // PRIMARY: cross-reference with guest_registrations.price
+                                // If price=0 in our DB, it's a courtesy — overrides Hostaway amount always
+                                const localReg = registrations.find((r: any) => String(r.hostaway_reservation_id) === String(res.id) && r.status !== 'checked_out');
+                                if (localReg && Number(localReg.price) === 0) {
+                                  return (
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: 0.5 }}>Total</div>
+                                      <div style={{ fontSize: 13, color: '#059669', fontWeight: 700 }}>🎁 Cortesía</div>
+                                    </div>
+                                  );
+                                }
+                                // SECONDARY: active hotel_sales override (status='closed')
                                 const sale = hotelSalesList.find((s: any) => String(s.reservation_id) === String(res.id));
                                 const displayAmount = sale ? Number(sale.amount) : res.totalAmount;
                                 const displayCurrency = sale ? (sale.currency || 'MXN') : res.currency;
