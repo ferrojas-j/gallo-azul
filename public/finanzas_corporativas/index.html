@@ -372,13 +372,62 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
 </div>
 <div id="panel-comisiones-canales" style="display:none">
-  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:64px 32px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
-    <div style="width:64px;height:64px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  <!-- sync badge -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <span style="background:#ede9fe;color:#5b21b6;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700">🔄 Sincronizado con Ingresos Hotel</span>
+    <span id="comm-period-badge" style="background:#f1f5f9;color:#475569;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600"></span>
+  </div>
+  <!-- KPI cards -->
+  <div class="kpi-grid" style="margin-bottom:20px">
+    <div class="kpi-card"><div class="kpi-label">Total Comisiones</div><div class="kpi-value" id="comm-kpi-total">—</div><div class="kpi-sub">💸 MXN pagado a canales</div></div>
+    <div class="kpi-card"><div class="kpi-label">% Efectivo s/ingresos</div><div class="kpi-value" id="comm-kpi-pct">—</div><div class="kpi-sub">📊 Porcentaje total</div></div>
+    <div class="kpi-card"><div class="kpi-label">Canal más costoso</div><div class="kpi-value" id="comm-kpi-top">—</div><div class="kpi-sub">🏆 Por monto total</div></div>
+    <div class="kpi-card"><div class="kpi-label">Reservas con comisión</div><div class="kpi-value" id="comm-kpi-count">—</div><div class="kpi-sub">🧾 Con datos identificados</div></div>
+  </div>
+  <!-- Channel breakdown table -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:20px">
+    <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span style="font-weight:800;color:#0f172a;font-size:15px">Comisiones por canal</span>
     </div>
-    <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 8px">Comisiones Canales</h2>
-    <p style="color:#64748b;font-size:14px;margin:0 0 24px">Módulo en desarrollo &mdash; próximamente disponible.</p>
-    <span style="background:#ede9fe;color:#5b21b6;padding:6px 18px;border-radius:100px;font-size:12px;font-weight:700">Próximamente</span>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead style="background:#f8fafc">
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <th style="text-align:left;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">Canal</th>
+          <th style="text-align:center;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">Reservas</th>
+          <th style="text-align:right;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">Ingresos MXN</th>
+          <th style="text-align:right;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">Comisión MXN</th>
+          <th style="text-align:center;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">% Comisión</th>
+          <th style="text-align:right;padding:11px 16px;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase">Fuente tasa</th>
+        </tr>
+      </thead>
+      <tbody id="comm-channel-body">
+        <tr><td colspan="6" style="text-align:center;padding:48px;color:#94a3b8">Esperando datos...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- Reservas detalle -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+    <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span style="font-weight:800;color:#0f172a;font-size:15px">Detalle por reserva</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead style="background:#f8fafc">
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <th style="text-align:left;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Fecha</th>
+          <th style="text-align:left;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Huésped</th>
+          <th style="text-align:left;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Canal</th>
+          <th style="text-align:right;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Ingreso MXN</th>
+          <th style="text-align:right;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Comisión MXN</th>
+          <th style="text-align:center;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">%</th>
+          <th style="text-align:center;padding:10px 14px;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase">Fuente</th>
+        </tr>
+      </thead>
+      <tbody id="comm-detail-body">
+        <tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Esperando datos...</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 <div id="panel-gastos-menores" style="display:none">
@@ -533,6 +582,9 @@ function applyFilters(){
   if(filterMonth!=='all')rows=rows.filter(function(r){return r[dateField]&&r[dateField].slice(5,7)===filterMonth;});
   if(filterChannel!=='all')rows=rows.filter(function(r){return r.source_name===filterChannel;});
   renderTable(rows);
+  // If commission panel is visible, keep it in sync
+  var cPanel=document.getElementById('panel-comisiones-canales');
+  if(cPanel && cPanel.style.display!=='none') renderComisionesCanales();
 }
 function renderTable(rows){
   const TODAY=new Date().toISOString().slice(0,10);
@@ -888,6 +940,7 @@ function showPanel(name){
   }
   // 4. Update page title
   if(name==='restaurante') loadRestauranteData();
+  if(name==='comisiones-canales') renderComisionesCanales();
   document.querySelector('.page-title').textContent=PAGE_TITLES[name]||'';
 }
 // Event listeners — all ID-based for reliability
@@ -1051,6 +1104,157 @@ function renderRestPanel(rows){
       +'<td style="padding:12px 16px;text-align:right;font-weight:800;color:'+balColor+'">'+fmt(balance)+'</td>'
       +'</tr>';
   }).join('');
+}
+// ---- COMISIONES CANALES MODULE ----
+// Shares allData, filterYear, filterMonth, filterChannel, COMM_OVERRIDES, COURTESY with hotel module
+
+function calcRowComm(r){
+  var isC = COURTESY.indexOf(Number(r.id)) > -1;
+  if(isC) return { mxnAmt:0, commAmt:0, source:'cortesia' };
+  var rate = Number(r.mxn_rate||0);
+  var mxnAmt = r.mxn_amount ? Number(r.mxn_amount) : Number(r.total_amount||0)*rate;
+  var commAmt, source;
+  if(COMM_OVERRIDES[r.source_name] !== undefined){
+    commAmt = mxnAmt * (COMM_OVERRIDES[r.source_name]/100);
+    source = 'override';
+  } else if(r.channel_commission && rate){
+    commAmt = Number(r.channel_commission)*rate;
+    source = 'db';
+  } else {
+    commAmt = 0;
+    source = 'sin datos';
+  }
+  return { mxnAmt:mxnAmt, commAmt:commAmt, source:source };
+}
+
+function renderComisionesCanales(){
+  var TODAY = new Date().toISOString().slice(0,10);
+  var dateField = filterOrder==='checkin' ? 'arrival_date' : 'booking_date';
+  // Apply same filters as hotel module
+  var rows = allData;
+  if(filterYear !== 'all') rows = rows.filter(function(r){ return r[dateField] && r[dateField].slice(0,4)===filterYear; });
+  if(filterMonth !== 'all') rows = rows.filter(function(r){ return r[dateField] && r[dateField].slice(5,7)===filterMonth; });
+
+  // Period label
+  var badge = document.getElementById('comm-period-badge');
+  if(badge){
+    var label = filterYear==='all'?'Todos los años':filterYear;
+    if(filterMonth!=='all'){
+      var MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      label += ' — '+MN[parseInt(filterMonth,10)-1];
+    }
+    badge.textContent = '📅 '+label+' · '+rows.length+' reservas';
+  }
+
+  if(!rows.length){
+    var eb='<tr><td colspan="6" style="text-align:center;padding:48px;color:#94a3b8">Sin reservas para el período seleccionado.</td></tr>';
+    var db='<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Sin reservas para el período seleccionado.</td></tr>';
+    document.getElementById('comm-channel-body').innerHTML=eb;
+    document.getElementById('comm-detail-body').innerHTML=db;
+    ['comm-kpi-total','comm-kpi-pct','comm-kpi-top','comm-kpi-count'].forEach(function(id){
+      var e=document.getElementById(id); if(e) e.textContent='—';
+    });
+    return;
+  }
+
+  var fmt = function(n){ return '$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var fmtPct = function(n){ return Number(n).toFixed(1)+'%'; };
+
+  // Per-channel aggregation
+  var channels = {};
+  var totalComm=0, totalInc=0, countWithComm=0;
+  var CHANNEL_COLORS = {
+    'Booking.com':'#003580','Expedia':'#000000','Airbnb':'#ff5a5f',
+    'Directo':'#f97316','Sitio Web':'#eab308','Otra':'#64748b'
+  };
+
+  rows.forEach(function(r){
+    var c = r.source_name || 'Otra';
+    var calc = calcRowComm(r);
+    if(!channels[c]) channels[c]={ name:c, count:0, mxnInc:0, commMXN:0, sources:[] };
+    channels[c].count++;
+    channels[c].mxnInc += calc.mxnAmt;
+    channels[c].commMXN += calc.commAmt;
+    channels[c].sources.push(calc.source);
+    totalInc += calc.mxnAmt;
+    totalComm += calc.commAmt;
+    if(calc.commAmt>0) countWithComm++;
+  });
+
+  // Sort channels by commMXN desc
+  var chArr = Object.values(channels).sort(function(a,b){ return b.commMXN-a.commMXN; });
+  var topChannel = chArr.length>0 ? chArr[0].name : '—';
+
+  // KPIs
+  var set=function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; };
+  set('comm-kpi-total', fmt(totalComm));
+  set('comm-kpi-pct', totalInc>0 ? fmtPct(totalComm/totalInc*100) : '0%');
+  set('comm-kpi-top', topChannel);
+  set('comm-kpi-count', countWithComm+' / '+rows.length);
+
+  // Channel table
+  var chRows = chArr.map(function(ch,idx){
+    var bg = idx%2===0?'#fff':'#f8fafc';
+    var color = CHANNEL_COLORS[ch.name]||'#64748b';
+    var pct = ch.mxnInc>0 ? fmtPct(ch.commMXN/ch.mxnInc*100) : '0%';
+    // dominant source
+    var srcMap={};
+    ch.sources.forEach(function(s){ srcMap[s]=(srcMap[s]||0)+1; });
+    var domSrc = Object.keys(srcMap).sort(function(a,b){return srcMap[b]-srcMap[a];})[0];
+    var srcLabel = domSrc==='override'?'<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">Manual</span>'
+      :domSrc==='db'?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">Automática</span>'
+      :'<span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">Sin datos</span>';
+    var barPct = totalComm>0 ? Math.round(ch.commMXN/totalComm*100) : 0;
+    return '<tr style="background:'+bg+';border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:13px 16px">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<span style="width:10px;height:10px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0"></span>'
+          +'<strong style="color:#0f172a">'+ch.name+'</strong>'
+        +'</div>'
+        +'<div style="margin-top:4px;height:4px;background:#f1f5f9;border-radius:4px;width:160px">'
+          +'<div style="height:4px;background:'+color+';border-radius:4px;width:'+barPct+'%"></div>'
+        +'</div>'
+      +'</td>'
+      +'<td style="padding:13px 16px;text-align:center;font-weight:700;color:#0f172a">'+ch.count+'</td>'
+      +'<td style="padding:13px 16px;text-align:right;color:#0f172a;font-weight:600">'+fmt(ch.mxnInc)+'</td>'
+      +'<td style="padding:13px 16px;text-align:right;font-weight:800;color:#dc2626">'+fmt(ch.commMXN)+'</td>'
+      +'<td style="padding:13px 16px;text-align:center">'
+        +'<span style="background:#fef2f2;color:#991b1b;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">'+pct+'</span>'
+      +'</td>'
+      +'<td style="padding:13px 16px;text-align:right">'+srcLabel+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('comm-channel-body').innerHTML = chRows||'<tr><td colspan="6" style="text-align:center;padding:32px;color:#94a3b8">Sin datos</td></tr>';
+
+  // Detail table — top 50 rows sorted by commMXN desc
+  var detailRows = rows.map(function(r){
+    var calc = calcRowComm(r);
+    return { r:r, calc:calc };
+  }).sort(function(a,b){ return b.calc.commAmt-a.calc.commAmt; }).slice(0,50);
+
+  var MNTH=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var dRows = detailRows.map(function(item,idx){
+    var r=item.r; var calc=item.calc;
+    var color=CHANNEL_COLORS[r.source_name]||'#64748b';
+    var bg=idx%2===0?'#fff':'#f8fafc';
+    var dStr=r.booking_date?r.booking_date.slice(0,10):'—';
+    var d=new Date(dStr); var dLabel=isNaN(d)?dStr:(d.getDate()+' '+MNTH[d.getMonth()]+' '+d.getFullYear());
+    var pct=calc.mxnAmt>0?fmtPct(calc.commAmt/calc.mxnAmt*100):'—';
+    var srcLabel=calc.source==='override'?'<span style="background:#ede9fe;color:#5b21b6;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">Manual</span>'
+      :calc.source==='db'?'<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">Auto</span>'
+      :calc.source==='cortesia'?'<span style="background:#f0f9ff;color:#0c4a6e;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">Cortesía</span>'
+      :'<span style="background:#fef9c3;color:#713f12;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">Sin datos</span>';
+    return '<tr style="background:'+bg+';border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:9px 14px;color:#475569">'+dLabel+'</td>'
+      +'<td style="padding:9px 14px;font-weight:600;color:#0f172a;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'—')+'</td>'
+      +'<td style="padding:9px 14px"><span style="background:'+color+'22;color:'+color+';border:1px solid '+color+'40;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">'+(r.source_name||'—')+'</span></td>'
+      +'<td style="padding:9px 14px;text-align:right;color:#0f172a;font-weight:600">'+fmt(calc.mxnAmt)+'</td>'
+      +'<td style="padding:9px 14px;text-align:right;font-weight:800;color:#dc2626">'+fmt(calc.commAmt)+'</td>'
+      +'<td style="padding:9px 14px;text-align:center;color:#64748b">'+pct+'</td>'
+      +'<td style="padding:9px 14px;text-align:center">'+srcLabel+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('comm-detail-body').innerHTML = dRows||'<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Sin datos</td></tr>';
 }
 
 loadHotelData();
