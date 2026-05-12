@@ -120,6 +120,9 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 .status-edit-wrap{display:flex;flex-direction:column;gap:5px;min-width:145px}
 .status-select{padding:5px 8px;border:2px solid #4f46e5;border-radius:7px;font-size:12px;font-weight:600;background:#fff;cursor:pointer;outline:none;width:100%}
 .status-preview{font-size:10px;font-weight:600;color:#94a3b8}
+.delete-test-btn{background:transparent;border:1px solid #f43f5e;color:#f43f5e;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:5px;vertical-align:middle;font-weight:700;transition:all .15s}
+.delete-test-btn:hover{background:#fff1f2}
+.delete-test-btn.confirming{background:#f43f5e;color:#fff;border-color:#f43f5e}
 </style></head><body>
 <div id="globalLoader" class="loader-overlay"><div class="spinner"></div></div>
 <div class="sidebar">
@@ -392,7 +395,7 @@ function renderTable(rows){
   updateKPIs(rows);
   updateDataQuality(rows);
   if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
-  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';  var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+' </td>'+'</tr>';}).join('');
+  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';var guestCell='<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span><button id="dtb-'+r.id+'" class="delete-test-btn" onclick="confirmDeleteTest('+r.id+')" title="Eliminar registro de prueba">🗑</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+guestCell+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+'</td>'+'</tr>';}).join('');
 }
 function updateKPIs(rows){
   let revMXN=0,nights=0,commMXN=0;
@@ -587,6 +590,49 @@ async function saveStatusEdit(id){
     if(prv){prv.textContent='✗ '+err.message;prv.style.color='#f43f5e';}
     if(btn){btn.textContent='✓ Guardar';btn.disabled=false;btn.style.background='#10b981';btn.style.color='#fff';}
     sel.disabled=false;
+  }
+}
+// ---- DELETE TEST RECORDS ----
+var _pendingDeleteConfirm=null;
+function confirmDeleteTest(id){
+  var btn=document.getElementById('dtb-'+id);
+  if(!btn)return;
+  if(_pendingDeleteConfirm!==id){
+    _pendingDeleteConfirm=id;
+    btn.textContent='⚠ ¿Eliminar?';
+    btn.classList.add('confirming');
+    // Auto-reset after 4s
+    setTimeout(function(){
+      if(_pendingDeleteConfirm===id){
+        _pendingDeleteConfirm=null;
+        if(btn){btn.textContent='🗑';btn.classList.remove('confirming');}
+      }
+    },4000);
+    return;
+  }
+  _pendingDeleteConfirm=null;
+  deleteTestRecord(id);
+}
+async function deleteTestRecord(id){
+  var btn=document.getElementById('dtb-'+id);
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(btn){btn.textContent='Eliminando...';btn.disabled=true;}
+  if(row){row.style.opacity='0.4';row.style.transition='opacity .3s';}
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    if(!res.ok){var eb=await res.text();throw new Error('HTTP '+res.status+' — '+eb);}
+    allData=allData.filter(function(x){return Number(x.id)!==Number(id);});
+    setTimeout(function(){applyFilters();},350);
+  }catch(err){
+    if(row){row.style.opacity='1';}
+    if(btn){btn.textContent='🗑';btn.disabled=false;btn.classList.remove('confirming');}
+    var errDiv=document.createElement('span');
+    errDiv.style.cssText='color:#f43f5e;font-size:10px;margin-left:8px';
+    errDiv.textContent='✗ '+err.message;
+    if(row&&row.cells[2])row.cells[2].appendChild(errDiv);
   }
 }
 document.querySelectorAll('.year-pill').forEach(function(b){b.addEventListener('click',function(){
