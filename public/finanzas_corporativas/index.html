@@ -127,6 +127,15 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 .delete-test-btn{background:transparent;border:1px solid #f43f5e;color:#f43f5e;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:5px;vertical-align:middle;font-weight:700;transition:all .15s}
 .delete-test-btn:hover{background:#fff1f2}
 .delete-test-btn.confirming{background:#f43f5e;color:#fff;border-color:#f43f5e}
+.comm-inp-row{display:flex;align-items:center;gap:6px;margin:8px 0 4px}
+.comm-inp{width:70px;padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;font-weight:700;color:#334155;outline:none;text-align:center}
+.comm-inp:focus{border-color:#4f46e5}
+.comm-inp-unit{font-size:12px;font-weight:700;color:#64748b}
+.comm-save-btn{background:#4f46e5;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.comm-save-btn:hover{background:#4338ca}
+.comm-delete-btn{display:inline-flex;align-items:center;gap:4px;background:transparent;border:1px solid #f43f5e;color:#f43f5e;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;margin-top:6px}
+.comm-delete-btn:hover{background:#fff1f2}
+.comm-identified{background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:800}
 </style></head><body>
 <div id="globalLoader" class="loader-overlay"><div class="spinner"></div></div>
 <div class="sidebar">
@@ -203,29 +212,47 @@ tr.row-test-entry:hover{background:#fef9c3!important}
              <div class="dq-comm-pct" id="dq-bk-pct" style="color:#166534">—</div>
              <div class="dq-comm-sub">Promedio sobre monto USD</div>
            </div>
-           <div class="dq-comm-card">
+           <div class="dq-comm-card" id="comm-card-expedia">
              <div class="dq-comm-name">
                <span class="dq-comm-ch" style="background:#1a1a1a">Expedia</span>
-               <span class="dq-comm-pending">⏳ Pendiente</span>
+               <span id="comm-status-expedia" class="dq-comm-pending">⏳ Pendiente</span>
              </div>
-             <div class="dq-comm-pct" style="color:#b45309">—</div>
-             <div class="dq-comm-sub">Identificar manualmente</div>
+             <div class="dq-comm-pct" id="comm-pct-expedia" style="color:#b45309">—</div>
+             <div class="comm-inp-row" id="comm-form-expedia">
+               <input type="number" id="comm-inp-expedia" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
+               <span class="comm-inp-unit">%</span>
+               <button class="comm-save-btn" onclick="saveChannelComm('Expedia','expedia')">Aplicar</button>
+             </div>
+             <div id="comm-action-expedia"></div>
+             <div class="dq-comm-sub" id="comm-sub-expedia">Identificar manualmente</div>
            </div>
-           <div class="dq-comm-card">
+           <div class="dq-comm-card" id="comm-card-airbnb">
              <div class="dq-comm-name">
                <span class="dq-comm-ch" style="background:#e00b27">Airbnb</span>
-               <span class="dq-comm-pending">⏳ Pendiente</span>
+               <span id="comm-status-airbnb" class="dq-comm-pending">⏳ Pendiente</span>
              </div>
-             <div class="dq-comm-pct" style="color:#b45309">—</div>
-             <div class="dq-comm-sub">Identificar manualmente</div>
+             <div class="dq-comm-pct" id="comm-pct-airbnb" style="color:#b45309">—</div>
+             <div class="comm-inp-row" id="comm-form-airbnb">
+               <input type="number" id="comm-inp-airbnb" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
+               <span class="comm-inp-unit">%</span>
+               <button class="comm-save-btn" onclick="saveChannelComm('Airbnb','airbnb')">Aplicar</button>
+             </div>
+             <div id="comm-action-airbnb"></div>
+             <div class="dq-comm-sub" id="comm-sub-airbnb">Identificar manualmente</div>
            </div>
-           <div class="dq-comm-card">
+           <div class="dq-comm-card" id="comm-card-sitioweb">
              <div class="dq-comm-name">
                <span class="dq-comm-ch" style="background:#ca8a04">Sitio Web</span>
-               <span class="dq-comm-pending">⏳ Pendiente</span>
+               <span id="comm-status-sitioweb" class="dq-comm-pending">⏳ Pendiente</span>
              </div>
-             <div class="dq-comm-pct" style="color:#b45309">—</div>
-             <div class="dq-comm-sub">Comisiones PMS Hostaway</div>
+             <div class="dq-comm-pct" id="comm-pct-sitioweb" style="color:#b45309">—</div>
+             <div class="comm-inp-row" id="comm-form-sitioweb">
+               <input type="number" id="comm-inp-sitioweb" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
+               <span class="comm-inp-unit">%</span>
+               <button class="comm-save-btn" onclick="saveChannelComm('Sitio Web','sitioweb')">Aplicar</button>
+             </div>
+             <div id="comm-action-sitioweb"></div>
+             <div class="dq-comm-sub" id="comm-sub-sitioweb">Comisiones PMS Hostaway</div>
            </div>
          </div>
        </div>
@@ -319,6 +346,49 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 <script>
 const SB='https://quzjixxqowxbezbcmqws.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1emppeHhxb3d4YmV6YmNtcXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MTYwMTcsImV4cCI6MjA5MzQ5MjAxN30.cp_eoG5fAbead2rOdVbsHjNo5hLFMRvkFS9OvL5rcyk';
+var COMM_OVERRIDES=JSON.parse(localStorage.getItem('gallo_comm_overrides')||'{}');
+function saveChannelComm(channelName,key){
+  var inp=document.getElementById('comm-inp-'+key);
+  if(!inp)return;
+  var pct=parseFloat(inp.value);
+  if(isNaN(pct)||pct<0||pct>100){inp.style.borderColor='#f43f5e';inp.focus();return;}
+  inp.style.borderColor='';
+  COMM_OVERRIDES[channelName]=pct;
+  localStorage.setItem('gallo_comm_overrides',JSON.stringify(COMM_OVERRIDES));
+  renderCommCard(key,channelName,pct);
+  applyFilters();
+}
+function deleteChannelComm(channelName,key){
+  delete COMM_OVERRIDES[channelName];
+  localStorage.setItem('gallo_comm_overrides',JSON.stringify(COMM_OVERRIDES));
+  renderCommCard(key,channelName,null);
+  applyFilters();
+}
+function renderCommCard(key,channelName,pct){
+  var statusEl=document.getElementById('comm-status-'+key);
+  var pctEl=document.getElementById('comm-pct-'+key);
+  var formEl=document.getElementById('comm-form-'+key);
+  var actionEl=document.getElementById('comm-action-'+key);
+  var subEl=document.getElementById('comm-sub-'+key);
+  if(pct!==null&&pct!==undefined){
+    if(statusEl){statusEl.className='comm-identified';statusEl.textContent='✓ Identificado';}
+    if(pctEl){pctEl.textContent=pct.toFixed(1)+'%';pctEl.style.color='#166534';}
+    if(formEl)formEl.style.display='none';
+    if(actionEl)actionEl.innerHTML='<button class="comm-delete-btn" onclick="deleteChannelComm(\'' +channelName+'\',\''+key+'\')">🗑 Eliminar comisión</button>';
+    if(subEl)subEl.textContent='Promedio sobre monto USD';
+  }else{
+    if(statusEl){statusEl.className='dq-comm-pending';statusEl.textContent='⏳ Pendiente';}
+    if(pctEl){pctEl.textContent='—';pctEl.style.color='#b45309';}
+    if(formEl)formEl.style.display='';
+    if(actionEl)actionEl.innerHTML='';
+    if(subEl)subEl.textContent=channelName==='Sitio Web'?'Comisiones PMS Hostaway':'Identificar manualmente';
+  }
+}
+function initCommOverrides(){
+  [['Expedia','expedia'],['Airbnb','airbnb'],['Sitio Web','sitioweb']].forEach(function(p){
+    if(COMM_OVERRIDES[p[0]]!==undefined)renderCommCard(p[1],p[0],COMM_OVERRIDES[p[0]]);
+  });
+}
 let allData=[], filterYear='2026', filterMonth='all', filterChannel='all', filterOrder='booking_date';
 const fmtUSD=v=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(v);
 const fmtMXN=v=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(v);
@@ -358,6 +428,7 @@ async function loadHotelData(){
     buildChannelPills();
     applyFilters();
     updateTableHeaders();
+    initCommOverrides();
   }catch(err){
     document.getElementById('hotel-table-body').innerHTML='<tr><td colspan="11" style="text-align:center;color:#f43f5e;padding:48px">Error: '+err.message+'</td></tr>';
     document.getElementById('hotel-table-badge').textContent='Error';
@@ -406,24 +477,30 @@ function renderTable(rows){
 function updateKPIs(rows){
   const TODAY=new Date().toISOString().slice(0,10);
   let paidMXN=0,pendingMXN=0,nights=0,commMXN=0;
-  let paidCount=0;
   rows.forEach(r=>{
     const isC=COURTESY.includes(Number(r.id));
     const rate=Number(r.mxn_rate||0);
     const mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate);
-    const mxnComm=isC?0:Number(r.channel_commission||0)*rate;
+    // Commission: use override % if set, otherwise use stored channel_commission
+    var commAmt;
+    if(isC){
+      commAmt=0;
+    } else if(COMM_OVERRIDES[r.source_name]!==undefined){
+      commAmt=Number(r.total_amount||0)*(COMM_OVERRIDES[r.source_name]/100)*rate;
+    } else {
+      commAmt=Number(r.channel_commission||0)*rate;
+    }
     const autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
     const paid=isC||r.is_paid||autoP;
     if(isC){
-      // cortesía: zero everywhere, counts as reservation
+      // cortesía: zero, counts as reservation
     } else if(paid){
       paidMXN+=mxnAmt;
-      paidCount++;
     } else {
       pendingMXN+=mxnAmt;
     }
     nights+=Number(r.nights||0);
-    commMXN+=mxnComm;
+    commMXN+=commAmt;
   });
   const totalMXN=paidMXN+pendingMXN;
   const adrNight=nights>0?totalMXN/nights:0;
