@@ -69,6 +69,7 @@ tr:hover td{background:#fafbfc}
 .row-high-value{background:linear-gradient(90deg,#fffbeb,#fff 70%)}
 .row-high-value>td:first-child{border-left:3px solid #f59e0b}
 .hv-badge{display:inline-flex;align-items:center;font-size:13px;font-weight:800;color:#b91c1c;background:#fef2f2;border-radius:4px;padding:1px 5px;border:1px solid #fecaca;margin-left:4px;cursor:help}
+.airbnb-alert{display:inline-flex;align-items:center;gap:3px;margin-left:6px;background:#fff0f2;color:#e00b27;border:1px solid #fca5b0;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:800;vertical-align:middle;white-space:nowrap;cursor:help;letter-spacing:0.3px}
 .loader-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;transition:opacity .3s}
 .loader-overlay.hidden{opacity:0;pointer-events:none}
 .spinner{width:38px;height:38px;border:4px solid var(--slate-200);border-top-color:var(--indigo);border-radius:50%;animation:spin 1s linear infinite}
@@ -110,10 +111,10 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
   <div class="content-body">
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Ingresos Totales</div><div class="kpi-value" id="kpi-revenue">$0.00</div><div class="kpi-sub">Registros mostrados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Reservas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">Confirmadas / modificadas</div></div>
-      <div class="kpi-card"><div class="kpi-label">ADR Promedio</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">Ingreso / noche</div></div>
-      <div class="kpi-card"><div class="kpi-label">Comisiones OTA</div><div class="kpi-value" id="kpi-com">$0.00</div><div class="kpi-sub">Pagadas a canales</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ingresos Totales</div><div class="kpi-value" id="kpi-revenue">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
+      <div class="kpi-card"><div class="kpi-label">Reservas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">Reservas confirmadas</div></div>
+      <div class="kpi-card"><div class="kpi-label">ADR Promedio</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">💵 MXN por noche</div></div>
+      <div class="kpi-card"><div class="kpi-label">Comisiones OTA</div><div class="kpi-value" id="kpi-com">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
     </div>
     <div class="hotel-filter-bar">
       <div class="hotel-filter-row">
@@ -285,22 +286,24 @@ function renderTable(rows){
   badge.textContent=rows.length+' registros';
   updateKPIs(rows);
   if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
-  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'">'+  (filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+'<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+'</td>'+'</tr>';}).join('');
+  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'">'+  (filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+'<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span>':'')+' </td>'+'</tr>';}).join('');
 }
 function updateKPIs(rows){
-  const TODAY=new Date().toISOString().slice(0,10);
-  let rev=0,nights=0,comm=0;
+  let revMXN=0,nights=0,commMXN=0;
   rows.forEach(r=>{
     const isC=COURTESY.includes(Number(r.id));
-    rev+=isC?0:Number(r.total_amount||0);
+    const rate=Number(r.mxn_rate||0);
+    const mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate);
+    const mxnComm=isC?0:Number(r.channel_commission||0)*rate;
+    revMXN+=mxnAmt;
     nights+=Number(r.nights||0);
-    comm+=isC?0:Number(r.channel_commission||0);
+    commMXN+=mxnComm;
   });
-  const adr=nights>0?rev/nights:0;
-  document.getElementById('kpi-revenue').textContent=fmtUSD(rev);
+  const adrMXN=nights>0?revMXN/nights:0;
+  document.getElementById('kpi-revenue').textContent=fmtMXN(revMXN);
   document.getElementById('kpi-res').textContent=rows.length;
-  document.getElementById('kpi-adr').textContent=fmtUSD(adr);
-  document.getElementById('kpi-com').textContent=fmtUSD(comm);
+  document.getElementById('kpi-adr').textContent=fmtMXN(adrMXN);
+  document.getElementById('kpi-com').textContent=fmtMXN(commMXN);
 }
 document.querySelectorAll('.year-pill').forEach(function(b){b.addEventListener('click',function(){
   document.querySelectorAll('.year-pill').forEach(function(x){x.classList.remove('active');});
