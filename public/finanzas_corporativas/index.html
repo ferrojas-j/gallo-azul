@@ -772,6 +772,9 @@ function showPanel(name){
       if(tc) tc.style.display=name==='hotel'?'':'none';
       var kg=document.querySelector('.kpi-grid');
       if(kg) kg.style.display=name==='hotel'?'':'none';
+      var dq=document.getElementById('dq-panel');
+      if(dq && name!=='hotel') dq.style.display='none';
+      if(name==='hotel' && typeof applyFilters === 'function' && allData.length>0) applyFilters();
     } else {
       var panel=document.getElementById('panel-'+p);
       if(panel) panel.style.display=name===p?'':'none';
