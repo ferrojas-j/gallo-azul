@@ -2854,9 +2854,21 @@ export default function App() {
                                   <div style={{ fontSize: 13, color: '#64748b' }}>{reg.nights} noches | {reg.pax} pax</div>
                                 </div>
                                 {(() => {
-                                  const res = upcomingCheckins.find(r => r.id === reg.hostaway_reservation_id);
-                                  // Check hotelSalesList first (override) — same logic as non-detailed card
+                                  // PRIMARY source of truth: reg.price from guest_registrations
+                                  // If price = 0, it's a courtesy — regardless of Hostaway amount or hotel_sales status
+                                  const regPrice = reg.price !== null && reg.price !== undefined ? Number(reg.price) : null;
+                                  if (regPrice === 0) {
+                                    return (
+                                      <div>
+                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Total</div>
+                                        <div style={{ fontSize: 13, color: '#059669', fontWeight: 700 }}>🎁 Cortesía</div>
+                                      </div>
+                                    );
+                                  }
+                                  // SECONDARY: active hotel_sales override (status='closed', not archived)
                                   const sale = hotelSalesList.find((s: any) => String(s.reservation_id) === String(reg.hostaway_reservation_id));
+                                  // FALLBACK: Hostaway totalAmount
+                                  const res = upcomingCheckins.find(r => r.id === reg.hostaway_reservation_id);
                                   const displayAmount = sale ? Number(sale.amount) : (res?.totalAmount ?? null);
                                   const displayCurrency = sale ? (sale.currency || 'MXN') : (res?.currency || 'MXN');
                                   if (displayAmount === null) return null;
