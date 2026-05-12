@@ -1,11 +1,13 @@
-// Gallo Azul PWA Service Worker
-const CACHE_NAME = 'gallo-azul-v9';
+// Gallo Azul PWA Service Worker — v10 (logo update)
+const CACHE_NAME = 'gallo-azul-v10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/logo.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/favicon.png',
   '/manifest.json',
 ];
 
@@ -14,10 +16,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Activate immediately, don't wait for old SW to die
 });
 
-// Activate: remove old caches
+// Activate: remove ALL old caches so clients get fresh icons
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -26,7 +28,7 @@ self.addEventListener('activate', (event) => {
       )
     )
   );
-  self.clients.claim();
+  self.clients.claim(); // Take control of all tabs immediately
 });
 
 // Fetch: Network-first with cache fallback for navigation, cache-first for assets
@@ -52,7 +54,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (JS, CSS, images) → cache first, fallback to network
+  // Icons and manifest → always network first to ensure freshness
+  if (url.pathname.match(/\.(png|ico|json)$/)) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const resClone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, resClone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Static assets (JS, CSS) → cache first, fallback to network
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
