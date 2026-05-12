@@ -2855,18 +2855,28 @@ export default function App() {
                                 </div>
                                 {(() => {
                                   const res = upcomingCheckins.find(r => r.id === reg.hostaway_reservation_id);
-                                  if (!res || !res.totalAmount) return null;
+                                  // Check hotelSalesList first (override) — same logic as non-detailed card
+                                  const sale = hotelSalesList.find((s: any) => String(s.reservation_id) === String(reg.hostaway_reservation_id));
+                                  const displayAmount = sale ? Number(sale.amount) : (res?.totalAmount ?? null);
+                                  const displayCurrency = sale ? (sale.currency || 'MXN') : (res?.currency || 'MXN');
+                                  if (displayAmount === null) return null;
                                   return (
                                     <div>
                                       <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Total</div>
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        <div style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
-                                          {res.currency} ${res.totalAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </div>
-                                        {res.currency === 'USD' && (
-                                          <div style={{ fontSize: 11, color: '#64748b' }}>
-                                            MXN ${(res.totalAmount * exchangeRate).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style={{ fontSize: 10 }}>(TC: {exchangeRate})</span>
-                                          </div>
+                                        {displayAmount === 0 ? (
+                                          <div style={{ fontSize: 13, color: '#059669', fontWeight: 700 }}>🎁 Cortesía</div>
+                                        ) : (
+                                          <>
+                                            <div style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>
+                                              {displayCurrency} ${displayAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </div>
+                                            {displayCurrency === 'USD' && (
+                                              <div style={{ fontSize: 11, color: '#64748b' }}>
+                                                MXN ${(displayAmount * exchangeRate).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style={{ fontSize: 10 }}>(TC: {exchangeRate})</span>
+                                              </div>
+                                            )}
+                                          </>
                                         )}
                                       </div>
                                     </div>
