@@ -151,6 +151,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
   <nav class="sidebar-nav">
     <div class="nav-label">Módulos</div>
+    <div class="nav-item" id="nav-dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
     <div class="nav-item active" id="nav-ingresos"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ingresos<svg class="nav-chevron open" id="chev-ingresos" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-ingresos">
       <div class="nav-sub-item active" id="nav-hotel">Hotel</div>
@@ -328,7 +329,16 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       </div>
     </div>
   
-<div id="panel-restaurante" style="display:none">
+<div id="panel-dashboard" style="display:none">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:80px 32px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+    <div style="width:72px;height:72px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 8px 24px rgba(79,70,229,.3)">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    </div>
+    <h2 style="font-size:24px;font-weight:800;color:#0f172a;margin:0 0 8px">Dashboard</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 28px;max-width:400px;margin-left:auto;margin-right:auto">Este módulo consolidará indicadores clave de todos los módulos financieros en una sola vista.</p>
+    <span style="background:#ede9fe;color:#5b21b6;padding:7px 20px;border-radius:100px;font-size:12px;font-weight:700;letter-spacing:.04em">⚙️ Por configurar</span>
+  </div>
+</div><div id="panel-restaurante" style="display:none">
   <!-- KPI bar -->
   <div class="kpi-grid" id="rest-kpi-grid" style="margin-bottom:20px">
     <div class="kpi-card"><div class="kpi-label">Total Cierres</div><div class="kpi-value" id="rest-kpi-count">—</div><div class="kpi-sub">📋 Registros cargados</div></div>
@@ -941,6 +951,7 @@ window.addEventListener('unhandledrejection',e=>{document.getElementById('global
 // ---- NAV PANEL SWITCHING ----
 // Module → { sub-nav id, sub-panel ids, parent nav id, first-child panel }
 var NAV_MAP = {
+  'dashboard':          { parent:'nav-dashboard',    sub:null,                    subId:null },
   'hotel':               { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-hotel' },
   'restaurante':         { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-restaurante' },
   'gastos-op':           { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-gastos-op' },
@@ -950,8 +961,9 @@ var NAV_MAP = {
   'analisis':            { parent:'nav-analisis',      sub:'nav-sub-analisis',      subId:'nav-analisis-sub' }
 };
 var ALL_SUBS = ['nav-sub-ingresos','nav-sub-egresos','nav-sub-conciliaciones','nav-sub-analisis'];
-var ALL_PANELS = ['hotel','restaurante','gastos-op','comisiones-canales','gastos-menores','conciliaciones','analisis'];
+var ALL_PANELS = ['dashboard','hotel','restaurante','gastos-op','comisiones-canales','gastos-menores','conciliaciones','analisis'];
 var PAGE_TITLES = {
+  'dashboard':'Dashboard',
   'hotel':'Ingresos por venta de habitaciones',
   'restaurante':'Ingresos Restaurante',
   'gastos-op':'Egresos — Gastos Operativos',
@@ -963,7 +975,10 @@ var PAGE_TITLES = {
 function showPanel(name){
   // 1. Hide/show all panels
   ALL_PANELS.forEach(function(p){
-    if(p==='hotel'){
+    if(p==='dashboard'){
+      var dp=document.getElementById('panel-dashboard');
+      if(dp) dp.style.display=name==='dashboard'?'':'none';
+    } else if(p==='hotel'){
       var fb=document.querySelector('.hotel-filter-bar');
       var tc=document.querySelector('.table-container');
       var kg=document.querySelector('.kpi-grid');
@@ -1017,6 +1032,7 @@ function showPanel(name){
   document.querySelector('.page-title').textContent=PAGE_TITLES[name]||'';
 }
 // Event listeners — all ID-based for reliability
+document.getElementById('nav-dashboard').addEventListener('click',function(){showPanel('dashboard');});
 document.getElementById('nav-ingresos').addEventListener('click',function(){showPanel('hotel');});
 document.getElementById('nav-hotel').addEventListener('click',function(){showPanel('hotel');});
 document.getElementById('nav-restaurante').addEventListener('click',function(){showPanel('restaurante');});
