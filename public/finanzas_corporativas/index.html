@@ -107,6 +107,19 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 .dq-comm-pending{font-size:10px;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:20px;padding:2px 8px}
 .dq-comm-pct{font-size:24px;font-weight:900;line-height:1.1;margin-bottom:3px}
 .dq-comm-sub{font-size:10px;color:#64748b}
+.edit-mxn-btn{display:block;margin:5px 0 0 auto;background:#4f46e5;color:#fff;border:none;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
+.edit-mxn-btn:hover{background:#3730a3}
+.edit-inline{display:flex;flex-direction:column;gap:4px;min-width:170px;align-items:flex-end}
+.edit-inline input{width:150px;padding:5px 9px;border:2px solid #4f46e5;border-radius:7px;font-size:13px;font-weight:600;text-align:right;outline:none}
+.edit-usd-preview{font-size:11px;font-weight:600;color:#94a3b8;text-align:right}
+.edit-actions{display:flex;gap:5px}
+.edit-save-btn{background:#10b981;color:#fff;border:none;padding:4px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+.edit-cancel-btn{background:#f1f5f9;color:#64748b;border:none;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+.edit-status-btn{background:transparent;border:1px solid #94a3b8;color:#64748b;padding:1px 6px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:5px;vertical-align:middle}
+.edit-status-btn:hover{background:#f1f5f9}
+.status-edit-wrap{display:flex;flex-direction:column;gap:5px;min-width:145px}
+.status-select{padding:5px 8px;border:2px solid #4f46e5;border-radius:7px;font-size:12px;font-weight:600;background:#fff;cursor:pointer;outline:none;width:100%}
+.status-preview{font-size:10px;font-weight:600;color:#94a3b8}
 </style></head><body>
 <div id="globalLoader" class="loader-overlay"><div class="spinner"></div></div>
 <div class="sidebar">
@@ -379,7 +392,7 @@ function renderTable(rows){
   updateKPIs(rows);
   updateDataQuality(rows);
   if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
-  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'">'+  (filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+'<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span>':'')+' </td>'+'</tr>';}).join('');
+  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';  var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+' </td>'+'</tr>';}).join('');
 }
 function updateKPIs(rows){
   let revMXN=0,nights=0,commMXN=0;
@@ -426,6 +439,155 @@ function updateDataQuality(rows){
   });
   var el=document.getElementById('dq-bk-pct');
   if(el) el.textContent=bkAmt>0?(bkComm/bkAmt*100).toFixed(1)+'%':'Sin datos';
+}
+// ---- INLINE EDIT MXN ----
+function openEdit(id){
+  var r=allData.find(function(x){return Number(x.id)===id;});
+  if(!r)return;
+  var rate=Number(r.mxn_rate||0);
+  var currentMXN=r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate;
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(!row)return;
+  // MXN cell is index 7
+  var mxnCell=row.cells[7];
+  mxnCell.innerHTML='<div class="edit-inline">'+
+    '<input id="ei-'+id+'" type="number" step="0.01" value="'+currentMXN.toFixed(2)+'" oninput="previewUSD('+id+','+rate+')"/>'+
+    '<span class="edit-usd-preview" id="ep-'+id+'">≈ '+fmtUSD(rate>0?currentMXN/rate:0)+' USD</span>'+
+    '<div class="edit-actions">'+
+      '<button id="eb-'+id+'" class="edit-save-btn" onclick="saveEdit('+id+','+rate+')">✓ Guardar</button>'+
+      '<button class="edit-cancel-btn" onclick="cancelEdit()">✕</button>'+
+    '</div>'+
+  '</div>';
+  document.getElementById('ei-'+id).focus();
+}
+function previewUSD(id,rate){
+  var inp=document.getElementById('ei-'+id);
+  var prv=document.getElementById('ep-'+id);
+  if(!inp||!prv)return;
+  var newMXN=Number(inp.value)||0;
+  var newUSD=rate>0?newMXN/rate:0;
+  prv.textContent='≈ '+fmtUSD(newUSD)+' USD';
+  prv.style.color=newUSD>2000?'#f43f5e':'#10b981';
+}
+async function saveEdit(id,rate){
+  var inp=document.getElementById('ei-'+id);
+  var btn=document.getElementById('eb-'+id);
+  var prv=document.getElementById('ep-'+id);
+  if(!inp)return;
+  var newMXN=Number(inp.value);
+  if(isNaN(newMXN)||newMXN<=0){
+    inp.style.borderColor='#f43f5e';
+    if(prv){prv.textContent='Ingresa un monto mayor a 0';prv.style.color='#f43f5e';}
+    return;
+  }
+  var newUSD=rate>0?newMXN/rate:0;
+  // Show loading state — no confirm() dialog needed
+  inp.disabled=true;
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;btn.style.background='#6366f1';}
+  if(prv){prv.textContent='Guardando en base de datos...';prv.style.color='#6366f1';}
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'PATCH',
+      headers:{
+        'apikey':KEY,
+        'Authorization':'Bearer '+KEY,
+        'Content-Type':'application/json',
+        'Prefer':'return=representation'
+      },
+      body:JSON.stringify({mxn_amount:newMXN,total_amount:parseFloat(newUSD.toFixed(2))})
+    });
+    if(!res.ok){
+      var errBody=await res.text();
+      throw new Error('HTTP '+res.status+' — '+errBody);
+    }
+    var updated=await res.json();
+    if(!updated||updated.length===0)throw new Error('No se actualizó ningún registro. Verifica permisos.');
+    // Update in-memory
+    var idx=allData.findIndex(function(x){return Number(x.id)===id;});
+    if(idx>-1){allData[idx].mxn_amount=newMXN;allData[idx].total_amount=parseFloat(newUSD.toFixed(2));}
+    // Brief success flash before re-render
+    if(prv){prv.textContent='✓ Guardado correctamente';prv.style.color='#10b981';}
+    if(btn){btn.textContent='✓';btn.style.background='#10b981';}
+    setTimeout(function(){applyFilters();},600);
+  }catch(err){
+    // Show error inline
+    if(prv){prv.textContent='✗ Error: '+err.message;prv.style.color='#f43f5e';}
+    if(btn){btn.textContent='✓ Guardar';btn.disabled=false;btn.style.background='#10b981';}
+    inp.disabled=false;
+    inp.style.borderColor='#f43f5e';
+  }
+}
+function cancelEdit(){
+  applyFilters();
+}
+// ---- INLINE STATUS EDIT (Airbnb pending) ----
+var _pendingStatusConfirm=null;
+function openStatusEdit(id){
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(!row)return;
+  _pendingStatusConfirm=null;
+  var cell=row.cells[10];
+  cell.innerHTML='<div class="status-edit-wrap">'+
+    '<select id="ss-'+id+'" class="status-select">'+
+      '<option value="pending">Pendiente</option>'+
+      '<option value="paid">Pagado</option>'+
+      '<option value="courtesy">Cortesía (monto = $0)</option>'+
+    '</select>'+
+    '<span class="status-preview" id="sp-'+id+'"></span>'+
+    '<div class="edit-actions">'+
+      '<button id="sb-'+id+'" class="edit-save-btn" onclick="confirmStatusEdit('+id+')">✓ Guardar</button>'+
+      '<button class="edit-cancel-btn" onclick="cancelEdit()">✕</button>'+
+    '</div>'+
+  '</div>';
+}
+function confirmStatusEdit(id){
+  var btn=document.getElementById('sb-'+id);
+  var sel=document.getElementById('ss-'+id);
+  if(!btn||!sel)return;
+  if(_pendingStatusConfirm!==id){
+    _pendingStatusConfirm=id;
+    var labels={pending:'Pendiente',paid:'Pagado',courtesy:'Cortesía — monto a $0'};
+    btn.textContent='⚠ ¿Confirmar '+labels[sel.value]+'?';
+    btn.style.background='#f59e0b';
+    btn.style.color='#78350f';
+    return;
+  }
+  _pendingStatusConfirm=null;
+  saveStatusEdit(id);
+}
+async function saveStatusEdit(id){
+  var sel=document.getElementById('ss-'+id);
+  var btn=document.getElementById('sb-'+id);
+  var prv=document.getElementById('sp-'+id);
+  if(!sel)return;
+  var newStatus=sel.value;
+  if(newStatus==='pending'){cancelEdit();return;}
+  var patchData={};
+  if(newStatus==='paid') patchData={is_paid:true};
+  if(newStatus==='courtesy') patchData={total_amount:0,mxn_amount:0,is_paid:true};
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;btn.style.background='#6366f1';btn.style.color='#fff';}
+  sel.disabled=true;
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(patchData)
+    });
+    if(!res.ok){var eb=await res.text();throw new Error('HTTP '+res.status+' — '+eb);}
+    var updated=await res.json();
+    if(!updated||updated.length===0)throw new Error('Sin filas actualizadas. Verifica permisos.');
+    var idx=allData.findIndex(function(x){return Number(x.id)===id;});
+    if(idx>-1){
+      if(newStatus==='paid') allData[idx].is_paid=true;
+      if(newStatus==='courtesy'){allData[idx].total_amount=0;allData[idx].mxn_amount=0;allData[idx].is_paid=true;if(!COURTESY.includes(Number(id)))COURTESY.push(Number(id));}
+    }
+    if(btn){btn.textContent='✓ Guardado';btn.style.background='#10b981';}
+    setTimeout(function(){applyFilters();},700);
+  }catch(err){
+    if(prv){prv.textContent='✗ '+err.message;prv.style.color='#f43f5e';}
+    if(btn){btn.textContent='✓ Guardar';btn.disabled=false;btn.style.background='#10b981';btn.style.color='#fff';}
+    sel.disabled=false;
+  }
 }
 document.querySelectorAll('.year-pill').forEach(function(b){b.addEventListener('click',function(){
   document.querySelectorAll('.year-pill').forEach(function(x){x.classList.remove('active');});
