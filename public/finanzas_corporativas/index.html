@@ -85,6 +85,28 @@ tr:hover td{background:#fafbfc}
 .test-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;letter-spacing:0.5px}
 tr.row-test-entry{background:#fffbeb!important}
 tr.row-test-entry:hover{background:#fef9c3!important}
+.dq-panel{background:#fffbeb;border:1.5px dashed #fcd34d;border-radius:14px;padding:16px 24px;margin-bottom:20px}
+.dq-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.dq-title{font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.9px}
+.dq-tag{font-size:10px;font-weight:800;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:4px;padding:2px 8px;letter-spacing:.5px}
+.dq-total-wrap{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#78350f}
+.dq-total-num{font-size:22px;font-weight:900;color:#b45309;line-height:1}
+.dq-metrics{display:flex;gap:12px;flex-wrap:wrap}
+.dq-metric{flex:1;min-width:180px;background:#fff;border:1px solid #fde68a;border-radius:10px;padding:13px 16px;display:flex;align-items:center;gap:13px}
+.dq-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.dq-label{font-size:11px;font-weight:600;color:#78350f;margin-bottom:3px;line-height:1.3}
+.dq-val{font-size:26px;font-weight:900;line-height:1}
+.dq-sub{font-size:10px;color:#a16207;margin-top:3px}
+.dq-comm-section{margin-top:14px;padding-top:14px;border-top:1px dashed #fcd34d}
+.dq-comm-title{font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px}
+.dq-comm-grid{display:flex;gap:10px;flex-wrap:wrap}
+.dq-comm-card{flex:1;min-width:150px;background:#fff;border:1px solid #fde68a;border-radius:9px;padding:12px 15px}
+.dq-comm-name{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
+.dq-comm-ch{padding:2px 9px;border-radius:4px;font-size:11px;font-weight:700;color:#fff}
+.dq-comm-ok{font-size:10px;font-weight:800;background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:20px;padding:2px 8px}
+.dq-comm-pending{font-size:10px;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:20px;padding:2px 8px}
+.dq-comm-pct{font-size:24px;font-weight:900;line-height:1.1;margin-bottom:3px}
+.dq-comm-sub{font-size:10px;color:#64748b}
 </style></head><body>
 <div id="globalLoader" class="loader-overlay"><div class="spinner"></div></div>
 <div class="sidebar">
@@ -115,6 +137,76 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       <div class="kpi-card"><div class="kpi-label">Reservas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">Reservas confirmadas</div></div>
       <div class="kpi-card"><div class="kpi-label">ADR Promedio</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">💵 MXN por noche</div></div>
       <div class="kpi-card"><div class="kpi-label">Comisiones OTA</div><div class="kpi-value" id="kpi-com">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
+    </div>
+    <div class="dq-panel" id="dq-panel" style="display:none">
+       <div class="dq-header">
+         <span class="dq-title">⚠ Indicadores de limpieza y normalización de datos</span>
+         <span class="dq-tag">TEMPORAL</span>
+         <div class="dq-total-wrap">Total alertas: <span class="dq-total-num" id="dq-total">0</span></div>
+       </div>
+       <div class="dq-metrics">
+         <div class="dq-metric">
+           <div class="dq-icon" style="background:#fef2f2">⚠</div>
+           <div>
+             <div class="dq-label">Cobros altos en USD (&gt;$2,000)</div>
+             <div class="dq-val" id="dq-hv" style="color:#b91c1c">0</div>
+             <div class="dq-sub">Requieren verificación manual</div>
+           </div>
+         </div>
+         <div class="dq-metric">
+           <div class="dq-icon" style="background:#fff0f2">🔴</div>
+           <div>
+             <div class="dq-label">Airbnb con pago pendiente</div>
+             <div class="dq-val" id="dq-airbnb" style="color:#e00b27">0</div>
+             <div class="dq-sub">Confirmar cobro en plataforma</div>
+           </div>
+         </div>
+         <div class="dq-metric">
+           <div class="dq-icon" style="background:#fef9c3">🧪</div>
+           <div>
+             <div class="dq-label">Registros de prueba</div>
+             <div class="dq-val" id="dq-test" style="color:#b45309">0</div>
+             <div class="dq-sub">Eliminar antes de reportes finales</div>
+           </div>
+         </div>
+       </div>
+       <div class="dq-comm-section">
+         <div class="dq-comm-title">Identificación de comisiones por canal</div>
+         <div class="dq-comm-grid">
+           <div class="dq-comm-card">
+             <div class="dq-comm-name">
+               <span class="dq-comm-ch" style="background:#003580">Booking.com</span>
+               <span class="dq-comm-ok">✓ Identificado</span>
+             </div>
+             <div class="dq-comm-pct" id="dq-bk-pct" style="color:#166534">—</div>
+             <div class="dq-comm-sub">Promedio sobre monto USD</div>
+           </div>
+           <div class="dq-comm-card">
+             <div class="dq-comm-name">
+               <span class="dq-comm-ch" style="background:#1a1a1a">Expedia</span>
+               <span class="dq-comm-pending">⏳ Pendiente</span>
+             </div>
+             <div class="dq-comm-pct" style="color:#b45309">—</div>
+             <div class="dq-comm-sub">Identificar manualmente</div>
+           </div>
+           <div class="dq-comm-card">
+             <div class="dq-comm-name">
+               <span class="dq-comm-ch" style="background:#e00b27">Airbnb</span>
+               <span class="dq-comm-pending">⏳ Pendiente</span>
+             </div>
+             <div class="dq-comm-pct" style="color:#b45309">—</div>
+             <div class="dq-comm-sub">Identificar manualmente</div>
+           </div>
+           <div class="dq-comm-card">
+             <div class="dq-comm-name">
+               <span class="dq-comm-ch" style="background:#ca8a04">Sitio Web</span>
+               <span class="dq-comm-pending">⏳ Pendiente</span>
+             </div>
+             <div class="dq-comm-pct" style="color:#b45309">—</div>
+             <div class="dq-comm-sub">Comisiones PMS Hostaway</div>
+           </div>
+         </div>
+       </div>
     </div>
     <div class="hotel-filter-bar">
       <div class="hotel-filter-row">
@@ -285,6 +377,7 @@ function renderTable(rows){
   const tbody=document.getElementById('hotel-table-body');
   badge.textContent=rows.length+' registros';
   updateKPIs(rows);
+  updateDataQuality(rows);
   if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
   tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'">'+  (filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+'<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span>':'')+'</td>'+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+'<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span>':'')+' </td>'+'</tr>';}).join('');
 }
@@ -304,6 +397,35 @@ function updateKPIs(rows){
   document.getElementById('kpi-res').textContent=rows.length;
   document.getElementById('kpi-adr').textContent=fmtMXN(adrMXN);
   document.getElementById('kpi-com').textContent=fmtMXN(commMXN);
+}
+function updateDataQuality(rows){
+  const TODAY=new Date().toISOString().slice(0,10);
+  let hvCount=0,airbnbCount=0,testCount=0;
+  rows.forEach(function(r){
+    var isC=COURTESY.includes(Number(r.id));
+    var amt=isC?0:Number(r.total_amount||0);
+    var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
+    var paid=isC||r.is_paid||autoP;
+    if(amt>2000) hvCount++;
+    if(r.source_name==='Airbnb'&&!paid&&!isC) airbnbCount++;
+    if(r.guest_name&&/test|prueba/i.test(r.guest_name)) testCount++;
+  });
+  var total=hvCount+airbnbCount+testCount;
+  document.getElementById('dq-total').textContent=total;
+  document.getElementById('dq-hv').textContent=hvCount;
+  document.getElementById('dq-airbnb').textContent=airbnbCount;
+  document.getElementById('dq-test').textContent=testCount;
+  document.getElementById('dq-panel').style.display='';
+  // Booking.com commission %
+  var bkAmt=0,bkComm=0;
+  rows.forEach(function(r){
+    if(r.source_name==='Booking.com'&&!COURTESY.includes(Number(r.id))){
+      bkAmt+=Number(r.total_amount||0);
+      bkComm+=Number(r.channel_commission||0);
+    }
+  });
+  var el=document.getElementById('dq-bk-pct');
+  if(el) el.textContent=bkAmt>0?(bkComm/bkAmt*100).toFixed(1)+'%':'Sin datos';
 }
 document.querySelectorAll('.year-pill').forEach(function(b){b.addEventListener('click',function(){
   document.querySelectorAll('.year-pill').forEach(function(x){x.classList.remove('active');});
