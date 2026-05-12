@@ -27,17 +27,21 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--slate-50);color:v
 .sync-btn.loading svg{animation:spin 1s linear infinite}
 @keyframes spin{100%{transform:rotate(360deg)}}
 .content-body{padding:24px 36px 40px;flex:1}
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:1400px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 .kpi-card{background:#fff;border:1px solid var(--slate-200);border-radius:14px;padding:20px 24px;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
-.kpi-card:nth-child(1)::before{background:var(--indigo)}
-.kpi-card:nth-child(2)::before{background:var(--emerald)}
-.kpi-card:nth-child(3)::before{background:var(--sky)}
-.kpi-card:nth-child(4)::before{background:var(--rose)}
+.kpi-card:nth-child(1)::before{background:var(--emerald)}
+.kpi-card:nth-child(2)::before{background:var(--indigo)}
+.kpi-card:nth-child(3)::before{background:#f59e0b}
+.kpi-card:nth-child(4)::before{background:var(--sky)}
+.kpi-card:nth-child(5)::before{background:#8b5cf6}
+.kpi-card:nth-child(6)::before{background:var(--rose)}
 .kpi-label{font-size:11px;font-weight:700;color:var(--slate-400);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
-.kpi-value{font-size:26px;font-weight:800;color:var(--slate-900);letter-spacing:-.5px;line-height:1.1}
-.kpi-card:nth-child(4) .kpi-value{color:var(--rose)}
+.kpi-value{font-size:22px;font-weight:800;color:var(--slate-900);letter-spacing:-.5px;line-height:1.1}
+.kpi-card:nth-child(6) .kpi-value{color:var(--rose)}
+.kpi-card:nth-child(3) .kpi-value{color:#b45309}
 .kpi-sub{font-size:11px;color:var(--slate-400);margin-top:6px;font-weight:500}
 .hotel-filter-bar{background:#fff;border:1px solid #dde3ec;border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(15,23,42,.06);margin-bottom:20px}
 .hotel-filter-row{display:grid;grid-template-columns:90px 1fr;min-height:48px}
@@ -149,9 +153,11 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
   <div class="content-body">
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Ingresos Totales</div><div class="kpi-value" id="kpi-revenue">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
-      <div class="kpi-card"><div class="kpi-label">Reservas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">Reservas confirmadas</div></div>
-      <div class="kpi-card"><div class="kpi-label">ADR Promedio</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">💵 MXN por noche</div></div>
+      <div class="kpi-card"><div class="kpi-label">Reservas confirmadas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">📋 Total de registros</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ingresos efectivos</div><div class="kpi-value" id="kpi-paid">$0.00</div><div class="kpi-sub">✅ Estado: Pagado (MXN)</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ingresos por cobrar</div><div class="kpi-value" id="kpi-pending">$0.00</div><div class="kpi-sub">⏳ Estado: Pendiente (MXN)</div></div>
+      <div class="kpi-card"><div class="kpi-label">ADR por noche</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">💵 MXN promedio/noche</div></div>
+      <div class="kpi-card"><div class="kpi-label">ADR por reserva</div><div class="kpi-value" id="kpi-adr-res">$0.00</div><div class="kpi-sub">💵 MXN promedio/reserva</div></div>
       <div class="kpi-card"><div class="kpi-label">Comisiones OTA</div><div class="kpi-value" id="kpi-com">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
     </div>
     <div class="dq-panel" id="dq-panel" style="display:none">
@@ -398,20 +404,35 @@ function renderTable(rows){
   tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';var guestCell='<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span><button id="dtb-'+r.id+'" class="delete-test-btn" onclick="confirmDeleteTest('+r.id+')" title="Eliminar registro de prueba">🗑</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+guestCell+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+'</td>'+'</tr>';}).join('');
 }
 function updateKPIs(rows){
-  let revMXN=0,nights=0,commMXN=0;
+  const TODAY=new Date().toISOString().slice(0,10);
+  let paidMXN=0,pendingMXN=0,nights=0,commMXN=0;
+  let paidCount=0;
   rows.forEach(r=>{
     const isC=COURTESY.includes(Number(r.id));
     const rate=Number(r.mxn_rate||0);
     const mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate);
     const mxnComm=isC?0:Number(r.channel_commission||0)*rate;
-    revMXN+=mxnAmt;
+    const autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
+    const paid=isC||r.is_paid||autoP;
+    if(isC){
+      // cortesía: zero everywhere, counts as reservation
+    } else if(paid){
+      paidMXN+=mxnAmt;
+      paidCount++;
+    } else {
+      pendingMXN+=mxnAmt;
+    }
     nights+=Number(r.nights||0);
     commMXN+=mxnComm;
   });
-  const adrMXN=nights>0?revMXN/nights:0;
-  document.getElementById('kpi-revenue').textContent=fmtMXN(revMXN);
+  const totalMXN=paidMXN+pendingMXN;
+  const adrNight=nights>0?totalMXN/nights:0;
+  const adrRes=rows.length>0?totalMXN/rows.length:0;
   document.getElementById('kpi-res').textContent=rows.length;
-  document.getElementById('kpi-adr').textContent=fmtMXN(adrMXN);
+  document.getElementById('kpi-paid').textContent=fmtMXN(paidMXN);
+  document.getElementById('kpi-pending').textContent=fmtMXN(pendingMXN);
+  document.getElementById('kpi-adr').textContent=fmtMXN(adrNight);
+  document.getElementById('kpi-adr-res').textContent=fmtMXN(adrRes);
   document.getElementById('kpi-com').textContent=fmtMXN(commMXN);
 }
 function updateDataQuality(rows){
