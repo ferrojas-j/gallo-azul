@@ -14,10 +14,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--slate-50);color:v
 .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.85)}
 .nav-item.active{background:rgba(79,70,229,.25);color:#818cf8}
 .nav-item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-.nav-sub{padding-left:36px}
-.nav-sub-item{display:block;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;color:rgba(255,255,255,.4);cursor:pointer;transition:all .12s;margin-bottom:1px}
-.nav-sub-item:hover{color:rgba(255,255,255,.75)}
-.nav-sub-item.active{color:#a5b4fc;background:rgba(79,70,229,.15)}
+/* nav-sub and nav-sub-item styles defined below with chevron */
+.nav-chevron{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;margin-left:auto;flex-shrink:0;transition:transform .25s ease;opacity:.55}
+.nav-item.active .nav-chevron{opacity:1}
+.nav-chevron.open{transform:rotate(90deg)}
+.nav-sub-item::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.4;margin-right:8px;flex-shrink:0;vertical-align:middle}
+.nav-sub-item{display:flex;align-items:center;padding:6px 10px 6px 14px;border-radius:6px;font-size:12px;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.nav-sub-item:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.04);border-left-color:rgba(255,255,255,.15)}
+.nav-sub-item.active{color:#a5b4fc;background:rgba(79,70,229,.12);border-left-color:#818cf8}
+.nav-sub{padding-left:16px;margin:2px 0 4px;border-left:1.5px solid rgba(255,255,255,.07);margin-left:18px;overflow:hidden;transition:max-height .25s ease,opacity .2s ease;opacity:1}
 .main-content{flex:1;min-width:0;display:flex;flex-direction:column}
 .page-header{display:flex;align-items:center;justify-content:space-between;padding:28px 36px 0;flex-wrap:wrap;gap:12px}
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--slate-900)}
@@ -146,22 +151,22 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
   <nav class="sidebar-nav">
     <div class="nav-label">Módulos</div>
-    <div class="nav-item active" id="nav-ingresos"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ingresos</div>
+    <div class="nav-item active" id="nav-ingresos"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ingresos<svg class="nav-chevron open" id="chev-ingresos" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-ingresos">
       <div class="nav-sub-item active" id="nav-hotel">Hotel</div>
       <div class="nav-sub-item" id="nav-restaurante">Restaurante</div>
     </div>
-    <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Egresos</div>
+    <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Egresos<svg class="nav-chevron" id="chev-egresos" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-egresos" style="display:none">
       <div class="nav-sub-item" id="nav-gastos-op">Gastos operativos</div>
       <div class="nav-sub-item" id="nav-comisiones-canales">Comisiones canales</div>
       <div class="nav-sub-item" id="nav-gastos-menores">Gastos menores (restaurante)</div>
     </div>
-    <div class="nav-item" id="nav-conciliaciones"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Conciliaciones</div>
+    <div class="nav-item" id="nav-conciliaciones"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Conciliaciones<svg class="nav-chevron" id="chev-conciliaciones" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-conciliaciones" style="display:none">
       <div class="nav-sub-item" id="nav-conciliaciones-sub">Conciliaciones</div>
     </div>
-    <div class="nav-item" id="nav-analisis"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Análisis</div>
+    <div class="nav-item" id="nav-analisis"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Análisis<svg class="nav-chevron" id="chev-analisis" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-analisis" style="display:none">
       <div class="nav-sub-item" id="nav-analisis-sub">Análisis</div>
     </div>
@@ -983,6 +988,20 @@ function showPanel(name){
     var activeSub=document.getElementById(map.sub);
     if(activeSub) activeSub.style.display='';
   }
+  // 2b. Update chevrons — rotate open the active module's chevron
+  var CHEV_MAP = {
+    'ingresos':['hotel','restaurante'],
+    'egresos':['gastos-op','comisiones-canales','gastos-menores'],
+    'conciliaciones':['conciliaciones'],
+    'analisis':['analisis']
+  };
+  ['ingresos','egresos','conciliaciones','analisis'].forEach(function(mod){
+    var chev = document.getElementById('chev-'+mod);
+    if(!chev) return;
+    var children = CHEV_MAP[mod];
+    var isOpen = (map && map.parent === 'nav-'+mod);
+    if(isOpen){ chev.classList.add('open'); } else { chev.classList.remove('open'); }
+  });
   // 3. Clear all active states then set active
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(function(el){el.classList.remove('active');});
   if(map){
