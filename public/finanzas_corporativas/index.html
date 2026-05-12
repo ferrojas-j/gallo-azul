@@ -146,10 +146,10 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   </div>
   <nav class="sidebar-nav">
     <div class="nav-label">Módulos</div>
-    <div class="nav-item active"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ingresos</div>
-    <div class="nav-sub">
-      <div class="nav-sub-item active">Hotel</div>
-      <div class="nav-sub-item">Restaurante</div>
+    <div class="nav-item active" id="nav-ingresos"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ingresos</div>
+    <div class="nav-sub" id="nav-sub-ingresos">
+      <div class="nav-sub-item active" id="nav-hotel">Hotel</div>
+      <div class="nav-sub-item" id="nav-restaurante">Restaurante</div>
     </div>
     <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Egresos</div>
     <div class="nav-sub" id="nav-sub-egresos" style="display:none">
@@ -157,7 +157,14 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       <div class="nav-sub-item" id="nav-comisiones-canales">Comisiones canales</div>
       <div class="nav-sub-item" id="nav-gastos-menores">Gastos menores (restaurante)</div>
     </div>
-    <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Conciliaciones</div>
+    <div class="nav-item" id="nav-conciliaciones"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Conciliaciones</div>
+    <div class="nav-sub" id="nav-sub-conciliaciones" style="display:none">
+      <div class="nav-sub-item" id="nav-conciliaciones-sub">Conciliaciones</div>
+    </div>
+    <div class="nav-item" id="nav-analisis"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Análisis</div>
+    <div class="nav-sub" id="nav-sub-analisis" style="display:none">
+      <div class="nav-sub-item" id="nav-analisis-sub">Análisis</div>
+    </div>
   </nav>
 </div>
 <div class="main-content">
@@ -354,6 +361,16 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 8px">Gastos Menores (Restaurante)</h2>
     <p style="color:#64748b;font-size:14px;margin:0 0 24px">Módulo en desarrollo &mdash; próximamente disponible.</p>
     <span style="background:#dcfce7;color:#166534;padding:6px 18px;border-radius:100px;font-size:12px;font-weight:700">Próximamente</span>
+  </div>
+</div>
+<div id="panel-analisis" style="display:none">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:64px 32px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+    <div style="width:64px;height:64px;background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    </div>
+    <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 8px">Análisis</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 24px">Módulo en desarrollo &mdash; próximamente disponible.</p>
+    <span style="background:#e0f2fe;color:#0c4a6e;padding:6px 18px;border-radius:100px;font-size:12px;font-weight:700">Próximamente</span>
   </div>
 </div>
 <div id="panel-conciliaciones" style="display:none">
@@ -784,68 +801,78 @@ window.addEventListener('error',e=>{document.getElementById('globalLoader').clas
 window.addEventListener('unhandledrejection',e=>{document.getElementById('globalLoader').classList.add('hidden');});
 
 // ---- NAV PANEL SWITCHING ----
+// Module → { sub-nav id, sub-panel ids, parent nav id, first-child panel }
+var NAV_MAP = {
+  'hotel':               { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-hotel' },
+  'restaurante':         { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-restaurante' },
+  'gastos-op':           { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-gastos-op' },
+  'comisiones-canales':  { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-comisiones-canales' },
+  'gastos-menores':      { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-gastos-menores' },
+  'conciliaciones':      { parent:'nav-conciliaciones',sub:'nav-sub-conciliaciones',subId:'nav-conciliaciones-sub' },
+  'analisis':            { parent:'nav-analisis',      sub:'nav-sub-analisis',      subId:'nav-analisis-sub' }
+};
+var ALL_SUBS = ['nav-sub-ingresos','nav-sub-egresos','nav-sub-conciliaciones','nav-sub-analisis'];
+var ALL_PANELS = ['hotel','restaurante','gastos-op','comisiones-canales','gastos-menores','conciliaciones','analisis'];
+var PAGE_TITLES = {
+  'hotel':'Ingresos por venta de habitaciones',
+  'restaurante':'Ingresos Restaurante',
+  'gastos-op':'Egresos — Gastos Operativos',
+  'comisiones-canales':'Egresos — Comisiones Canales',
+  'gastos-menores':'Egresos — Gastos Menores (Restaurante)',
+  'conciliaciones':'Conciliaciones',
+  'analisis':'Análisis'
+};
 function showPanel(name){
-  var allPanels=['hotel','restaurante','gastos-op','comisiones-canales','gastos-menores','conciliaciones'];
-  allPanels.forEach(function(p){
+  // 1. Hide/show all panels
+  ALL_PANELS.forEach(function(p){
     if(p==='hotel'){
       var fb=document.querySelector('.hotel-filter-bar');
       var tc=document.querySelector('.table-container');
+      var kg=document.querySelector('.kpi-grid');
+      var dq=document.getElementById('dq-panel');
       if(fb) fb.style.display=name==='hotel'?'':'none';
       if(tc) tc.style.display=name==='hotel'?'':'none';
-      var kg=document.querySelector('.kpi-grid');
       if(kg) kg.style.display=name==='hotel'?'':'none';
-      var dq=document.getElementById('dq-panel');
       if(dq && name!=='hotel') dq.style.display='none';
-      if(name==='hotel' && typeof applyFilters === 'function' && allData.length>0) applyFilters();
+      if(name==='hotel' && typeof applyFilters==='function' && allData.length>0) applyFilters();
     } else {
       var panel=document.getElementById('panel-'+p);
       if(panel) panel.style.display=name===p?'':'none';
     }
   });
-  // Egresos subcategory sub-nav visibility
-  var subEgresos=document.getElementById('nav-sub-egresos');
-  var egresosNames=['gastos-op','comisiones-canales','gastos-menores'];
-  if(subEgresos) subEgresos.style.display=egresosNames.includes(name)?'':'none';
-  // Update sidebar active states
-  document.querySelectorAll('.nav-item,.nav-sub-item').forEach(function(el){el.classList.remove('active');});
-  var titles={
-    'hotel':'Ingresos por venta de habitaciones',
-    'restaurante':'Ingresos Restaurante',
-    'gastos-op':'Egresos — Gastos Operativos',
-    'comisiones-canales':'Egresos — Comisiones Canales',
-    'gastos-menores':'Egresos — Gastos Menores (Restaurante)',
-    'conciliaciones':'Conciliaciones'
-  };
-  document.querySelector('.page-title').textContent=titles[name]||'';
-  if(name==='hotel'){
-    document.querySelectorAll('.nav-item')[0].classList.add('active');
-    document.querySelectorAll('.nav-sub-item')[0].classList.add('active');
-  } else if(name==='restaurante'){
-    document.querySelectorAll('.nav-item')[0].classList.add('active');
-    document.querySelectorAll('.nav-sub-item')[1].classList.add('active');
-  } else if(name==='gastos-op'){
-    document.getElementById('nav-egresos').classList.add('active');
-    document.getElementById('nav-gastos-op').classList.add('active');
-  } else if(name==='comisiones-canales'){
-    document.getElementById('nav-egresos').classList.add('active');
-    document.getElementById('nav-comisiones-canales').classList.add('active');
-  } else if(name==='gastos-menores'){
-    document.getElementById('nav-egresos').classList.add('active');
-    document.getElementById('nav-gastos-menores').classList.add('active');
-  } else if(name==='conciliaciones'){
-    document.querySelectorAll('.nav-item')[2].classList.add('active');
+  // 2. Collapse all sub-navs, then expand only the active one
+  ALL_SUBS.forEach(function(sid){
+    var el=document.getElementById(sid);
+    if(el) el.style.display='none';
+  });
+  var map=NAV_MAP[name];
+  if(map){
+    var activeSub=document.getElementById(map.sub);
+    if(activeSub) activeSub.style.display='';
   }
+  // 3. Clear all active states then set active
+  document.querySelectorAll('.nav-item,.nav-sub-item').forEach(function(el){el.classList.remove('active');});
+  if(map){
+    var parentEl=document.getElementById(map.parent);
+    if(parentEl) parentEl.classList.add('active');
+    var subEl=document.getElementById(map.subId);
+    if(subEl) subEl.classList.add('active');
+  }
+  // 4. Update page title
+  document.querySelector('.page-title').textContent=PAGE_TITLES[name]||'';
 }
-document.querySelectorAll('.nav-sub-item')[0].addEventListener('click',function(){showPanel('hotel');});
-document.querySelectorAll('.nav-sub-item')[1].addEventListener('click',function(){showPanel('restaurante');});
+// Event listeners — all ID-based for reliability
+document.getElementById('nav-ingresos').addEventListener('click',function(){showPanel('hotel');});
+document.getElementById('nav-hotel').addEventListener('click',function(){showPanel('hotel');});
+document.getElementById('nav-restaurante').addEventListener('click',function(){showPanel('restaurante');});
+document.getElementById('nav-egresos').addEventListener('click',function(){showPanel('gastos-op');});
 document.getElementById('nav-gastos-op').addEventListener('click',function(){showPanel('gastos-op');});
 document.getElementById('nav-comisiones-canales').addEventListener('click',function(){showPanel('comisiones-canales');});
 document.getElementById('nav-gastos-menores').addEventListener('click',function(){showPanel('gastos-menores');});
-document.querySelectorAll('.nav-item')[2].addEventListener('click',function(){showPanel('conciliaciones');});
-// Egresos nav-item toggles its sub-nav and selects first subcategory
-document.getElementById('nav-egresos').addEventListener('click',function(){showPanel('gastos-op');});
-// Also clicking "Ingresos" nav-item selects Hotel by default
-document.querySelectorAll('.nav-item')[0].addEventListener('click',function(){showPanel('hotel');});
+document.getElementById('nav-conciliaciones').addEventListener('click',function(){showPanel('conciliaciones');});
+document.getElementById('nav-conciliaciones-sub').addEventListener('click',function(){showPanel('conciliaciones');});
+document.getElementById('nav-analisis').addEventListener('click',function(){showPanel('analisis');});
+document.getElementById('nav-analisis-sub').addEventListener('click',function(){showPanel('analisis');});
 
 // ---- ORDEN SWITCHING ----
 function updateTableHeaders(){
