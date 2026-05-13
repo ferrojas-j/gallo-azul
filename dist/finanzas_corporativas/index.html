@@ -49,28 +49,26 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--slate-50);color:v
 .main-content{flex:1;min-width:0;display:flex;flex-direction:column}
 .page-header{display:flex;align-items:center;justify-content:space-between;padding:28px 36px 0;flex-wrap:wrap;gap:12px}
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--slate-900)}
-.sync-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--indigo),var(--indigo-dark));color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s}
-.sync-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(79,70,229,.35)}
-.sync-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.sync-btn.loading svg{animation:spin 1s linear infinite}
 @keyframes spin{100%{transform:rotate(360deg)}}
 .content-body{padding:24px 36px 40px;flex:1}
-.kpi-grid{display:grid;grid-template-columns:minmax(90px,0.55fr) repeat(5,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px}
 @media(max-width:1400px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-.kpi-card{background:#fff;border:1px solid var(--slate-200);border-radius:14px;padding:clamp(12px,1.2vw,20px) clamp(12px,1.5vw,24px);position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
-.kpi-card:nth-child(1)::before{background:var(--emerald)}
-.kpi-card:nth-child(2)::before{background:var(--indigo)}
-.kpi-card:nth-child(3)::before{background:#f59e0b}
-.kpi-card:nth-child(4)::before{background:var(--sky)}
-.kpi-card:nth-child(5)::before{background:#8b5cf6}
-.kpi-card:nth-child(6)::before{background:var(--rose)}
-.kpi-label{font-size:11px;font-weight:700;color:var(--slate-400);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px}
-.kpi-value{font-size:clamp(12px,1.15vw,22px);font-weight:800;color:var(--slate-900);letter-spacing:-.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi-card:nth-child(6) .kpi-value{color:var(--rose)}
-.kpi-card:nth-child(3) .kpi-value{color:#b45309}
-.kpi-sub{font-size:11px;color:var(--slate-400);margin-top:6px;font-weight:500}
+.kpi-card{background:#fff;border:1px solid #e8edf5;border-radius:16px;padding:18px 20px 16px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,.06);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;gap:0}
+.kpi-card:hover{box-shadow:0 6px 20px rgba(15,23,42,.1);transform:translateY(-1px)}
+.kpi-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.kpi-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kpi-label{font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;line-height:1.3}
+.kpi-value{font-size:clamp(15px,1.4vw,24px);font-weight:900;color:#0f172a;letter-spacing:-.5px;line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-sub{font-size:11px;color:#94a3b8;font-weight:500;display:flex;align-items:center;gap:4px}
+.kpi-divider{height:1px;background:linear-gradient(90deg,#e2e8f0,transparent);margin:10px 0 8px}
+/* accent bars via card class */
+.kpi-c1 .kpi-icon{background:#ecfdf5} .kpi-c1 .kpi-value{color:#059669}
+.kpi-c2 .kpi-icon{background:#eef2ff} .kpi-c2 .kpi-value{color:#4f46e5}
+.kpi-c3 .kpi-icon{background:#fffbeb} .kpi-c3 .kpi-value{color:#d97706}
+.kpi-c4 .kpi-icon{background:#f0f9ff} .kpi-c4 .kpi-value{color:#0284c7}
+.kpi-c5 .kpi-icon{background:#faf5ff} .kpi-c5 .kpi-value{color:#7c3aed}
+.kpi-c6 .kpi-icon{background:#fff1f2} .kpi-c6 .kpi-value{color:#e11d48}
 .hotel-filter-bar{background:#fff;border:1px solid #dde3ec;border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(15,23,42,.06);margin-bottom:20px}
 .hotel-filter-row{display:grid;grid-template-columns:90px 1fr;min-height:48px}
 .hotel-filter-row:not(:last-child){border-bottom:1px solid #edf2f7}
@@ -117,28 +115,6 @@ tr:hover td{background:#fafbfc}
 .test-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;letter-spacing:0.5px}
 tr.row-test-entry{background:#fffbeb!important}
 tr.row-test-entry:hover{background:#fef9c3!important}
-.dq-panel{background:#fffbeb;border:1.5px dashed #fcd34d;border-radius:14px;padding:16px 24px;margin-bottom:20px}
-.dq-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.dq-title{font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.9px}
-.dq-tag{font-size:10px;font-weight:800;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:4px;padding:2px 8px;letter-spacing:.5px}
-.dq-total-wrap{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#78350f}
-.dq-total-num{font-size:22px;font-weight:900;color:#b45309;line-height:1}
-.dq-metrics{display:flex;gap:12px;flex-wrap:wrap}
-.dq-metric{flex:1;min-width:180px;background:#fff;border:1px solid #fde68a;border-radius:10px;padding:13px 16px;display:flex;align-items:center;gap:13px}
-.dq-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
-.dq-label{font-size:11px;font-weight:600;color:#78350f;margin-bottom:3px;line-height:1.3}
-.dq-val{font-size:26px;font-weight:900;line-height:1}
-.dq-sub{font-size:10px;color:#a16207;margin-top:3px}
-.dq-comm-section{margin-top:14px;padding-top:14px;border-top:1px dashed #fcd34d}
-.dq-comm-title{font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.9px;margin-bottom:10px}
-.dq-comm-grid{display:flex;gap:10px;flex-wrap:wrap}
-.dq-comm-card{flex:1;min-width:150px;background:#fff;border:1px solid #fde68a;border-radius:9px;padding:12px 15px}
-.dq-comm-name{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
-.dq-comm-ch{padding:2px 9px;border-radius:4px;font-size:11px;font-weight:700;color:#fff}
-.dq-comm-ok{font-size:10px;font-weight:800;background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:20px;padding:2px 8px}
-.dq-comm-pending{font-size:10px;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:20px;padding:2px 8px}
-.dq-comm-pct{font-size:24px;font-weight:900;line-height:1.1;margin-bottom:3px}
-.dq-comm-sub{font-size:10px;color:#64748b}
 .edit-mxn-btn{display:block;margin:5px 0 0 auto;background:#4f46e5;color:#fff;border:none;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
 .edit-mxn-btn:hover{background:#3730a3}
 .edit-inline{display:flex;flex-direction:column;gap:4px;min-width:170px;align-items:flex-end}
@@ -155,15 +131,6 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 .delete-test-btn{background:transparent;border:1px solid #f43f5e;color:#f43f5e;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:5px;vertical-align:middle;font-weight:700;transition:all .15s}
 .delete-test-btn:hover{background:#fff1f2}
 .delete-test-btn.confirming{background:#f43f5e;color:#fff;border-color:#f43f5e}
-.comm-inp-row{display:flex;align-items:center;gap:6px;margin:8px 0 4px}
-.comm-inp{width:70px;padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;font-weight:700;color:#334155;outline:none;text-align:center}
-.comm-inp:focus{border-color:#4f46e5}
-.comm-inp-unit{font-size:12px;font-weight:700;color:#64748b}
-.comm-save-btn{background:#4f46e5;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
-.comm-save-btn:hover{background:#4338ca}
-.comm-delete-btn{display:inline-flex;align-items:center;gap:4px;background:transparent;border:1px solid #f43f5e;color:#f43f5e;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;margin-top:6px}
-.comm-delete-btn:hover{background:#fff1f2}
-.comm-identified{background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:800}
 /* ===== MOBILE RESPONSIVE ===== */
 .mobile-header{display:none}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
@@ -188,13 +155,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
   .mobile-hamburger svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round}
   .mobile-page-title{color:#fff;font-size:14px;font-weight:700;flex:1;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mobile-sync-btn{
-    background:rgba(99,102,241,.35);border:1px solid rgba(99,102,241,.5);
-    color:#a5b4fc;border-radius:8px;padding:7px 11px;font-size:11px;
-    font-weight:700;cursor:pointer;white-space:nowrap;
-    display:flex;align-items:center;gap:5px;flex-shrink:0
-  }
-  .mobile-sync-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
 
   /* Sidebar: fixed drawer, hidden by default */
   .sidebar{
@@ -319,10 +280,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <span class="mobile-page-title" id="mobile-title">Finanzas · Gallo Azul</span>
-  <button class="mobile-sync-btn" id="mobileSyncBtn">
-    <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
-    Sync
-  </button>
+
 </div>
 <div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
@@ -357,105 +315,107 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 <div class="main-content">
   <div class="page-header">
     <h1 class="page-title">Ingresos por venta de habitaciones</h1>
-    <button class="sync-btn" id="btnSync"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>Sincronizar</button>
+
   </div>
   <div class="content-body">
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Reservas confirmadas</div><div class="kpi-value" id="kpi-res">0</div><div class="kpi-sub">📋 Total de registros</div></div>
-      <div class="kpi-card"><div class="kpi-label">Ingresos efectivos</div><div class="kpi-value" id="kpi-paid">$0.00</div><div class="kpi-sub">✅ Estado: Pagado (MXN)</div></div>
-      <div class="kpi-card"><div class="kpi-label">Ingresos por cobrar</div><div class="kpi-value" id="kpi-pending">$0.00</div><div class="kpi-sub">⏳ Estado: Pendiente (MXN)</div></div>
-      <div class="kpi-card"><div class="kpi-label">ADR por noche</div><div class="kpi-value" id="kpi-adr">$0.00</div><div class="kpi-sub">💵 MXN promedio/noche</div></div>
-      <div class="kpi-card"><div class="kpi-label">ADR por reserva</div><div class="kpi-value" id="kpi-adr-res">$0.00</div><div class="kpi-sub">💵 MXN promedio/reserva</div></div>
-      <div class="kpi-card"><div class="kpi-label">Comisiones OTA</div><div class="kpi-value" id="kpi-com">$0.00</div><div class="kpi-sub">💵 Pesos mexicanos (MXN)</div></div>
+      <!-- 1. Reservas -->
+      <div class="kpi-card kpi-c1">
+        <div class="kpi-top">
+          <div class="kpi-label">Reservas<br>confirmadas</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-res">0</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Total de registros</div>
+      </div>
+      <!-- 2. Ingresos efectivos -->
+      <div class="kpi-card kpi-c2">
+        <div class="kpi-top">
+          <div class="kpi-label">Ingresos<br>efectivos</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-paid">$0.00</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Estado: Pagado (MXN)</div>
+      </div>
+      <!-- 3. Por cobrar -->
+      <div class="kpi-card kpi-c3">
+        <div class="kpi-top">
+          <div class="kpi-label">Ingresos<br>por cobrar</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-pending">$0.00</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Pendientes de cobro</div>
+      </div>
+      <!-- 4. ADR noche -->
+      <div class="kpi-card kpi-c4">
+        <div class="kpi-top">
+          <div class="kpi-label">ADR<br>por noche</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-adr">$0.00</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>MXN promedio / noche</div>
+      </div>
+      <!-- 5. ADR reserva -->
+      <div class="kpi-card kpi-c5">
+        <div class="kpi-top">
+          <div class="kpi-label">ADR<br>por reserva</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-adr-res">$0.00</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>MXN promedio / reserva</div>
+      </div>
+      <!-- 6. Comisiones -->
+      <div class="kpi-card kpi-c6">
+        <div class="kpi-top">
+          <div class="kpi-label">Comisiones<br>OTA</div>
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        </div>
+        <div class="kpi-value" id="kpi-com">$0.00</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-sub"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Pesos mexicanos (MXN)</div>
+      </div>
     </div>
-    <div class="dq-panel" id="dq-panel" style="display:none">
-       <div class="dq-header">
-         <span class="dq-title">⚠ Indicadores de limpieza y normalización de datos</span>
-         <span class="dq-tag">TEMPORAL</span>
-         <div class="dq-total-wrap">Total alertas: <span class="dq-total-num" id="dq-total">0</span></div>
-       </div>
-       <div class="dq-metrics">
-         <div class="dq-metric">
-           <div class="dq-icon" style="background:#fef2f2">⚠</div>
-           <div>
-             <div class="dq-label">Cobros altos en USD (&gt;$2,000)</div>
-             <div class="dq-val" id="dq-hv" style="color:#b91c1c">0</div>
-             <div class="dq-sub">Requieren verificación manual</div>
-           </div>
-         </div>
-         <div class="dq-metric">
-           <div class="dq-icon" style="background:#fff0f2">🔴</div>
-           <div>
-             <div class="dq-label">Airbnb con pago pendiente</div>
-             <div class="dq-val" id="dq-airbnb" style="color:#e00b27">0</div>
-             <div class="dq-sub">Confirmar cobro en plataforma</div>
-           </div>
-         </div>
-         <div class="dq-metric">
-           <div class="dq-icon" style="background:#fef9c3">🧪</div>
-           <div>
-             <div class="dq-label">Registros de prueba</div>
-             <div class="dq-val" id="dq-test" style="color:#b45309">0</div>
-             <div class="dq-sub">Eliminar antes de reportes finales</div>
-           </div>
-         </div>
-       </div>
-       <div class="dq-comm-section">
-         <div class="dq-comm-title">Identificación de comisiones por canal</div>
-         <div class="dq-comm-grid">
-           <div class="dq-comm-card">
-             <div class="dq-comm-name">
-               <span class="dq-comm-ch" style="background:#003580">Booking.com</span>
-               <span class="dq-comm-ok">✓ Identificado</span>
-             </div>
-             <div class="dq-comm-pct" id="dq-bk-pct" style="color:#166534">—</div>
-             <div class="dq-comm-sub">Promedio sobre monto USD</div>
-           </div>
-           <div class="dq-comm-card" id="comm-card-expedia">
-             <div class="dq-comm-name">
-               <span class="dq-comm-ch" style="background:#1a1a1a">Expedia</span>
-               <span id="comm-status-expedia" class="dq-comm-pending">⏳ Pendiente</span>
-             </div>
-             <div class="dq-comm-pct" id="comm-pct-expedia" style="color:#b45309">—</div>
-             <div class="comm-inp-row" id="comm-form-expedia">
-               <input type="number" id="comm-inp-expedia" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
-               <span class="comm-inp-unit">%</span>
-               <button class="comm-save-btn" onclick="saveChannelComm('Expedia','expedia')">Aplicar</button>
-             </div>
-             <div id="comm-action-expedia"></div>
-             <div class="dq-comm-sub" id="comm-sub-expedia">Identificar manualmente</div>
-           </div>
-           <div class="dq-comm-card" id="comm-card-airbnb">
-             <div class="dq-comm-name">
-               <span class="dq-comm-ch" style="background:#e00b27">Airbnb</span>
-               <span id="comm-status-airbnb" class="dq-comm-pending">⏳ Pendiente</span>
-             </div>
-             <div class="dq-comm-pct" id="comm-pct-airbnb" style="color:#b45309">—</div>
-             <div class="comm-inp-row" id="comm-form-airbnb">
-               <input type="number" id="comm-inp-airbnb" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
-               <span class="comm-inp-unit">%</span>
-               <button class="comm-save-btn" onclick="saveChannelComm('Airbnb','airbnb')">Aplicar</button>
-             </div>
-             <div id="comm-action-airbnb"></div>
-             <div class="dq-comm-sub" id="comm-sub-airbnb">Identificar manualmente</div>
-           </div>
-           <div class="dq-comm-card" id="comm-card-sitioweb">
-             <div class="dq-comm-name">
-               <span class="dq-comm-ch" style="background:#ca8a04">Sitio Web</span>
-               <span id="comm-status-sitioweb" class="dq-comm-pending">⏳ Pendiente</span>
-             </div>
-             <div class="dq-comm-pct" id="comm-pct-sitioweb" style="color:#b45309">—</div>
-             <div class="comm-inp-row" id="comm-form-sitioweb">
-               <input type="number" id="comm-inp-sitioweb" class="comm-inp" min="0" max="100" step="0.1" placeholder="0.0">
-               <span class="comm-inp-unit">%</span>
-               <button class="comm-save-btn" onclick="saveChannelComm('Sitio Web','sitioweb')">Aplicar</button>
-             </div>
-             <div id="comm-action-sitioweb"></div>
-             <div class="dq-comm-sub" id="comm-sub-sitioweb">Comisiones PMS Hostaway</div>
-           </div>
-         </div>
-       </div>
+
+    <!-- ▸ Tasas de comisión por canal (informativo) -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.7px">Tasas de comisión</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;align-items:center;gap:7px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:6px 13px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#003580;display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:700;color:#1e40af">Booking.com</span>
+          <span style="font-size:14px;font-weight:900;color:#1d4ed8;margin-left:4px">18.1%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;background:#fff1f2;border:1px solid #fecdd3;border-radius:9px;padding:6px 13px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#e00b27;display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:700;color:#be123c">Airbnb</span>
+          <span style="font-size:14px;font-weight:900;color:#e11d48;margin-left:4px">15.5%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:6px 13px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#1a1a1a;display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:700;color:#334155">Expedia</span>
+          <span style="font-size:14px;font-weight:900;color:#0f172a;margin-left:4px">14.2%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;background:#fefce8;border:1px solid #fef08a;border-radius:9px;padding:6px 13px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#ca8a04;display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:700;color:#a16207">Sitio Web / Stripe</span>
+          <span style="font-size:14px;font-weight:900;color:#ca8a04;margin-left:4px">7.2%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:6px 13px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:700;color:#c2410c">Directo</span>
+          <span style="font-size:14px;font-weight:900;color:#ea580c;margin-left:4px">0%</span>
+        </div>
+      </div>
+      <span style="margin-left:auto;font-size:10px;color:#94a3b8;font-weight:600;flex-shrink:0">Aplicadas sobre precio USD · Solo referencia</span>
     </div>
+
     <div class="hotel-filter-bar">
       <div class="hotel-filter-row">
         <div class="hotel-filter-label-cell label-accent-year">Año</div>
@@ -714,49 +674,6 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 <script>
 const SB='https://quzjixxqowxbezbcmqws.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1emppeHhxb3d4YmV6YmNtcXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MTYwMTcsImV4cCI6MjA5MzQ5MjAxN30.cp_eoG5fAbead2rOdVbsHjNo5hLFMRvkFS9OvL5rcyk';
-var COMM_OVERRIDES=JSON.parse(localStorage.getItem('gallo_comm_overrides')||'{}');
-function saveChannelComm(channelName,key){
-  var inp=document.getElementById('comm-inp-'+key);
-  if(!inp)return;
-  var pct=parseFloat(inp.value);
-  if(isNaN(pct)||pct<0||pct>100){inp.style.borderColor='#f43f5e';inp.focus();return;}
-  inp.style.borderColor='';
-  COMM_OVERRIDES[channelName]=pct;
-  localStorage.setItem('gallo_comm_overrides',JSON.stringify(COMM_OVERRIDES));
-  renderCommCard(key,channelName,pct);
-  applyFilters();
-}
-function deleteChannelComm(channelName,key){
-  delete COMM_OVERRIDES[channelName];
-  localStorage.setItem('gallo_comm_overrides',JSON.stringify(COMM_OVERRIDES));
-  renderCommCard(key,channelName,null);
-  applyFilters();
-}
-function renderCommCard(key,channelName,pct){
-  var statusEl=document.getElementById('comm-status-'+key);
-  var pctEl=document.getElementById('comm-pct-'+key);
-  var formEl=document.getElementById('comm-form-'+key);
-  var actionEl=document.getElementById('comm-action-'+key);
-  var subEl=document.getElementById('comm-sub-'+key);
-  if(pct!==null&&pct!==undefined){
-    if(statusEl){statusEl.className='comm-identified';statusEl.textContent='✓ Identificado';}
-    if(pctEl){pctEl.textContent=pct.toFixed(1)+'%';pctEl.style.color='#166534';}
-    if(formEl)formEl.style.display='none';
-    if(actionEl)actionEl.innerHTML='<button class="comm-delete-btn" onclick="deleteChannelComm(\'' +channelName+'\',\''+key+'\')">🗑 Eliminar comisión</button>';
-    if(subEl)subEl.textContent='Promedio sobre monto USD';
-  }else{
-    if(statusEl){statusEl.className='dq-comm-pending';statusEl.textContent='⏳ Pendiente';}
-    if(pctEl){pctEl.textContent='—';pctEl.style.color='#b45309';}
-    if(formEl)formEl.style.display='';
-    if(actionEl)actionEl.innerHTML='';
-    if(subEl)subEl.textContent=channelName==='Sitio Web'?'Comisiones PMS Hostaway':'Identificar manualmente';
-  }
-}
-function initCommOverrides(){
-  [['Expedia','expedia'],['Airbnb','airbnb'],['Sitio Web','sitioweb']].forEach(function(p){
-    if(COMM_OVERRIDES[p[0]]!==undefined)renderCommCard(p[1],p[0],COMM_OVERRIDES[p[0]]);
-  });
-}
 let allData=[], filterYear='2026', filterMonth='all', filterChannel='all', filterOrder='booking_date';
 const fmtUSD=v=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(v);
 const fmtMXN=v=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(v);
@@ -786,7 +703,7 @@ async function loadHotelData(){
   try{
     var y=filterYear==='all'?null:filterYear;
     var df=y?('&arrival_date=gte.'+y+'-01-01&arrival_date=lte.'+y+'-12-31'):'&arrival_date=gte.2020-01-01&arrival_date=lte.2030-12-31';
-    const url=SB+'/rest/v1/financial_reservations?select=id,guest_name,room_name,arrival_date,departure_date,nights,total_amount,channel_commission,source_name,is_paid,booking_date,mxn_rate,mxn_amount'+
+    const url=SB+'/rest/v1/financial_reservations?select=id,guest_name,room_name,arrival_date,departure_date,nights,total_amount,channel_commission,source_name,is_paid,booking_date,mxn_rate,mxn_amount,hv_verified'+
       '&status=in.(new,confirmed,reserved,modified,ownerStay,inquiryPreapproved)'+
       df+'&order='+(filterOrder==='checkin'?'arrival_date':'booking_date')+'.desc&limit=2000';;
     const r=await fetch(url,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=none'}});
@@ -796,7 +713,6 @@ async function loadHotelData(){
     buildChannelPills();
     applyFilters();
     updateTableHeaders();
-    initCommOverrides();
   }catch(err){
     document.getElementById('hotel-table-body').innerHTML='<tr><td colspan="11" style="text-align:center;color:#f43f5e;padding:48px">Error: '+err.message+'</td></tr>';
     document.getElementById('hotel-table-badge').textContent='Error';
@@ -831,9 +747,6 @@ function applyFilters(){
   if(filterMonth!=='all')rows=rows.filter(function(r){return r[dateField]&&r[dateField].slice(5,7)===filterMonth;});
   if(filterChannel!=='all')rows=rows.filter(function(r){return r.source_name===filterChannel;});
   renderTable(rows);
-  // If commission panel is visible, keep it in sync
-  var cPanel=document.getElementById('panel-comisiones-canales');
-  if(cPanel && cPanel.style.display!=='none') renderComisionesCanales();
 }
 function renderTable(rows){
   const TODAY=new Date().toISOString().slice(0,10);
@@ -841,9 +754,8 @@ function renderTable(rows){
   const tbody=document.getElementById('hotel-table-body');
   badge.textContent=rows.length+' registros';
   updateKPIs(rows);
-  updateDataQuality(rows);
   if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
-  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';var guestCell='<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span><button id="dtb-'+r.id+'" class="delete-test-btn" onclick="confirmDeleteTest('+r.id+')" title="Eliminar registro de prueba">🗑</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+guestCell+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+'</td>'+'</tr>';}).join('');
+  tbody.innerHTML=rows.map(function(r){var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000&&!r.hv_verified;var hasCI=r.arrival_date&&r.arrival_date<=TODAY;var ciTag=r.arrival_date?(hasCI?'<span class="ci-done">✓ Ingresó</span>':'<span class="ci-upcoming">⏳ Próximo</span>'):'';var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';var guestCell='<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span><button id="dtb-'+r.id+'" class="delete-test-btn" onclick="confirmDeleteTest('+r.id+')" title="Eliminar registro de prueba">🗑</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+ciTag+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+ciTag+'</td>')+guestCell+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+'</td>'+'</tr>';}).join('');
 }
 function updateKPIs(rows){
   const TODAY=new Date().toISOString().slice(0,10);
@@ -852,15 +764,8 @@ function updateKPIs(rows){
     const isC=COURTESY.includes(Number(r.id));
     const rate=Number(r.mxn_rate||0);
     const mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate);
-    // Commission: use override % if set, otherwise use stored channel_commission
-    var commAmt;
-    if(isC){
-      commAmt=0;
-    } else if(COMM_OVERRIDES[r.source_name]!==undefined){
-      commAmt=Number(r.total_amount||0)*(COMM_OVERRIDES[r.source_name]/100)*rate;
-    } else {
-      commAmt=Number(r.channel_commission||0)*rate;
-    }
+    // Commission: use stored channel_commission from DB
+    var commAmt = isC ? 0 : Number(r.channel_commission||0)*rate;
     const autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
     const paid=isC||r.is_paid||autoP;
     if(isC){
@@ -883,35 +788,7 @@ function updateKPIs(rows){
   document.getElementById('kpi-adr-res').textContent=fmtMXN(adrRes);
   document.getElementById('kpi-com').textContent=fmtMXN(commMXN);
 }
-function updateDataQuality(rows){
-  const TODAY=new Date().toISOString().slice(0,10);
-  let hvCount=0,airbnbCount=0,testCount=0;
-  rows.forEach(function(r){
-    var isC=COURTESY.includes(Number(r.id));
-    var amt=isC?0:Number(r.total_amount||0);
-    var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
-    var paid=isC||r.is_paid||autoP;
-    if(amt>2000) hvCount++;
-    if(r.source_name==='Airbnb'&&!paid&&!isC) airbnbCount++;
-    if(r.guest_name&&/test|prueba/i.test(r.guest_name)) testCount++;
-  });
-  var total=hvCount+airbnbCount+testCount;
-  document.getElementById('dq-total').textContent=total;
-  document.getElementById('dq-hv').textContent=hvCount;
-  document.getElementById('dq-airbnb').textContent=airbnbCount;
-  document.getElementById('dq-test').textContent=testCount;
-  document.getElementById('dq-panel').style.display='';
-  // Booking.com commission %
-  var bkAmt=0,bkComm=0;
-  rows.forEach(function(r){
-    if(r.source_name==='Booking.com'&&!COURTESY.includes(Number(r.id))){
-      bkAmt+=Number(r.total_amount||0);
-      bkComm+=Number(r.channel_commission||0);
-    }
-  });
-  var el=document.getElementById('dq-bk-pct');
-  if(el) el.textContent=bkAmt>0?(bkComm/bkAmt*100).toFixed(1)+'%':'Sin datos';
-}
+
 // ---- INLINE EDIT MXN ----
 function openEdit(id){
   var r=allData.find(function(x){return Number(x.id)===id;});
@@ -1115,17 +992,7 @@ document.querySelectorAll('.month-pill').forEach(b=>b.addEventListener('click',(
   document.querySelectorAll('.month-pill').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');filterMonth=b.dataset.month;applyFilters();
 }));
-document.getElementById('btnSync').addEventListener('click',async()=>{
-  const btn=document.getElementById('btnSync');btn.classList.add('loading');
-  try{
-    const res=await fetch(SB+'/functions/v1/hostaway-financial-sync',{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({})});
-    const d=await res.json();
-    if(d.error)throw new Error(d.error);
-    alert('Sincronización exitosa: '+(d.synced||0)+' reservas actualizadas.');
-    loadHotelData();
-  }catch(err){alert('Error: '+err.message);}
-  finally{btn.classList.remove('loading');}
-});
+
 window.addEventListener('error',e=>{document.getElementById('globalLoader').classList.add('hidden');});
 window.addEventListener('unhandledrejection',e=>{document.getElementById('globalLoader').classList.add('hidden');});
 
@@ -1163,11 +1030,9 @@ function showPanel(name){
       var fb=document.querySelector('.hotel-filter-bar');
       var tc=document.querySelector('.table-container');
       var kg=document.querySelector('.kpi-grid');
-      var dq=document.getElementById('dq-panel');
       if(fb) fb.style.display=name==='hotel'?'':'none';
       if(tc) tc.style.display=name==='hotel'?'':'none';
       if(kg) kg.style.display=name==='hotel'?'':'none';
-      if(dq && name!=='hotel') dq.style.display='none';
       if(name==='hotel' && typeof applyFilters==='function' && allData.length>0) applyFilters();
     } else {
       var panel=document.getElementById('panel-'+p);
@@ -1214,10 +1079,6 @@ function showPanel(name){
   var _mt=document.getElementById('mobile-title'); if(_mt) _mt.textContent=PAGE_TITLES[name]||'Finanzas · Gallo Azul';
 }
 // Event listeners — all ID-based for reliability
-// Wire mobile sync btn
-document.getElementById('mobileSyncBtn').addEventListener('click',function(){
-  var btn=document.getElementById('btnSync'); if(btn) btn.click();
-});
 document.getElementById('nav-dashboard').addEventListener('click',function(){showPanel('dashboard');});
 document.getElementById('nav-ingresos').addEventListener('click',function(){showPanel('hotel');});
 document.getElementById('nav-hotel').addEventListener('click',function(){showPanel('hotel');});
@@ -1381,7 +1242,6 @@ function renderRestPanel(rows){
   }).join('');
 }
 // ---- COMISIONES CANALES MODULE ----
-// Shares allData, filterYear, filterMonth, filterChannel, COMM_OVERRIDES, COURTESY with hotel module
 
 function calcRowComm(r){
   var isC = COURTESY.indexOf(Number(r.id)) > -1;
@@ -1389,10 +1249,7 @@ function calcRowComm(r){
   var rate = Number(r.mxn_rate||0);
   var mxnAmt = r.mxn_amount ? Number(r.mxn_amount) : Number(r.total_amount||0)*rate;
   var commAmt, source;
-  if(COMM_OVERRIDES[r.source_name] !== undefined){
-    commAmt = mxnAmt * (COMM_OVERRIDES[r.source_name]/100);
-    source = 'override';
-  } else if(r.channel_commission && rate){
+  if(r.channel_commission && rate){
     commAmt = Number(r.channel_commission)*rate;
     source = 'db';
   } else {
