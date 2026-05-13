@@ -1175,11 +1175,11 @@ function showPanel(name){
       var kg=document.querySelector('.kpi-grid');
       var cr=document.getElementById('panel-commission-rates');
       var fw=document.getElementById('panel-filter-occ');
-      if(fb) fb.style.display=name==='hotel'?'':'none';
-      if(tc) tc.style.display=name==='hotel'?'':'none';
-      if(kg) kg.style.display=name==='hotel'?'':'none';
-      if(cr) cr.style.display=name==='hotel'?'':'none';
-      if(fw) fw.style.display=name==='hotel'?'':'none';
+      if(fb) fb.style.display=name==='hotel'?'block':'none';
+      if(tc) tc.style.display=name==='hotel'?'block':'none';
+      if(kg) kg.style.display=name==='hotel'?'grid':'none';
+      if(cr) cr.style.display=name==='hotel'?'flex':'none';
+      if(fw) fw.style.display=name==='hotel'?'flex':'none';
       if(name==='hotel' && typeof applyFilters==='function' && allData.length>0) applyFilters();
     } else {
       var panel=document.getElementById('panel-'+p);
