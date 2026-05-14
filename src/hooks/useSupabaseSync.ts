@@ -318,6 +318,22 @@ export function useSupabaseSync() {
   const fetchTodayTotalsRef = useRef(fetchTodayTotals);
   fetchTodayTotalsRef.current = fetchTodayTotals;
 
+  // Refs to stable fetch callbacks (avoids stale closures in realtime handler)
+  const fetchTablesRef = useRef(fetchTables);
+  const fetchOrdersRef = useRef(fetchOrdersAndItems);
+  const fetchUsersRef = useRef(fetchUsers);
+  const fetchMenuRef = useRef(fetchMenu);
+  const fetchDailySummariesRef = useRef(fetchDailySummaries);
+  const fetchTodayTicketsRef = useRef(fetchTodayTickets);
+  const fetchRegistrationsRef = useRef(fetchRegistrations);
+  fetchTablesRef.current = fetchTables;
+  fetchOrdersRef.current = fetchOrdersAndItems;
+  fetchUsersRef.current = fetchUsers;
+  fetchMenuRef.current = fetchMenu;
+  fetchDailySummariesRef.current = fetchDailySummaries;
+  fetchTodayTicketsRef.current = fetchTodayTickets;
+  fetchRegistrationsRef.current = fetchRegistrations;
+
   // ── Initial Fetch & Polling ──────────────────────────
   useEffect(() => {
     fetchAll();
@@ -327,63 +343,141 @@ export function useSupabaseSync() {
     return () => clearInterval(rateInterval);
   }, [fetchAll, fetchExchangeRate]);
 
-  // ── Realtime subscriptions ──────────────────────────
+  // ── Realtime subscriptions (hardened) ───────────────
   useEffect(() => {
-    const channel = supabase
-      .channel('app-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        const table = payload.table;
-        
-        // Use a short delay to account for potential PostgREST replication lag 
-        // so that the subsequent select() queries don't return stale data.
-        setTimeout(() => {
-          switch (table) {
-            case 'tables':
-              fetchTables();
-              fetchTodayTotalsRef.current();
-              break;
-            case 'orders':
-            case 'order_items':
-              fetchOrdersAndItems();
-              fetchTodayTotalsRef.current();
-              break;
-            case 'expenses':
-            case 'hotel_sales':
-              fetchTodayTotalsRef.current();
-              break;
-            case 'users':
-              fetchUsers();
-              break;
-            case 'menu_items':
-            case 'menu_item_variants':
-            case 'menu_categories':
-              fetchMenu();
-              break;
-            case 'shift_summaries':
-              fetchDailySummaries();
-              fetchOrdersAndItems();
-              fetchTables();
-              fetchTodayTotalsRef.current();
-              break;
-            case 'printed_tickets':
-              fetchTodayTickets();
-              break;
-            case 'guest_registrations':
-              fetchRegistrations();
-              break;
-            default:
-              break;
-          }
-        }, 800);
-      })
-      .subscribe((status) => {
-        console.log('Realtime status:', status);
-      });
+    // Unique channel name per session prevents cross-tab subscription conflicts
+    const sessionId = Math.random().toString(36).slice(2, 8);
+    const channelName = `app-realtime-${sessionId}`;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
+    let isConnected = false;
+    let channelRef: ReturnType<typeof supabase.channel> | null = null;
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    // Debounce map to prevent duplicate handler calls for the same table within 300ms
+    const pendingRefreshes: Record<string, ReturnType<typeof setTimeout>> = {};
+
+    const scheduleRefresh = (table: string, delay = 300) => {
+      if (pendingRefreshes[table]) clearTimeout(pendingRefreshes[table]);
+      pendingRefreshes[table] = setTimeout(() => {
+        delete pendingRefreshes[table];
+        switch (table) {
+          case 'tables':
+            fetchTablesRef.current();
+            fetchTodayTotalsRef.current();
+            break;
+          case 'orders':
+          case 'order_items':
+            fetchOrdersRef.current();
+            fetchTodayTotalsRef.current();
+            break;
+          case 'expenses':
+          case 'hotel_sales':
+            fetchTodayTotalsRef.current();
+            break;
+          case 'users':
+            fetchUsersRef.current();
+            break;
+          case 'menu_items':
+          case 'menu_item_variants':
+          case 'menu_categories':
+            fetchMenuRef.current();
+            break;
+          case 'shift_summaries':
+            fetchDailySummariesRef.current();
+            fetchOrdersRef.current();
+            fetchTablesRef.current();
+            fetchTodayTotalsRef.current();
+            break;
+          case 'printed_tickets':
+            fetchTodayTicketsRef.current();
+            break;
+          case 'guest_registrations':
+            fetchRegistrationsRef.current();
+            break;
+          default:
+            break;
+        }
+      }, delay);
     };
-  }, [fetchTables, fetchOrdersAndItems, fetchUsers, fetchMenu, fetchDailySummaries, fetchTodayTickets, fetchRegistrations]);
+
+    // Polling fallback: every 15s do a full refresh of operational data
+    // This ensures consistency even when Realtime WebSocket is interrupted
+    const startPolling = () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+      pollingInterval = setInterval(() => {
+        fetchTablesRef.current();
+        fetchOrdersRef.current();
+        fetchTodayTotalsRef.current();
+        fetchTodayTicketsRef.current();
+      }, 15000);
+    };
+
+    const subscribe = () => {
+      if (channelRef) {
+        try { supabase.removeChannel(channelRef); } catch (_) { /* ignore */ }
+      }
+
+      channelRef = supabase
+        .channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+          scheduleRefresh(payload.table);
+        })
+        .subscribe((status) => {
+          console.log(`[Realtime ${sessionId}] status:`, status);
+
+          if (status === 'SUBSCRIBED') {
+            isConnected = true;
+            // Clear any retry timer
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+            console.log(`[Realtime ${sessionId}] Connected ✓`);
+          }
+
+          if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            isConnected = false;
+            console.warn(`[Realtime ${sessionId}] Disconnected — retrying in 5s`);
+            // Auto-reconnect after 5 seconds
+            retryTimer = setTimeout(() => {
+              console.log(`[Realtime ${sessionId}] Reconnecting...`);
+              // Full refresh on reconnect to catch any missed events
+              fetchTablesRef.current();
+              fetchOrdersRef.current();
+              fetchTodayTotalsRef.current();
+              fetchRegistrationsRef.current();
+              subscribe();
+            }, 5000);
+          }
+        });
+    };
+
+    subscribe();
+    startPolling();
+
+    // Handle browser tab visibility: refresh data when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Realtime] Tab visible — refreshing data');
+        fetchTablesRef.current();
+        fetchOrdersRef.current();
+        fetchTodayTotalsRef.current();
+        if (!isConnected) {
+          console.log('[Realtime] Reconnecting after tab restore');
+          subscribe();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (retryTimer) clearTimeout(retryTimer);
+      if (pollingInterval) clearInterval(pollingInterval);
+      Object.values(pendingRefreshes).forEach(t => clearTimeout(t));
+      if (channelRef) {
+        try { supabase.removeChannel(channelRef); } catch (_) { /* ignore */ }
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Operations ──────────────────────────────────────
 

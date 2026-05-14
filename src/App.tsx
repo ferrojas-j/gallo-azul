@@ -497,6 +497,13 @@ function IdPhotoCapture({ idPhoto, onChange, t }: { idPhoto: string; onChange: (
   );
 }
 
+// ─── Day Pass helper ──────────────────────────────────────────────────────
+const parseDayPassInfo = (name: string): { adults: number; children: number } | null => {
+  const m = name.match(/\u{1F3D6}\uFE0F Day Pass \xB7 (\d+)Ad (\d+)Ni/u);
+  if (!m) return null;
+  return { adults: parseInt(m[1], 10), children: parseInt(m[2], 10) };
+};
+
 // ─── App ─────────────────────────────────────────────────
 export default function App() {
   // Supabase sync
@@ -554,6 +561,9 @@ export default function App() {
   const [editExpenseForm, setEditExpenseForm] = useState({ amount: '', concept: '', detail: '' });
   const [contractLang, setContractLang] = useState<string>('es');
   const [isIosPromptVisible, setIsIosPromptVisible] = useState(false);
+  const [showDayPassModal, setShowDayPassModal] = useState(false);
+  const [dayPassAdults, setDayPassAdults] = useState(2);
+  const [dayPassChildren, setDayPassChildren] = useState(0);
   const showIosButton = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).standalone;
 
   // Checkout & Discount State
@@ -1467,6 +1477,21 @@ export default function App() {
     }
   };
 
+
+  const handleCreateDayPass = async () => {
+    const name = `\u{1F3D6}\uFE0F Day Pass \xB7 ${dayPassAdults}Ad ${dayPassChildren}Ni`;
+    const { data, error } = await supabase
+      .from('tables')
+      .insert([{ name, category: 'Day Pass', status: 'occupied', capacity: dayPassAdults + dayPassChildren }])
+      .select().single();
+    if (error) { alert('Error creando Day Pass: ' + error.message); return; }
+    setSelectedTableId(data.id);
+    setCurrentView('mesa');
+    setShowDayPassModal(false);
+    setDayPassAdults(2);
+    setDayPassChildren(0);
+  };
+
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseAmount || !expenseConcept) return;
@@ -2193,10 +2218,9 @@ export default function App() {
     
     return (
       <div className="header">
-        {isSubView ? (
+        {isSubView && currentView !== 'mesa' && currentView !== 'checkout' ? (
           <button className="icon-button" onClick={() => {
             if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
-            else if (currentView === 'checkout') setCurrentView('mesa');
             else if (currentView === 'registros') setCurrentView('checkin');
             else setCurrentView('salon');
           }}>
@@ -4899,6 +4923,20 @@ export default function App() {
           >
             <Plus size={16} strokeWidth={3} /> Compra
           </button>
+          <button
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: '#0ea5e9', color: 'white', border: 'none',
+              padding: '10px 20px', borderRadius: '8px', fontWeight: 700,
+              fontSize: '14px', boxShadow: '0 2px 8px rgba(14,165,233,0.3)',
+              cursor: 'pointer', letterSpacing: '0.3px', transition: 'background 0.2s ease'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#0284c7'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#0ea5e9'}
+            onClick={() => setShowDayPassModal(true)}
+          >
+            🏖️ Day Pass
+          </button>
         </div>
 
         <div className="salon-legend">
@@ -5031,9 +5069,19 @@ export default function App() {
     return (
       <div className="mesa-view fade-in">
         <div className="mesa-header-premium">
-          <button className="back-btn-pill" onClick={() => setCurrentView('salon')}>
-            <ChevronLeft size={20} />
-            <span>Restaurante</span>
+          <button
+            onClick={() => setCurrentView('salon')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+              color: '#fff', border: 'none', borderRadius: 14,
+              padding: '10px 20px', fontSize: 15, fontWeight: 800,
+              cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+              letterSpacing: '0.2px',
+            }}
+          >
+            <ChevronLeft size={22} strokeWidth={2.5} />
+            <span>Volver</span>
           </button>
           <div className="mesa-title-wrap">
              <h2>{table?.name}</h2>
@@ -5044,6 +5092,38 @@ export default function App() {
           </button>
         </div>
 
+        {/* Day Pass Banner */}
+        {(() => {
+          const dpT = tables.find(t => t.id === selectedTableId);
+          const dpI = dpT ? parseDayPassInfo(dpT.name) : null;
+          if (!dpI) return null;
+          const dpMin = dpI.adults * 400 + dpI.children * 250;
+          const consumed = activeItems.filter(i => i.table_id === selectedTableId).reduce((s, i) => s + i.price * i.qty, 0);
+          const reached = consumed >= dpMin;
+          return (
+            <div style={{
+              background: reached ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
+              borderRadius: 12, padding: '10px 16px', marginBottom: 8,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff'
+            }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  🏖️ Day Pass
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
+                  {dpI.adults} adulto{dpI.adults !== 1 ? 's' : ''} · {dpI.children} niño{dpI.children !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mínimo consumible</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>${dpMin}</div>
+                {!reached && <div style={{ fontSize: 10, opacity: 0.75 }}>Faltan ${dpMin - consumed} para el mínimo</div>}
+                {reached && <div style={{ fontSize: 10, opacity: 0.9 }}>✓ Mínimo superado</div>}
+              </div>
+            </div>
+          );
+        })()}
+        
         <div className="tab-control-premium">
           <button className={`tab-btn-p ${mesaTab === 'orden' ? 'active' : ''}`} onClick={() => setMesaTab('orden')}>
             <ClipboardList size={18} />
@@ -5346,23 +5426,42 @@ export default function App() {
   const renderCheckout = () => {
     if (!selectedTableId) return null;
     
+    const dpCheckTable = tables.find(t => t.id === selectedTableId);
+    const dpCheckInfo = dpCheckTable ? parseDayPassInfo(dpCheckTable.name) : null;
+    const dpCheckMin = dpCheckInfo ? dpCheckInfo.adults * 400 + dpCheckInfo.children * 250 : 0;
+    const effectiveFinalTotal = dpCheckInfo ? Math.max(dpCheckMin, finalTotal) : finalTotal;
+
     const isEfectivo = paymentMethod === 'efectivo';
     const tipVal = isEfectivo ? 0 : (tipPercent === 'Otro' 
       ? parseFloat(customTip) || 0 
       : (tipPercent === 'none' 
           ? 0 
-          : finalTotal * (parseFloat(tipPercent)/100)
+          : effectiveFinalTotal * (parseFloat(tipPercent)/100)
         ));
-    const grandTotal = finalTotal + tipVal;
+    const grandTotal = effectiveFinalTotal + tipVal;
 
     return (
       <div className="fade-in">
+        <button
+          onClick={() => setCurrentView('mesa')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+            color: '#fff', border: 'none', borderRadius: 14,
+            padding: '10px 20px', fontSize: 15, fontWeight: 800,
+            cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+            marginBottom: 20, letterSpacing: '0.2px',
+          }}
+        >
+          <ChevronLeft size={22} strokeWidth={2.5} />
+          <span>Volver</span>
+        </button>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontSize: 14, color: '#64748b', marginBottom: 8 }}>Total a cobrar (Cuenta + Propina)</div>
           <div style={{ fontSize: 56, fontWeight: 600, color: '#0e122b', letterSpacing: -1 }}>${grandTotal.toFixed(0)}</div>
           
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 4, fontSize: 13, color: '#64748b' }}>
-            <span>Cuenta: <b>${finalTotal.toFixed(0)}</b></span>
+            <span>Cuenta: <b>${effectiveFinalTotal.toFixed(0)}</b></span>
             {tipVal > 0 && <span>Propina: <b style={{ color: '#ef4444' }}>+${tipVal.toFixed(0)}</b></span>}
           </div>
 
@@ -5865,6 +5964,44 @@ export default function App() {
 
 
       {/* Table Actions Confirm Modal (Open / Pay) */}
+      {/* ══ Day Pass Modal ══════════════════════════════════ */}
+      {showDayPassModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0f172a' }}>🏖️ Day Pass</h2>
+            <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b' }}>Mínimo: $400/adulto · $250/niño</p>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Adultos</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <button onClick={() => setDayPassAdults(Math.max(0, dayPassAdults - 1))} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <span style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', minWidth: 40, textAlign: 'center' }}>{dayPassAdults}</span>
+                <button onClick={() => setDayPassAdults(dayPassAdults + 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: '#0f172a', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Niños</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <button onClick={() => setDayPassChildren(Math.max(0, dayPassChildren - 1))} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <span style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', minWidth: 40, textAlign: 'center' }}>{dayPassChildren}</span>
+                <button onClick={() => setDayPassChildren(dayPassChildren + 1)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: '#0f172a', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+            </div>
+
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12, padding: '12px 16px', marginBottom: 20, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#0284c7', fontWeight: 600, marginBottom: 4 }}>Mínimo consumible</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#0369a1' }}>${dayPassAdults * 400 + dayPassChildren * 250}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => setShowDayPassModal(false)} style={{ flex: 1, padding: '14px', borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: 15, cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
+              <button onClick={handleCreateDayPass} style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Abrir cuenta</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tableConfirmModal.isOpen && (
         <div className="confirm-overlay" onClick={() => setTableConfirmModal({ ...tableConfirmModal, isOpen: false })}>
           <div className="confirm-sheet" style={{ padding: 32, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
