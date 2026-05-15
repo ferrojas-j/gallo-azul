@@ -883,6 +883,13 @@ export function useSupabaseSync() {
         await supabase.from('tables').update({ is_active: false }).in('id', deliveryIds);
       }
 
+      // Also deactivate Day Pass tables (dynamic, created per session)
+      const dayPassTables = tables.filter(t => t.category === 'Day Pass');
+      if (dayPassTables.length > 0) {
+        const dayPassIds = dayPassTables.map(t => t.id);
+        await supabase.from('tables').update({ is_active: false }).in('id', dayPassIds);
+      }
+
       // 5. Final confirmation refresh
       console.log('Shift closed successfully. Resetting totals...');
       await Promise.all([
@@ -952,7 +959,33 @@ export function useSupabaseSync() {
   }, [fetchTodayTickets]);
 
   const deleteClosedOrder = useCallback(async (id: string) => {
-    await dbOrders.delete(id);
+    // 1. Optimistic: remove from local state immediately
+    setTodayClosedOrders(prev => prev.filter((o: any) => o.id !== id));
+
+    // 2. Delete child order_items first (FK: order_items.order_id → orders.id NO ACTION)
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', id);
+
+    if (itemsError) {
+      console.error('Error deleting order items:', itemsError);
+      alert('Error al borrar ítems de la venta: ' + itemsError.message);
+      await fetchTodayTotals();
+      return;
+    }
+
+    // 3. Now delete the order itself
+    const { error } = await dbOrders.delete(id);
+
+    if (error) {
+      console.error('Error deleting closed order:', error);
+      alert('Error al borrar la venta: ' + error.message);
+      await fetchTodayTotals();
+      return;
+    }
+
+    // 4. Sync totals
     await fetchTodayTotals();
   }, [fetchTodayTotals]);
 
@@ -1096,6 +1129,8 @@ export function useSupabaseSync() {
     registrations,
 
     // Actions
+    fetchTables,
+    fetchOrdersAndItems,
     createOrderForTable,
     createDeliveryOrder,
     addItemToOrder,

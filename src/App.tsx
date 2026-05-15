@@ -18,6 +18,7 @@ import { useSupabaseSync } from './hooks/useSupabaseSync';
 import type { UserRow } from './lib/supabaseService';
 import { getUpcomingCheckins, updateReservationStatus, createReservation, addTransaction } from './lib/hostawayService';
 import type { Reservation } from './lib/hostawayService';
+import { bluetoothPrinter, buildEscPos, tryRawBt } from './utils/bluetoothPrinter';
 
 // BUILD: 2026-05-11T21:00:00Z — cortesia-icon v8
 const _BUILD_VERSION = '2026-05-11T21:00:00Z';
@@ -523,7 +524,8 @@ export default function App() {
     addHotelSale, deleteHotelSale, updateHotelSale, exchangeRate,
     pendingTickets, markTicketPrinted, deleteTicket, deleteClosedOrder, fetchTodayTotals,
     createDeliveryOrder, registrations, fetchRegistrations, deleteRegistration, rectificarCuenta,
-    updateExpense, deleteExpense, revertHotelSaleByReservation
+    updateExpense, deleteExpense, revertHotelSaleByReservation,
+    fetchTables, fetchOrdersAndItems
   } = useSupabaseSync();
 
   // UI state
@@ -535,7 +537,11 @@ export default function App() {
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
   const [expandedAdminCategories, setExpandedAdminCategories] = useState<Set<string>>(new Set());
-  
+  const [btConnected, setBtConnected] = useState(false);
+  const [btConnecting, setBtConnecting] = useState(false);
+  // Wire BT status changes to React state
+  bluetoothPrinter.onStatusChange(setBtConnected);
+
   const toggleAdminCategory = (category: string) => {
     setExpandedAdminCategories(prev => {
       const next = new Set(prev);
@@ -564,6 +570,7 @@ export default function App() {
   const [showDayPassModal, setShowDayPassModal] = useState(false);
   const [dayPassAdults, setDayPassAdults] = useState(2);
   const [dayPassChildren, setDayPassChildren] = useState(0);
+  const [dayPassPaymentMethod, setDayPassPaymentMethod] = useState<'tarjeta'|'efectivo'|'transferencia'>('tarjeta');
   const showIosButton = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).standalone;
 
   // Checkout & Discount State
@@ -682,6 +689,13 @@ export default function App() {
         return false;
       });
     }
+    // Pizzas: ALWAYS sort by price ascending (permanent rule)
+    list = list.sort((a, b) => {
+      const aIsPizza = a.category.toLowerCase().includes('pizza');
+      const bIsPizza = b.category.toLowerCase().includes('pizza');
+      if (aIsPizza && bIsPizza) return (a.price ?? 0) - (b.price ?? 0);
+      return 0; // preserve original order for non-pizza items
+    });
     return list;
   }, [menuItems, menuCategory, menuSearch]);
 
@@ -694,6 +708,13 @@ export default function App() {
         m.category.toLowerCase().includes(s)
       );
     }
+    // Pizzas: always price ascending
+    list = list.slice().sort((a, b) => {
+      const aIsPizza = a.category.toLowerCase().includes('pizza');
+      const bIsPizza = b.category.toLowerCase().includes('pizza');
+      if (aIsPizza && bIsPizza) return (a.price ?? 0) - (b.price ?? 0);
+      return 0;
+    });
     return list;
   }, [menuItems, menuSearch]);
 
@@ -1249,6 +1270,7 @@ export default function App() {
 
   const openTable = (id: number) => {
     setSelectedTableId(id);
+    setMesaTab('orden');
     setCurrentView('mesa');
   };
 
@@ -1304,14 +1326,22 @@ export default function App() {
     if (discountType === 'percentage') totalToPay = subtotal * (1 - dVal / 100);
     else if (discountType === 'amount') totalToPay = Math.max(0, subtotal - dVal);
 
-    // Tip calculation
+    // Day Pass: subtract the pre-paid consumable credit — only record the actual overage
+    const dpTable = tables.find(t => t.id === selectedTableId);
+    const dpInfo = dpTable ? parseDayPassInfo(dpTable.name) : null;
+    if (dpInfo) {
+      const dpCredit = dpInfo.adults * 300 + dpInfo.children * 150;
+      totalToPay = Math.max(0, totalToPay - dpCredit);
+    }
+
+    // Tip calculation (applied on the effective amount after credit)
     let tipVal = 0;
     if (paymentMethod !== 'efectivo') {
       if (tipPercent === 'Otro') {
         tipVal = parseFloat(customTip) || 0;
       } else if (tipPercent !== 'none') {
         const p = parseFloat(tipPercent);
-        tipVal = (p / 100) * subtotal;
+        tipVal = (p / 100) * totalToPay;
       }
     }
 
@@ -1399,12 +1429,129 @@ export default function App() {
     }
   };
 
-  const dispatchPrintOnly = (ticket: any) => {
-    setTicketToPrint(ticket);
+  const dispatchPrintOnly = async (ticket: any) => {
+    const table = tables.find(t => t.id === ticket.table_id);
+    const tableName = table?.name || `Mesa ${ticket.table_id}`;
+    const fecha = new Date(ticket.created_at).toLocaleDateString('es-MX', {
+      timeZone: 'America/Mazatlan',
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    // ── Try Bluetooth ESC/POS first ──────────────────────────────────
+    if (bluetoothPrinter.isConnected()) {
+      try {
+        const escPos = buildEscPos({
+          isPedido: ticket.is_pedido,
+          title: ticket.is_pedido ? 'COMANDA - COCINA/BAR' : 'Gallo Azul Resto',
+          mesa: `Mesa: ${tableName}`,
+          fecha,
+          items: ticket.items_summary,
+          total: !ticket.is_pedido ? `$${Number(ticket.total).toFixed(0)}` : undefined,
+        });
+        await bluetoothPrinter.print(escPos);
+        return; // Done — no popup needed
+      } catch (e) {
+        console.error('BT print failed, falling back to popup:', e);
+      }
+    }
+
+    // ── Try RawBT (Classic BT via Android app) ──────────────────────
+    // RawBT bridges ESC/POS data to Classic Bluetooth printers on Android.
+    // Only attempt this on Android PWA (not desktop browsers).
+    const isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const escPos = buildEscPos({
+        isPedido: ticket.is_pedido,
+        title: ticket.is_pedido ? 'COMANDA - COCINA/BAR' : 'Gallo Azul Resto',
+        mesa: `Mesa: ${tableName}`,
+        fecha,
+        items: ticket.items_summary,
+        total: !ticket.is_pedido ? `$${Number(ticket.total).toFixed(0)}` : undefined,
+      });
+      tryRawBt(escPos);
+      return; // RawBT handles the rest — app switch to RawBT
+    }
+
+    // ── Fallback: browser popup window ───────────────────────────────
+    const title = ticket.is_pedido ? 'COMANDA — COCINA/BAR' : 'Gallo Azul Resto';
+    const subtitle = ticket.is_pedido
+      ? `<div style="font-size:14px;font-weight:800;margin-top:4px;">COCINA / BAR</div>`
+      : `<div style="font-size:12px;color:#555;">Atendido por: ${ticket.printed_by}</div>`;
+    const totalRow = !ticket.is_pedido
+      ? `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;margin-top:10px;">
+           <span>TOTAL:</span><span>$${Number(ticket.total).toFixed(0)}</span>
+         </div>`
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>${title}</title>
+  <style>
+    @page { margin: 10mm; size: auto; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      width: 100%;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+    }
+    .ticket {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      color: #000;
+      background: #fff;
+      width: 78mm;
+      max-width: 78mm;
+      padding: 8px 6px;
+    }
+    h2 { margin: 0 0 4px 0; font-size: 16px; text-align: center; }
+    .center { text-align: center; }
+    .sep { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+    .items { white-space: pre-wrap; font-size: 14px; font-weight: 700; line-height: 1.7; }
+    .total-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 16px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="ticket">
+    <div class="center">
+      <h2>${title}</h2>
+      ${subtitle}
+      <div style="font-weight:700;font-size:14px;margin:6px 0;">Mesa: ${tableName}</div>
+      <div style="font-size:11px;color:#555;">${fecha}</div>
+    </div>
+    <hr class="sep"/>
+    <div class="items">${ticket.items_summary.replace(/\n/g, '<br/>')}</div>
+    <hr class="sep"/>
+    ${totalRow}
+  </div>
+</body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no');
+    if (!popup) {
+      alert('El navegador bloqueó la ventana emergente. Permite pop-ups para esta página.');
+      return;
+    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    // Give browser time to render before printing
+    popup.onload = () => {
+      popup.print();
+      setTimeout(() => popup.close(), 1000);
+    };
+    // Fallback if onload doesn't fire (already loaded)
     setTimeout(() => {
-      window.print();
-      setTicketToPrint(null);
-    }, 500);
+      try { popup.print(); setTimeout(() => popup.close(), 1000); } catch {}
+    }, 600);
   };
 
   // Edit menu modal
@@ -1479,17 +1626,51 @@ export default function App() {
 
 
   const handleCreateDayPass = async () => {
-    const name = `\u{1F3D6}\uFE0F Day Pass \xB7 ${dayPassAdults}Ad ${dayPassChildren}Ni`;
-    const { data, error } = await supabase
+    const adults = dayPassAdults;
+    const children = dayPassChildren;
+    const totalMinimo = adults * 400 + children * 250;
+    const creditoConsumo = adults * 300 + children * 150;
+
+    // 1. Create the Day Pass table (is_active: true required for it to appear in table queries)
+    const name = `🏖️ Day Pass · ${adults}Ad ${children}Ni`;
+    const { data: tableData, error: tableError } = await supabase
       .from('tables')
-      .insert([{ name, category: 'Day Pass', status: 'occupied', capacity: dayPassAdults + dayPassChildren }])
+      .insert([{ name, category: 'Day Pass', status: 'occupied', capacity: adults + children, is_active: true }])
       .select().single();
-    if (error) { alert('Error creando Day Pass: ' + error.message); return; }
-    setSelectedTableId(data.id);
-    setCurrentView('mesa');
+    if (tableError) { alert('Error creando Day Pass: ' + tableError.message); return; }
+
+    // 2. Register the initial entry payment as a CLOSED order (receipt for the client)
+    const summary = `Day Pass: ${adults} adulto${adults !== 1 ? 's' : ''} · ${children} niño${children !== 1 ? 's' : ''} | Crédito consumo: $${creditoConsumo}`;
+    const { error: orderError } = await supabase.from('orders').insert([{
+      table_id: tableData.id,
+      status: 'closed',
+      payment_method: dayPassPaymentMethod,
+      total: totalMinimo,
+      tip: 0,
+      items_summary: summary,
+      closed_at: new Date().toISOString(),
+    }]);
+    if (orderError) { alert('Error registrando pago inicial: ' + orderError.message); return; }
+
+    // 3. Create an OPEN consumption order so the table shows as occupied in the salon
+    //    and the mesero can add food/drinks against the credit.
+    const { error: consumoError } = await supabase.from('orders').insert([{
+      table_id: tableData.id,
+      status: 'open',
+      items_summary: `[DP] Crédito consumo: $${creditoConsumo}`,
+    }]);
+    if (consumoError) { alert('Error creando cuenta de consumo: ' + consumoError.message); return; }
+
+    // 4. Force immediate refresh — do NOT rely solely on Realtime
+    await Promise.all([fetchTables(), fetchOrdersAndItems(), fetchTodayTotals()]);
+
     setShowDayPassModal(false);
     setDayPassAdults(2);
     setDayPassChildren(0);
+    setDayPassPaymentMethod('tarjeta');
+    // Navigate to the new Day Pass table
+    setSelectedTableId(tableData.id);
+    setCurrentView('mesa');
   };
 
   const handleExpenseSubmit = async (e: React.FormEvent) => {
@@ -2219,12 +2400,23 @@ export default function App() {
     return (
       <div className="header">
         {isSubView && currentView !== 'mesa' && currentView !== 'checkout' ? (
-          <button className="icon-button" onClick={() => {
-            if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
-            else if (currentView === 'registros') setCurrentView('checkin');
-            else setCurrentView('salon');
-          }}>
-            <ChevronLeft size={24} />
+          <button
+            onClick={() => {
+              if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
+              else if (currentView === 'registros') setCurrentView('checkin');
+              else setCurrentView('salon');
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+              color: '#fff', border: 'none', borderRadius: 14,
+              padding: '10px 20px', fontSize: 15, fontWeight: 800,
+              cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+              letterSpacing: '0.2px',
+            }}
+          >
+            <ChevronLeft size={20} strokeWidth={2.5} />
+            <span>Volver</span>
           </button>
         ) : (
           <div className="header-title-container">
@@ -2239,14 +2431,18 @@ export default function App() {
             </span>
           </div>
         )}
-        {currentView === 'mesa' && (
-          <div className="header-title-container" style={{ alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -4 }}>Atendiendo</span>
-            <span className="header-title" style={{ fontSize: 26, fontWeight: 800 }}>
-              Mesa {tables.find(t => t.id === selectedTableId)?.name || selectedTableId}
-            </span>
-          </div>
-        )}
+        {currentView === 'mesa' && (() => {
+          const mesaTable = tables.find(t => t.id === selectedTableId);
+          const isDayPass = mesaTable ? !!parseDayPassInfo(mesaTable.name) : false;
+          return (
+            <div className="header-title-container" style={{ alignItems: 'flex-start' }}>
+              {!isDayPass && <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -4 }}>Atendiendo</span>}
+              <span className="header-title" style={{ fontSize: isDayPass ? 18 : 26, fontWeight: 800 }}>
+                {isDayPass ? '🏖️ Day Pass' : `Mesa ${mesaTable?.name || selectedTableId}`}
+              </span>
+            </div>
+          );
+        })()}
         {currentView === 'checkout' && (
           <div className="header-title-container" style={{ alignItems: 'center' }}>
             <span className="header-title" style={{ fontSize: 22, fontWeight: 600 }}>Cobrar</span>
@@ -2258,9 +2454,7 @@ export default function App() {
           </div>
         )}
         {currentView === 'mesa' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 800 }}>
-            <Users size={15} color="#64748b" /> {tables.find(t => t.id === selectedTableId)?.capacity ?? 4}
-          </div>
+          <div style={{ width: 44 }} />
         ) : isSubView ? (
           <div style={{ width: 44 }} />
         ) : (
@@ -2276,6 +2470,40 @@ export default function App() {
               </button>
             )}
               <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
+
+              {/* Bluetooth Printer Button */}
+              {bluetoothPrinter.isSupported() && (
+                <button
+                  title={btConnected ? 'Impresora BT conectada — click para desconectar' : 'Conectar impresora Bluetooth'}
+                  onClick={async () => {
+                    if (btConnected) {
+                      bluetoothPrinter.disconnect();
+                    } else {
+                      setBtConnecting(true);
+                      try { await bluetoothPrinter.connect(); }
+                      catch (e: any) { alert('Error BT: ' + e.message); }
+                      finally { setBtConnecting(false); }
+                    }
+                  }}
+                  style={{
+                    background: btConnected ? '#dcfce7' : '#f1f5f9',
+                    border: `2px solid ${btConnected ? '#22c55e' : '#cbd5e1'}`,
+                    borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 12, fontWeight: 700,
+                    color: btConnected ? '#16a34a' : '#64748b',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>🖨️</span>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: btConnecting ? '#f59e0b' : btConnected ? '#22c55e' : '#94a3b8',
+                    display: 'inline-block',
+                    boxShadow: btConnected ? '0 0 0 2px #bbf7d0' : 'none',
+                  }} />
+                </button>
+              )}
 
           </div>
         )}
@@ -2298,7 +2526,7 @@ export default function App() {
   // ── Renders ──────────────────────────────────────────
 
   const renderHome = () => {
-    const freeTables = tables.filter(t => t.category !== 'Pedidos para llevar' && !tableOrders[t.id]).length;
+    const freeTables = tables.filter(t => t.category !== 'Pedidos para llevar' && t.category !== 'Day Pass' && !tableOrders[t.id]).length;
     const pendingItems = activeItems.filter(i => i.status === 'pending');
     const activePedidos = pendingItems.length;
 
@@ -2355,6 +2583,16 @@ export default function App() {
               <TrendingUp size={24} />
             </div>
             <span className="home-action-label" style={{ color: 'white' }}>Control financiero</span>
+          </div>
+          <div
+            className="home-action-btn"
+            onClick={() => alert('Sección en configuración')}
+            style={{ gridColumn: 'span 2', marginTop: '8px', background: 'linear-gradient(135deg, #475569 0%, #1e293b 100%)', color: 'white', cursor: 'pointer' }}
+          >
+            <div className="home-action-icon-wrap" style={{ background: 'rgba(255,255,255,0.15)' }}>
+              <Users size={24} color="white" />
+            </div>
+            <span className="home-action-label" style={{ color: 'white' }}>Control de usuarios</span>
           </div>
         </div>
       </div>
@@ -4880,7 +5118,8 @@ export default function App() {
       const isOccupied = !!tableOrders[tableId];
       if (!isOccupied) {
         const table = (tables || []).find(t => t.id === tableId);
-        if (table && table.category === 'Pedidos para llevar' && table.status === 'occupied') {
+        // Delivery and Day Pass tables can be occupied even without an active open order
+        if (table && (table.category === 'Pedidos para llevar' || table.category === 'Day Pass') && table.status === 'occupied') {
           return 'occupied-done';
         }
         return 'free';
@@ -4898,7 +5137,7 @@ export default function App() {
 
     return (
       <div className="salon-view fade-in">
-        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 16, marginBottom: 24 }}>
           <button 
             onClick={() => setShowPosExpenseModal(true)} 
             style={{ 
@@ -4923,20 +5162,6 @@ export default function App() {
           >
             <Plus size={16} strokeWidth={3} /> Compra
           </button>
-          <button
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: '#0ea5e9', color: 'white', border: 'none',
-              padding: '10px 20px', borderRadius: '8px', fontWeight: 700,
-              fontSize: '14px', boxShadow: '0 2px 8px rgba(14,165,233,0.3)',
-              cursor: 'pointer', letterSpacing: '0.3px', transition: 'background 0.2s ease'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#0284c7'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#0ea5e9'}
-            onClick={() => setShowDayPassModal(true)}
-          >
-            🏖️ Day Pass
-          </button>
         </div>
 
         <div className="salon-legend">
@@ -4946,7 +5171,7 @@ export default function App() {
         </div>
 
         {/* Table grid grouped by category */}
-        {['Salón', 'Terraza', 'Jardín', 'Barra', 'Camastros Alberca', 'Pedidos para llevar'].filter(c => c === 'Pedidos para llevar' || safeTables.some(t => t.category === c)).map(category => (
+        {['Salón', 'Terraza', 'Jardín', 'Barra', 'Camastros Alberca', 'Pedidos para llevar', 'Day Pass'].filter(c => c === 'Pedidos para llevar' || c === 'Day Pass' || safeTables.some(t => t.category === c)).map(category => (
           <div key={category} style={{ marginBottom: 32 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ 
@@ -4956,10 +5181,10 @@ export default function App() {
                 textTransform: 'uppercase', 
                 letterSpacing: 1, 
                 paddingLeft: 4,
-                borderLeft: '4px solid #3b82f6',
+                borderLeft: category === 'Day Pass' ? '4px solid #0ea5e9' : '4px solid #3b82f6',
                 margin: 0
               }}>
-                {category}
+                {category === 'Day Pass' ? '🏖️ Cuentas Day Pass' : category}
               </h3>
               {category === 'Pedidos para llevar' && (
                 <button 
@@ -4973,8 +5198,20 @@ export default function App() {
                   <Plus size={14} /> NUEVO PEDIDO
                 </button>
               )}
+              {category === 'Day Pass' && (
+                <button
+                  onClick={() => setShowDayPassModal(true)}
+                  style={{
+                    background: '#0ea5e9', color: 'white', border: 'none',
+                    padding: '6px 12px', borderRadius: 12, fontSize: 11,
+                    fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  <Plus size={14} /> NUEVO DAY PASS
+                </button>
+              )}
             </div>
-            <div className={category === 'Pedidos para llevar' ? "delivery-list" : "card-grid"}>
+            <div className={category === 'Pedidos para llevar' || category === 'Day Pass' ? "delivery-list" : "card-grid"}>
               {safeTables.filter(t => t.category === category).map(table => {
                 const effectiveStatus = getEffectiveStatus(table.id);
                 const tableItems = safeActiveItems.filter(i => i.table_id === table.id);
@@ -5025,6 +5262,62 @@ export default function App() {
                   );
                 }
 
+                if (category === 'Day Pass') {
+                  // Only show occupied Day Pass tables
+                  if (effectiveStatus === 'free') return null;
+
+                  // Credit is stored in:
+                  //   - the open consumption order: "[DP] Crédito consumo: $NNN"
+                  //   - fallback: the closed entry order: "... | Crédito consumo: $NNN"
+                  const openOrder = tableOrders[table.id];
+                  const entryOrder = (todayClosedOrders || []).find(o => o.table_id === table.id);
+                  const creditSummary = openOrder?.items_summary || entryOrder?.items_summary || '';
+                  const creditMatch = creditSummary.match(/Crédito consumo: \$(\d+)/);
+
+                  const creditAmount = creditMatch ? parseInt(creditMatch[1]) : 0;
+                  const consumed = activeTotal;
+                  const creditRemaining = Math.max(0, creditAmount - consumed);
+                  const extraCharge = Math.max(0, consumed - creditAmount);
+                  const hasExtra = extraCharge > 0;
+
+                  return (
+                    <div
+                      key={table.id}
+                      className="daypass-card"
+                      onClick={() => openTable(table.id)}
+                    >
+                      <div className="daypass-card-header">
+                        <span className="daypass-emoji">🏖️</span>
+                        <div className="daypass-name-block">
+                          <span className="daypass-name">{table.name.replace('🏖️ ', '')}</span>
+                          <span className="daypass-status">{effectiveStatus === 'occupied-pending' ? '⏳ Con pedidos pendientes' : '✅ Al día'}</span>
+                        </div>
+                        <div className={`daypass-extra-badge ${hasExtra ? 'has-extra' : ''}`}>
+                          {hasExtra ? `+$${extraCharge.toFixed(0)} extra` : 'En crédito'}
+                        </div>
+                      </div>
+                      <div className="daypass-credit-bar-wrap">
+                        <div className="daypass-credit-labels">
+                          <span>🍽️ Consumido <strong>${consumed.toFixed(0)}</strong></span>
+                          <span>💳 Crédito <strong>${creditAmount}</strong></span>
+                        </div>
+                        <div className="daypass-credit-bar-bg">
+                          <div
+                            className="daypass-credit-bar-fill"
+                            style={{ width: `${Math.min(100, creditAmount > 0 ? (consumed / creditAmount) * 100 : 0)}%`, background: hasExtra ? '#ef4444' : '#10b981' }}
+                          />
+                        </div>
+                        <div className="daypass-credit-remaining">
+                          {hasExtra
+                            ? <span style={{ color: '#ef4444', fontWeight: 700 }}>⚠️ Cobro extra: ${extraCharge.toFixed(0)}</span>
+                            : <span style={{ color: '#0369a1' }}>Crédito restante: <strong>${creditRemaining.toFixed(0)}</strong></span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={table.id}
@@ -5055,6 +5348,28 @@ export default function App() {
                   </div>
                 );
               })}
+              {category === 'Pedidos para llevar' && safeTables.filter(t => t.category === 'Pedidos para llevar' && getEffectiveStatus(t.id) !== 'free').length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '20px 16px',
+                  background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
+                  borderRadius: 16, border: '2px dashed #a78bfa'
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🛵</div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#6366f1' }}>Sin pedidos para llevar activos</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Pulsa &quot;+ NUEVO PEDIDO&quot; para registrar uno</p>
+                </div>
+              )}
+              {category === 'Day Pass' && safeTables.filter(t => t.category === 'Day Pass' && getEffectiveStatus(t.id) !== 'free').length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '20px 16px',
+                  background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
+                  borderRadius: 16, border: '2px dashed #7dd3fc'
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🏖️</div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0284c7' }}>Sin cuentas Day Pass activas</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Pulsa &quot;+ NUEVO&quot; para abrir una cuenta</p>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -5097,28 +5412,40 @@ export default function App() {
           const dpT = tables.find(t => t.id === selectedTableId);
           const dpI = dpT ? parseDayPassInfo(dpT.name) : null;
           if (!dpI) return null;
-          const dpMin = dpI.adults * 400 + dpI.children * 250;
+          const credit = dpI.adults * 300 + dpI.children * 150;
           const consumed = activeItems.filter(i => i.table_id === selectedTableId).reduce((s, i) => s + i.price * i.qty, 0);
-          const reached = consumed >= dpMin;
+          const remaining = credit - consumed;
+          const overCredit = consumed > credit;
           return (
             <div style={{
-              background: reached ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
-              borderRadius: 12, padding: '10px 16px', marginBottom: 8,
+              background: overCredit
+                ? 'linear-gradient(135deg,#f59e0b,#d97706)'
+                : remaining === credit
+                  ? 'linear-gradient(135deg,#0ea5e9,#0284c7)'
+                  : 'linear-gradient(135deg,#10b981,#059669)',
+              borderRadius: 12, padding: '12px 16px', marginBottom: 8,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff'
             }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  🏖️ Day Pass
+                <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
+                  🏖️ Day Pass · {dpI.adults}Ad {dpI.children}Ni
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
-                  {dpI.adults} adulto{dpI.adults !== 1 ? 's' : ''} · {dpI.children} niño{dpI.children !== 1 ? 's' : ''}
-                </div>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>✅ Cobro inicial registrado</div>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>Crédito consumo: <b>${credit}</b></div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 10, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mínimo consumible</div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>${dpMin}</div>
-                {!reached && <div style={{ fontSize: 10, opacity: 0.75 }}>Faltan ${dpMin - consumed} para el mínimo</div>}
-                {reached && <div style={{ fontSize: 10, opacity: 0.9 }}>✓ Mínimo superado</div>}
+                {overCredit ? (
+                  <>
+                    <div style={{ fontSize: 10, opacity: 0.9, textTransform: 'uppercase' }}>A cobrar adicional</div>
+                    <div style={{ fontSize: 22, fontWeight: 900 }}>${consumed - credit}</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 10, opacity: 0.9, textTransform: 'uppercase' }}>Crédito restante</div>
+                    <div style={{ fontSize: 22, fontWeight: 900 }}>${remaining}</div>
+                    <div style={{ fontSize: 10, opacity: 0.8 }}>Consumido: ${consumed}</div>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -5176,27 +5503,76 @@ export default function App() {
                     ))}
                   </div>
                   {/* Running Total */}
-                  <div style={{
-                    margin: '12px 0 0 0',
-                    padding: '14px 18px',
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
-                    borderRadius: 16,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Total acumulado
+                  {(() => {
+                    const rawTotal = selectedTableItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+                    const dpT = tables.find(t => t.id === selectedTableId);
+                    const dpI = dpT ? parseDayPassInfo(dpT.name) : null;
+                    const dpCredit = dpI ? dpI.adults * 300 + dpI.children * 150 : 0;
+                    const netCharge = dpI ? Math.max(0, rawTotal - dpCredit) : rawTotal;
+
+                    return dpI ? (
+                      // Day Pass: show breakdown
+                      <div style={{
+                        margin: '12px 0 0 0',
+                        padding: '14px 18px',
+                        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+                        borderRadius: 16,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Consumo bruto
+                          </span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textDecoration: 'line-through' }}>
+                            ${rawTotal.toFixed(0)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            💳 Crédito Day Pass
+                          </span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: '#4ade80' }}>
+                            −${Math.min(dpCredit, rawTotal).toFixed(0)}
+                          </span>
+                        </div>
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: netCharge > 0 ? '#fbbf24' : 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              {netCharge > 0 ? '⚠️ A cobrar adicional' : '✅ Sin cobro adicional'}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                              {selectedTableItems.length} {selectedTableItems.length === 1 ? 'producto' : 'productos'}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 30, fontWeight: 900, color: netCharge > 0 ? '#fbbf24' : '#4ade80', letterSpacing: '-0.5px' }}>
+                            ${netCharge.toFixed(0)}
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
-                        {selectedTableItems.length} {selectedTableItems.length === 1 ? 'producto' : 'productos'}
+                    ) : (
+                      // Normal table: simple total
+                      <div style={{
+                        margin: '12px 0 0 0',
+                        padding: '14px 18px',
+                        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+                        borderRadius: 16,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Total acumulado
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                            {selectedTableItems.length} {selectedTableItems.length === 1 ? 'producto' : 'productos'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px' }}>
+                          ${rawTotal.toFixed(0)}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px' }}>
-                      ${selectedTableItems.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(0)}
-                    </div>
-                  </div>
+                    );
+                  })()}
                   <div className="order-actions-grid" style={{ marginTop: 12, paddingTop: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                        <button className="order-btn-sec" onClick={() => setPrintCuentaModal({isOpen: true, tableId: selectedTableId, isFinalBill: false})} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '12px 8px' }}>
@@ -5251,7 +5627,20 @@ export default function App() {
                   const renderItem = (item: MenuItem) => (
                     <div key={item.id} className="menu-order-item">
                       <div className="menu-order-item-header">
-                        <div className="menu-order-item-name">{item.name}</div>
+                        <div className="menu-order-item-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {item.name}
+                          {(() => {
+                            const qty = orderItems.filter(o => o.menu_item_id === item.id).reduce((s, o) => s + o.qty, 0);
+                            return qty > 0 ? (
+                              <span style={{
+                                background: '#0f172a', color: '#fff',
+                                borderRadius: 20, padding: '2px 9px',
+                                fontSize: 12, fontWeight: 800, lineHeight: 1.6,
+                                minWidth: 22, textAlign: 'center', flexShrink: 0,
+                              }}>{qty}</span>
+                            ) : null;
+                          })()}
+                        </div>
                         {!item.hasVariants && (
                           <button className="single-add-btn" onClick={() => handleAddItem(item)}>
                             <span>${item.price}</span>
@@ -5428,8 +5817,9 @@ export default function App() {
     
     const dpCheckTable = tables.find(t => t.id === selectedTableId);
     const dpCheckInfo = dpCheckTable ? parseDayPassInfo(dpCheckTable.name) : null;
-    const dpCheckMin = dpCheckInfo ? dpCheckInfo.adults * 400 + dpCheckInfo.children * 250 : 0;
-    const effectiveFinalTotal = dpCheckInfo ? Math.max(dpCheckMin, finalTotal) : finalTotal;
+    // Day Pass: initial payment already made. Charge only the overage above the consumable credit.
+    const dpCredit = dpCheckInfo ? dpCheckInfo.adults * 300 + dpCheckInfo.children * 150 : 0;
+    const effectiveFinalTotal = dpCheckInfo ? Math.max(0, finalTotal - dpCredit) : finalTotal;
 
     const isEfectivo = paymentMethod === 'efectivo';
     const tipVal = isEfectivo ? 0 : (tipPercent === 'Otro' 
@@ -5586,18 +5976,18 @@ export default function App() {
             {/* Standard Order for Card/Transfer */}
             <div style={{ marginBottom: 24, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
               <label className="label" style={{ marginBottom: 12 }}>Propina</label>
-              <div style={{ display: 'flex', gap: 8, marginBottom: tipPercent === 'Otro' ? 16 : 0, overflowX: 'auto', paddingBottom: 4 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: tipPercent === 'Otro' ? 16 : 0 }}>
                 {(['none', '10', '15', '20', 'Otro'] as const).map(t => (
                   <button 
                     key={t}
                     onClick={() => { setTipPercent(t); if(t !== 'Otro') setCustomTip(''); }}
                     style={{
-                      flex: '1 0 auto', padding: '10px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600,
+                      flex: '1 1 auto', padding: '10px 12px', borderRadius: 12, fontSize: 14, fontWeight: 600,
                       border: tipPercent === t ? '2px solid #ef4444' : '1px solid #cbd5e1',
                       background: tipPercent === t ? '#fef2f2' : '#fff',
                       color: tipPercent === t ? '#b91c1c' : '#64748b',
                       cursor: 'pointer',
-                      minWidth: 70
+                      minWidth: 60,
                     }}>
                     {t === 'none' ? 'Sin propina' : t === 'Otro' ? 'Otro' : `${t}%`}
                   </button>
@@ -5617,7 +6007,7 @@ export default function App() {
               )}
               {tipPercent !== 'none' && tipPercent !== 'Otro' && (
                 <div style={{ marginTop: 12, textAlign: 'right', fontSize: 14, color: '#0f172a', fontWeight: 600 }}>
-                  +${((parseFloat(tipPercent) / 100) * finalTotal).toFixed(0)} de propina
+                  +${((parseFloat(tipPercent) / 100) * effectiveFinalTotal).toFixed(0)} de propina ({tipPercent}% de ${effectiveFinalTotal.toFixed(0)})
                 </div>
               )}
             </div>
@@ -5967,9 +6357,9 @@ export default function App() {
       {/* ══ Day Pass Modal ══════════════════════════════════ */}
       {showDayPassModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-            <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0f172a' }}>🏖️ Day Pass</h2>
-            <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b' }}>Mínimo: $400/adulto · $250/niño</p>
+          <div style={{ background: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#0f172a' }}>🏖️ Day Pass</h2>
+            <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>Se cobrará el monto inicial y quedará un crédito de consumo.<br/>Adulto: $400 · Niño: $250</p>
 
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Adultos</label>
@@ -5980,7 +6370,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Niños</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <button onClick={() => setDayPassChildren(Math.max(0, dayPassChildren - 1))} style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
@@ -5989,14 +6379,47 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12, padding: '12px 16px', marginBottom: 20, textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: '#0284c7', fontWeight: 600, marginBottom: 4 }}>Mínimo consumible</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: '#0369a1' }}>${dayPassAdults * 400 + dayPassChildren * 250}</div>
+            {/* Payment method for initial charge */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Método de pago del cobro inicial</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['tarjeta', 'efectivo', 'transferencia'] as const).map(pm => (
+                  <button
+                    key={pm}
+                    onClick={() => setDayPassPaymentMethod(pm)}
+                    style={{
+                      flex: 1, padding: '10px 4px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+                      border: dayPassPaymentMethod === pm ? '2px solid #0ea5e9' : '1px solid #e2e8f0',
+                      background: dayPassPaymentMethod === pm ? '#f0f9ff' : '#f8fafc',
+                      color: dayPassPaymentMethod === pm ? '#0284c7' : '#64748b',
+                      cursor: 'pointer',
+                    }}>
+                    {pm === 'tarjeta' ? '💳 Tarjeta' : pm === 'efectivo' ? '💵 Efectivo' : '🏦 Transfer'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>💰 Cobro inicial ({dayPassAdults}Ad + {dayPassChildren}Ni)</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#15803d' }}>${dayPassAdults * 400 + dayPassChildren * 250}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>🍽️ Crédito de consumo</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#0369a1' }}>${dayPassAdults * 300 + dayPassChildren * 150}</span>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={() => setShowDayPassModal(false)} style={{ flex: 1, padding: '14px', borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: 15, cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-              <button onClick={handleCreateDayPass} style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Abrir cuenta</button>
+              <button
+                onClick={handleCreateDayPass}
+                disabled={dayPassAdults + dayPassChildren === 0}
+                style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none', background: dayPassAdults + dayPassChildren === 0 ? '#e2e8f0' : 'linear-gradient(135deg, #10b981, #059669)', color: dayPassAdults + dayPassChildren === 0 ? '#94a3b8' : '#fff', fontWeight: 700, fontSize: 15, cursor: dayPassAdults + dayPassChildren === 0 ? 'not-allowed' : 'pointer' }}>
+                Cobrar y abrir
+              </button>
             </div>
           </div>
         </div>
@@ -6091,17 +6514,9 @@ export default function App() {
                           <span>Fecha y hora del corte:</span>
                           <span style={{ color: '#0f172a', fontWeight: 500 }}>{fechaCorte}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Ventas restaurante (Base):</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasRestauranteBase)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Ventas hotel:</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasHotel)}</span>
-                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>
-                          <span>Ingresos totales:</span>
-                          <span style={{ color: '#4f46e5' }}>{formatCurrency(ventasTotales)}</span>
+                          <span>Ventas restaurante:</span>
+                          <span style={{ color: '#4f46e5' }}>{formatCurrency(ventasRestauranteBase)}</span>
                         </div>
                       </div>
                     </div>
@@ -6132,10 +6547,9 @@ export default function App() {
                           <span>Compras:</span>
                           <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatCurrency(todayExpenses)}</span>
                         </div>
-                        {/* Venta Total = Ingresos totales (debe coincidir siempre) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                          <span>Venta Total:</span>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasTotales)}</span>
+                          <span>Ventas restaurante:</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(ventasRestauranteBase)}</span>
                         </div>
                         {/* Fondo + Propinas = Pesos + Dólares + Tarjetas + Transfer + Compras - VentaTotal */}
                         {(() => {
@@ -6145,7 +6559,7 @@ export default function App() {
                           return (
                             <>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                                <span>Fondo + Propinas en tarjetas:</span>
+                                <span>Fondo + Prop:</span>
                                 <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCurrency(fondoPropinas)}</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
@@ -6322,18 +6736,72 @@ export default function App() {
               </div>
             )}
 
+
+            {/* Botón Compartir — Web Share API (Android + iOS) */}
             <button
-              className={`btn-primary cierre-submit`}
-              disabled={isClosingTurn}
-              onClick={() => setShowCierreConfirm(true)}
-              style={{
-                marginTop: 12, height: 56, fontSize: 16, fontWeight: 800,
-                opacity: isClosingTurn ? 0.7 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12
+              onClick={async () => {
+                const propinasEfectivoAMostrar = overrideCashTips !== '' ? Number(overrideCashTips) : 0;
+                const propinasTotales = todayTotalTips - todayCashTips + propinasEfectivoAMostrar;
+                const ventasHotel = hotelCardSales + hotelCashSales;
+                const ventasTotales = todayIncome + ventasHotel;
+                const efectivoMXNHotel = hotelSalesList.filter((s: any) => s.currency === 'MXN' && s.payment_method === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.amount), 0);
+                const dolaresConv = hotelSalesList.filter((s: any) => s.currency === 'USD' && s.payment_method === 'efectivo').reduce((acc: number, s: any) => acc + (Number(s.amount) * (s.exchange_rate || exchangeRate)), 0);
+                const totalEfectivoPesos = todayCashIncome + efectivoMXNHotel;
+                const totalTarjeta = todayCardIncome + hotelCardSales;
+                const totalTransferencia = todayTransferIncome;
+                const propinasTC = todayCardTips + todayTransferTips;
+                const entregaFinal = ventasTotales + propinasTotales - todayExpenses;
+                const fechaImp = new Date().toLocaleString('es-MX', { timeZone: 'America/Mazatlan', dateStyle: 'long', timeStyle: 'short' });
+                const fw = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                const fondoProp = (pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales;
+                const fondo = fondoProp - propinasTC;
+
+                const texto = [
+                  '🐓 GALLO AZUL — CIERRE DE JORNADA',
+                  `📅 ${fechaImp}`,
+                  '',
+                  '── REPORTE DIARIO ──',
+                  `Ventas restaurante:   ${fw(todayIncome)}`,
+                  '',
+                  '── CORTE ──',
+                  `Pesos:                ${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}`,
+                  `Dólares convertidos:  ${fw(dolaresConv)}`,
+                  `Tarjetas:             ${fw(totalTarjeta + todayCardTips)}`,
+                  `Transferencias:       ${fw(totalTransferencia + todayTransferTips)}`,
+                  `Compras:             -${fw(todayExpenses)}`,
+                  `Ventas restaurante:   ${fw(todayIncome)}`,
+                  `Fondo + Prop:         ${fw(fondoProp)}`,
+                  `Propinas en tarjetas: ${fw(propinasTC)}`,
+                  `Fondo:                ${fw(fondo)}`,
+                  '',
+                  '── PROPINAS ──',
+                  `Efectivo:             ${fw(propinasEfectivoAMostrar)}`,
+                  `Tarjetas:             ${fw(propinasTC)}`,
+                  `Total propinas:       ${fw(propinasTotales)}`,
+                  '',
+                  '── ENTREGA FINAL ──',
+                  `${fw(entregaFinal)}`,
+                  '',
+                  `Reportado por: ${currentUser?.name || 'Administrador'}`,
+                ].join('\n');
+
+                if (navigator.share) {
+                  try {
+                    await navigator.share({ title: 'Cierre Gallo Azul', text: texto });
+                  } catch (e: any) {
+                    if (e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message);
+                  }
+                } else {
+                  await navigator.clipboard.writeText(texto);
+                  alert('Texto copiado al portapapeles. Pégalo en WhatsApp u otra app.');
+                }
               }}
+              style={{ marginTop: 10, height: 50, width: '100%', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#dcfce7', color: '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s' }}
+              onMouseOver={e => { e.currentTarget.style.background = '#bbf7d0'; }}
+              onMouseOut={e => { e.currentTarget.style.background = '#dcfce7'; }}
             >
-              <Lock size={20} />
-              Ejecutar Cierre General
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Compartir cierre
             </button>
 
             {/* Botón Imprimir Cierre */}
@@ -6362,17 +6830,15 @@ export default function App() {
 <div class="sub">Restaurante &amp; Hotel — Todos Santos, BCS</div>
 <div class="fecha">CIERRE DE JORNADA &nbsp;|&nbsp; ${fechaImp}</div>
 <div class="sec">Reporte Diario</div>
-<div class="row"><span>Ventas restaurante (Base):</span><span>${fw(todayIncome)}</span></div>
-<div class="row"><span>Ventas hotel:</span><span>${fw(ventasHotel)}</span></div>
-<div class="row total"><span>Ingresos totales:</span><span>${fw(ventasTotales)}</span></div>
+<div class="row total"><span>Ventas restaurante:</span><span>${fw(todayIncome)}</span></div>
 <div class="sec">Corte</div>
 <div class="row"><span>Pesos:</span><span>${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}</span></div>
 <div class="row"><span>Dólares convertidos:</span><span>${fw(dolaresConv)}</span></div>
 <div class="row"><span>Tarjetas:</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
 <div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
 <div class="row neg"><span>Compras:</span><span>${fw(todayExpenses)}</span></div>
-<div class="row"><span>Venta Total:</span><span>${fw(ventasTotales)}</span></div>
-<div class="row"><span>Fondo + Propinas en tarjetas:</span><span>${fw((pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales)}</span></div>
+<div class="row"><span>Ventas restaurante:</span><span>${fw(todayIncome)}</span></div>
+<div class="row"><span>Fondo + Prop:</span><span>${fw((pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales)}</span></div>
 <div class="row"><span>Propinas en tarjetas:</span><span>${fw(propinasTC)}</span></div>
 <div class="row total"><span>Fondo:</span><span>${fw((pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales - propinasTC)}</span></div>
 <div class="sec">Propinas</div>
@@ -6397,11 +6863,26 @@ export default function App() {
                 printWin.focus();
                 setTimeout(() => { printWin.print(); }, 350);
               }}
-              style={{ marginTop: 10, height: 50, width: '100%', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f1f5f9', color: '#334155', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ marginTop: 8, height: 50, width: '100%', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f1f5f9', color: '#334155', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseOver={e => { e.currentTarget.style.background = '#e2e8f0'; }}
               onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; }}
             >
               <Printer size={18} strokeWidth={2.5} /> Imprimir cierre
+            </button>
+
+            {/* Botón Ejecutar Cierre General — va de último */}
+            <button
+              className={`btn-primary cierre-submit`}
+              disabled={isClosingTurn}
+              onClick={() => setShowCierreConfirm(true)}
+              style={{
+                marginTop: 8, height: 56, fontSize: 16, fontWeight: 800,
+                opacity: isClosingTurn ? 0.7 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12
+              }}
+            >
+              <Lock size={20} />
+              Ejecutar Cierre General
             </button>
           </div>
         </div>
@@ -7297,8 +7778,16 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
-                            onClick={async () => { if (window.confirm('¿Eliminar este registro de venta?')) { await deleteClosedOrder(order.id); } }}
-                            style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 10, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🗑 Borrar</button>
+                            onClick={async (e) => {
+                              const btn = e.currentTarget;
+                              if (btn.disabled) return;
+                              if (!window.confirm('¿Eliminar este registro de venta?')) return;
+                              btn.disabled = true;
+                              btn.textContent = 'Borrando...';
+                              await deleteClosedOrder(order.id);
+                              // Button is gone after optimistic removal — no need to re-enable
+                            }}
+                            style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 10, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🗑 Borrar</button>
                         </div>
                       </div>
                     );

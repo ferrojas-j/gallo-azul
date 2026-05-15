@@ -50,7 +50,7 @@ html, body, #root {
 }
 
 .header {
-  padding: 24px;
+  padding: calc(env(safe-area-inset-top, 24px) + 48px) 24px 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1093,9 +1093,17 @@ html, body, #root {
   color: #3b82f6;
 }
 
+.home-action-btn.pos {
+  border: 1.5px solid #bfdbfe;
+}
+
 .home-action-btn.checkin .home-action-icon-wrap {
   background: #fdf2f8;
   color: #db2777;
+}
+
+.home-action-btn.checkin {
+  border: 1.5px solid #fbcfe8;
 }
 
 .home-action-label {
@@ -4112,7 +4120,7 @@ input[type="date"] {
 
 /* -- Mesa Premium View -------------------------------------- */
 .mesa-view {
-  padding: 16px 16px 120px;
+  padding: calc(env(safe-area-inset-top, 24px) + 48px) 16px 120px;
   background: #f8fafc;
   min-height: 100vh;
   display: flex;
@@ -4239,11 +4247,24 @@ input[type="date"] {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Orden tab (first child) — always slightly highlighted so the waiter can find it */
+.tab-btn-p:first-child {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
 .tab-btn-p.active {
   background: white;
   color: #0f172a;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
 }
+
+/* When Orden tab IS active, keep it white/dark like the standard active style */
+.tab-btn-p:first-child.active {
+  background: white;
+  color: #0f172a;
+}
+
 
 .tab-content-premium {
   flex: 1;
@@ -4664,4 +4685,107 @@ input[type="date"] {
 .vm-close:hover {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+/* ── Day Pass Cards ───────────────────────────────────────── */
+.daypass-card {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #7dd3fc;
+  border-radius: 20px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+}
+
+.daypass-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.15);
+}
+
+.daypass-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.daypass-emoji {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.daypass-name-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.daypass-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0c4a6e;
+  line-height: 1.2;
+}
+
+.daypass-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0284c7;
+}
+
+.daypass-extra-badge {
+  background: #e0f2fe;
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  border: 1px solid #7dd3fc;
+}
+
+.daypass-extra-badge.has-extra {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.daypass-credit-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.daypass-credit-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #0369a1;
+}
+
+.daypass-credit-labels strong {
+  color: #0c4a6e;
+}
+
+.daypass-credit-bar-bg {
+  height: 8px;
+  background: rgba(14, 165, 233, 0.15);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.daypass-credit-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.daypass-credit-remaining {
+  font-size: 12px;
+  text-align: right;
+  font-weight: 600;
+  color: #0369a1;
 }
