@@ -6514,9 +6514,17 @@ export default function App() {
                           <span>Fecha y hora del corte:</span>
                           <span style={{ color: '#0f172a', fontWeight: 500 }}>{fechaCorte}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 600, color: '#64748b', fontSize: '14px' }}>
                           <span>Ventas restaurante:</span>
-                          <span style={{ color: '#4f46e5' }}>{formatCurrency(ventasRestauranteBase)}</span>
+                          <span style={{ color: '#0f172a' }}>{formatCurrency(ventasRestauranteBase)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#64748b', fontSize: '14px' }}>
+                          <span>Ventas hotel:</span>
+                          <span style={{ color: '#0f172a' }}>{formatCurrency(hotelCardSales + hotelCashSales)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontWeight: 800, color: '#0f172a', fontSize: '15px' }}>
+                          <span>Ventas totales:</span>
+                          <span style={{ color: '#4f46e5' }}>{formatCurrency(ventasTotales)}</span>
                         </div>
                       </div>
                     </div>
