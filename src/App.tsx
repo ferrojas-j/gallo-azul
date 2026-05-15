@@ -2578,7 +2578,7 @@ export default function App() {
             </div>
             <span className="home-action-label">Hotel</span>
           </div>
-          <div className="home-action-btn financial" onClick={() => window.open('/finanzas_corporativas', '_blank')} style={{ gridColumn: 'span 2', marginTop: '12px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white' }}>
+          <div className="home-action-btn financial" onClick={() => window.open('https://gallops.cloud/finanzas_corporativas/', '_blank')} style={{ gridColumn: 'span 2', marginTop: '12px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white' }}>
             <div className="home-action-icon-wrap" style={{ background: 'rgba(255,255,255,0.2)' }}>
               <TrendingUp size={24} />
             </div>

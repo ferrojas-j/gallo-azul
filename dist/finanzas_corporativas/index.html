@@ -299,6 +299,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Egresos<svg class="nav-chevron" id="chev-egresos" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-egresos" style="display:none">
       <div class="nav-sub-item" id="nav-gastos-op">Gastos operativos</div>
+      <div class="nav-sub-item" id="nav-remuneraciones">Remuneraciones</div>
       <div class="nav-sub-item" id="nav-comisiones-canales">Comisiones canales</div>
       <div class="nav-sub-item" id="nav-gastos-menores">Gastos menores (restaurante)</div>
     </div>
@@ -618,7 +619,16 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <span style="background:#fef3c7;color:#92400e;padding:6px 18px;border-radius:100px;font-size:12px;font-weight:700">Próximamente</span>
   </div>
 </div>
-<div id="panel-comisiones-canales" style="display:none">
+<div id="panel-remuneraciones" style="display:none">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:80px 32px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
+    <div style="width:72px;height:72px;background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 8px 24px rgba(15,23,42,.3)">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    </div>
+    <h2 style="font-size:24px;font-weight:800;color:#0f172a;margin:0 0 8px">Remuneraciones</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 28px;max-width:400px;margin-left:auto;margin-right:auto">Este módulo registrará sueldos, nómina y compensaciones del equipo de trabajo.</p>
+    <span style="background:#f1f5f9;color:#475569;padding:7px 20px;border-radius:100px;font-size:12px;font-weight:700;letter-spacing:.04em">⚙️ Por configurar</span>
+  </div>
+</div><div id="panel-comisiones-canales" style="display:none">
   <!-- sync badge -->
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
     <span style="background:#ede9fe;color:#5b21b6;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700">🔄 Sincronizado con Ingresos Hotel</span>
@@ -1146,18 +1156,20 @@ var NAV_MAP = {
   'hotel':               { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-hotel' },
   'restaurante':         { parent:'nav-ingresos',      sub:'nav-sub-ingresos',      subId:'nav-restaurante' },
   'gastos-op':           { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-gastos-op' },
+  'remuneraciones':      { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-remuneraciones' },
   'comisiones-canales':  { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-comisiones-canales' },
   'gastos-menores':      { parent:'nav-egresos',       sub:'nav-sub-egresos',       subId:'nav-gastos-menores' },
   'conciliaciones':      { parent:'nav-conciliaciones',sub:'nav-sub-conciliaciones',subId:'nav-conciliaciones-sub' },
   'analisis':            { parent:'nav-analisis',      sub:'nav-sub-analisis',      subId:'nav-analisis-sub' }
 };
 var ALL_SUBS = ['nav-sub-ingresos','nav-sub-egresos','nav-sub-conciliaciones','nav-sub-analisis'];
-var ALL_PANELS = ['dashboard','hotel','restaurante','gastos-op','comisiones-canales','gastos-menores','conciliaciones','analisis'];
+var ALL_PANELS = ['dashboard','hotel','restaurante','gastos-op','remuneraciones','comisiones-canales','gastos-menores','conciliaciones','analisis'];
 var PAGE_TITLES = {
   'dashboard':'Dashboard',
   'hotel':'Ingresos por venta de habitaciones',
   'restaurante':'Ingresos Restaurante',
   'gastos-op':'Egresos — Gastos Operativos',
+  'remuneraciones':'Egresos — Remuneraciones',
   'comisiones-canales':'Egresos — Comisiones Canales',
   'gastos-menores':'Egresos — Gastos Menores (Restaurante)',
   'conciliaciones':'Conciliaciones',
@@ -1199,7 +1211,7 @@ function showPanel(name){
   // 2b. Update chevrons — rotate open the active module's chevron
   var CHEV_MAP = {
     'ingresos':['hotel','restaurante'],
-    'egresos':['gastos-op','comisiones-canales','gastos-menores'],
+    'egresos':['gastos-op','remuneraciones','comisiones-canales','gastos-menores'],
     'conciliaciones':['conciliaciones'],
     'analisis':['analisis']
   };
