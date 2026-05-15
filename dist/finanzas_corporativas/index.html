@@ -13,10 +13,7 @@
         var key="fin_build_v";
         var stored=localStorage.getItem(key);
         localStorage.setItem(key,d.v);
-        if(stored!==null && stored!==d.v){
-          // New version detected — reload bypassing cache
-          location.reload(true);
-        }
+        if(stored!==null&&stored!==d.v){/* version stored, user can refresh manually */}
       }).catch(function(){});
   }catch(e){}
 })();
@@ -855,7 +852,7 @@ async function loadHotelData(){
     const url=SB+'/rest/v1/financial_reservations?select=id,guest_name,room_name,arrival_date,departure_date,nights,total_amount,channel_commission,source_name,is_paid,booking_date,mxn_rate,mxn_amount,hv_verified'+
       '&status=in.(new,confirmed,reserved,modified,ownerStay,inquiryPreapproved)'+
       df+'&order='+(filterOrder==='checkin'?'arrival_date':'booking_date')+'.desc&limit=2000';;
-    const r=await fetch(url,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=none'}});
+    const _ctrl=new AbortController();const _tid=setTimeout(()=>_ctrl.abort(),20000);const r=await fetch(url,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=none'},signal:_ctrl.signal});clearTimeout(_tid);
     if(!r.ok)throw new Error('HTTP '+r.status);
     const batch=await r.json();
     allData=Array.isArray(batch)?batch:[];
