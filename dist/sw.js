@@ -1,5 +1,5 @@
-// Gallo Azul PWA Service Worker — v10 (logo update)
-const CACHE_NAME = 'gallo-azul-v10';
+// Gallo Azul PWA Service Worker — v14 (universal force-update)
+const CACHE_NAME = 'gallo-azul-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,76 +11,63 @@ const STATIC_ASSETS = [
   '/manifest.json',
 ];
 
-// Install: pre-cache static shell
+// Install: pre-cache static shell and skip waiting immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting(); // Activate immediately, don't wait for old SW to die
+  self.skipWaiting(); // Activate immediately, do NOT wait for old tabs to close
 });
 
-// Activate: remove ALL old caches so clients get fresh icons
+// Activate: delete ALL old caches, claim all clients, broadcast reload signal
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+    caches.keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => k !== CACHE_NAME).map((k) => {
+            console.log('[SW v14] Deleting old cache:', k);
+            return caches.delete(k);
+          })
+        )
       )
-    )
+      .then(() => self.clients.claim()) // Take control of ALL open tabs
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then((clients) => {
+        // Broadcast to every open window/tab so they reload immediately
+        // This covers iOS Safari standalone, Android Chrome, desktop — ALL
+        clients.forEach((client) => {
+          console.log('[SW v14] Sending SW_UPDATED to:', client.url);
+          client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME });
+        });
+      })
   );
-  self.clients.claim(); // Take control of all tabs immediately
 });
 
-// Fetch: Network-first with cache fallback for navigation, cache-first for assets
+// Fetch: NETWORK-FIRST — always try network, cache is only an offline fallback
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and external requests (Supabase, Hostaway API)
+  // Skip non-GET and cross-origin requests (Supabase, Hostaway API, etc.)
   if (request.method !== 'GET') return;
-  if (!url.origin.includes(self.location.origin)) return;
+  if (url.origin !== self.location.origin) return;
 
-  // Navigation requests (HTML pages) → network first, fallback to cached /index.html
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, resClone));
-          return res;
-        })
-        .catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  // Icons and manifest → always network first to ensure freshness
-  if (url.pathname.match(/\.(png|ico|json)$/)) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const resClone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, resClone));
-          }
-          return res;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Static assets (JS, CSS) → cache first, fallback to network
+  // For navigation requests always go network-first (critical for HTML updates)
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((res) => {
-        if (res.ok) {
+    fetch(request, { cache: 'no-store' })
+      .then((res) => {
+        if (res && res.status === 200) {
           const resClone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, resClone));
         }
         return res;
-      });
-    })
+      })
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
+          if (request.mode === 'navigate') return caches.match('/index.html');
+        })
+      )
   );
 });

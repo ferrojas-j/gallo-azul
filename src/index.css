@@ -1052,6 +1052,20 @@ html, body, #root {
 }
 
 /* Home Action Buttons */
+.home-section {
+  margin-bottom: 24px;
+}
+
+.home-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
 .home-actions-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1092,7 +1106,6 @@ html, body, #root {
   background: #eff6ff;
   color: #3b82f6;
 }
-
 .home-action-btn.pos {
   border: 1.5px solid #bfdbfe;
 }
@@ -1101,15 +1114,47 @@ html, body, #root {
   background: #fdf2f8;
   color: #db2777;
 }
-
 .home-action-btn.checkin {
   border: 1.5px solid #fbcfe8;
+}
+
+.home-action-btn.staff .home-action-icon-wrap {
+  background: #fef3c7;
+  color: #d97706;
+}
+.home-action-btn.staff {
+  border: 1.5px solid #fde68a;
+}
+
+.home-action-btn.expenses .home-action-icon-wrap {
+  background: #dcfce7;
+  color: #059669;
+}
+.home-action-btn.expenses {
+  border: 1.5px solid #bbf7d0;
+}
+
+.home-action-btn.users .home-action-icon-wrap {
+  background: #f1f5f9;
+  color: #475569;
+}
+.home-action-btn.users {
+  border: 1.5px solid #e2e8f0;
+}
+
+.home-action-btn.financial .home-action-icon-wrap {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+.home-action-btn.financial {
+  border: 1.5px solid #c7d2fe;
 }
 
 .home-action-label {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-dark);
+  text-align: center;
 }
 
 .home-stat-card {
@@ -4083,7 +4128,18 @@ input[type="date"] {
   overflow: hidden;
   position: relative;
   transition: border-color 0.2s;
+  /* Android: bloquea el scroll/pan al interactuar con el canvas de firma */
+  touch-action: none;
+  -ms-touch-action: none;
+  overscroll-behavior: none;
 }
+
+.signature-pad-container canvas {
+  /* Bloqueo explícito de gesto táctil en el elemento canvas */
+  touch-action: none;
+  -ms-touch-action: none;
+}
+
 
 .signature-pad-container:hover {
   border-color: #e2e8f0;

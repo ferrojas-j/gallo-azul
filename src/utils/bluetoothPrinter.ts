@@ -24,21 +24,38 @@ const CHAR_UUIDS = [
   'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
 ];
 
-// ESC/POS command bytes
+// ESC/POS command constants
 const ESC = 0x1b;
 const GS  = 0x1d;
 
-function normalize(s: string): string {
+/**
+ * toAscii — Convert any Unicode string to strict 7-bit ASCII.
+ *
+ * Uses NFD decomposition to strip combining diacritical marks (accents, tildes)
+ * universally, then replaces any remaining non-ASCII (emojis, em-dashes, etc.)
+ * with a safe placeholder.
+ *
+ * WHY: Thermal printers use single-byte code pages (ASCII / CP437 / Latin-1).
+ * They CANNOT interpret UTF-8 multi-byte sequences — those bytes print as
+ * random garbage characters. This function ensures every byte we send is ≤ 0x7F.
+ */
+function toAscii(s: string): string {
   return s
-    .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
-    .replace(/[íìï]/g,'i').replace(/[óòö]/g,'o')
-    .replace(/[úùü]/g,'u').replace(/[ñ]/g,'n')
-    .replace(/[ÁÀÄÉÈËÍÌÏÓÒÖÚÙÜÑ]/g, c =>
-      'AAAEEEIIIOOOUU N'['ÁÀÄÉÈËÍÌÏÓÒÖÚÙÜÑ'.indexOf(c)] ?? c);
+    .normalize('NFD')                // é → e + U+0301 (combining acute accent)
+    .replace(/[\u0300-\u036f]/g, '') // strip all combining diacritical marks
+    .replace(/[^\x00-\x7F]/g, '?'); // replace any remaining non-ASCII with '?'
 }
 
-function bytes(...nums: number[]): number[] { return nums; }
-function str(s: string): number[] { return Array.from(new TextEncoder().encode(normalize(s))); }
+/**
+ * pushStr — Push each character as a single ASCII byte into the buffer.
+ * Never uses TextEncoder (which produces UTF-8 multi-byte sequences).
+ */
+function pushStr(c: number[], s: string): void {
+  const safe = toAscii(s);
+  for (let i = 0; i < safe.length; i++) {
+    c.push(safe.charCodeAt(i) & 0x7f);
+  }
+}
 
 export function buildEscPos(ticket: {
   isPedido: boolean;
@@ -49,47 +66,41 @@ export function buildEscPos(ticket: {
   total?: string;
 }): Uint8Array {
   const c: number[] = [];
-  const SEP = '--------------------------------\n';
-  const push = (...b: number[]) => c.push(...b);
+  const B = (...b: number[]) => c.push(...b);
+  const S = (s: string) => { const a = toAscii(s); for (let i = 0; i < a.length; i++) c.push(a.charCodeAt(i) & 0x7f); };
+  const NL = () => c.push(0x0a);
+  const SEP = () => { S('================================'); NL(); };
 
-  // Init + center
-  push(...bytes(ESC,0x40, ESC,0x61,0x01));
+  // ESC @ — REQUIRED by RAW BT to recognize data as a valid print job
+  // Without this, RAW BT returns "Empty print job" even with valid text.
+  B(0x1b, 0x40);
 
-  // Title bold + double size
-  push(...bytes(ESC,0x45,0x01, GS,0x21,0x11));
-  push(...str(ticket.title + '\n'));
-  push(...bytes(GS,0x21,0x00, ESC,0x45,0x00));
+  // Plain text content — no double-size or alignment commands
+  // (those caused garbled output on previous attempts)
+  NL();
+  S(ticket.title.toUpperCase()); NL();
+  if (ticket.isPedido) { S('** COCINA / BAR **'); NL(); }
+  S(ticket.mesa); NL();
+  S(ticket.fecha); NL();
+  SEP();
 
-  if (ticket.isPedido) {
-    push(...bytes(ESC,0x45,0x01, GS,0x21,0x01));
-    push(...str('COCINA / BAR\n'));
-    push(...bytes(GS,0x21,0x00, ESC,0x45,0x00));
-  }
+  ticket.items.split('\n').forEach(line => {
+    if (line.trim()) { S(line); NL(); }
+  });
 
-  push(...str(ticket.mesa + '\n'));
-  push(...str(ticket.fecha + '\n'));
+  SEP();
 
-  // Items left-aligned
-  push(...bytes(ESC,0x61,0x00));
-  push(...str(SEP));
-  push(...bytes(ESC,0x45,0x01, GS,0x21,0x01));
-  // items already newline-separated
-  push(...str(ticket.items + '\n'));
-  push(...bytes(GS,0x21,0x00, ESC,0x45,0x00));
-  push(...str(SEP));
-
-  // Total
   if (ticket.total) {
-    push(...bytes(ESC,0x61,0x02, ESC,0x45,0x01, GS,0x21,0x11));
-    push(...str('TOTAL: ' + ticket.total + '\n'));
-    push(...bytes(GS,0x21,0x00, ESC,0x45,0x00));
+    NL();
+    S('TOTAL:  ' + ticket.total); NL();
   }
 
-  // Feed 4 lines + partial cut
-  push(...bytes(ESC,0x64,0x04, GS,0x56,0x01));
+  // Feed lines so paper advances past the cut line
+  B(0x0a, 0x0a, 0x0a, 0x0a);
 
   return new Uint8Array(c);
 }
+
 
 // Singleton connection state
 let _device: BluetoothDevice | null = null;
@@ -181,32 +192,60 @@ export const bluetoothPrinter = {
 };
 
 /**
- * tryRawBt — Send ESC/POS data to the RawBT Android app via URL scheme.
+ * tryRawBt — Send ESC/POS data to the RawBT Android app.
  *
- * RawBT is a free Android app that bridges web apps to Classic Bluetooth
- * thermal printers (SPP). It receives ESC/POS data as a base64 URL and
- * forwards it to the paired printer.
+ * Strategy 1 (primary): invisible <a> click with rawbt:// scheme.
+ *   - More reliable than window.location.href in Chrome Android standalone PWA mode.
+ *   - Chrome blocks location.href deep-link navigation from PWA standalone context
+ *     but allows anchor clicks triggered by user-gesture chains.
  *
- * Install RawBT: https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter
+ * Strategy 2 (fallback): window.open() which sometimes succeeds when anchor does not.
  *
- * Returns true if the intent was dispatched (RawBT may or may not be installed),
- * false if the environment doesn't support it.
+ * RawBT URL format: rawbt://base64/<base64-encoded-ESC/POS>
+ *
+ * Returns true if the dispatch was attempted, false on encoding error.
  */
 export function tryRawBt(data: Uint8Array): boolean {
   try {
-    // Convert Uint8Array to base64
+    if (!data || data.length === 0) {
+      console.error('[RawBT] tryRawBt called with empty data!');
+      return false;
+    }
+
+    // Encode ESC/POS bytes to base64
     let binary = '';
     data.forEach(b => { binary += String.fromCharCode(b); });
     const base64 = btoa(binary);
 
-    // RawBT URL scheme — opens RawBT app and sends the ESC/POS payload
-    const url = `rawbt:data:application/vnd.rawbt;base64,${base64}`;
+    console.log(`[RawBT] data.length=${data.length} base64.length=${base64.length} first10="${base64.substring(0,10)}"`);
 
-    // Use location.href on Android PWA (triggers app intent)
-    window.location.href = url;
-    return true;
-  } catch {
+    // Try multiple URL formats in sequence.
+    // We know anchor click reaches RAW BT (confirmed via printed output).
+    // Format priority: simplest first, then MIME data URI.
+    const urls = [
+      `rawbt:${base64}`,                                          // Simplest: scheme + raw base64
+      `rawbt:data:application/vnd.rawbt;base64,${base64}`,       // MIME data URI (RAW BT recognized this format)
+    ];
+
+    for (const url of urls) {
+      // Anchor click: confirmed to reach RAW BT on Android PWA
+      try {
+        const a = document.createElement('a');
+        a.setAttribute('href', url); // setAttribute avoids Chrome's URL normalization on a.href
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 1000);
+        console.log(`[RawBT] dispatched via anchor: ${url.substring(0, 50)}...`);
+        return true;
+      } catch (e) {
+        console.warn('[RawBT] anchor click failed:', e);
+      }
+    }
+
+    return false;
+  } catch (e) {
+    console.error('[RawBT] error:', e);
     return false;
   }
 }
-

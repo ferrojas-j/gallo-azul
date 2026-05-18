@@ -704,8 +704,13 @@ export function useSupabaseSync() {
 
   const deleteMenuItem = useCallback(async (id: string) => {
     setMenuItems(prev => prev.filter(m => m.id !== id));
-    await dbMenu.deleteItem(id);
-  }, []);
+    const { error } = await dbMenu.deleteItem(id);
+    if (error) {
+      console.error('Error al eliminar el producto:', error);
+      alert('Error al eliminar el producto: ' + error.message);
+      await fetchMenu();
+    }
+  }, [fetchMenu]);
 
   const addCategory = useCallback(async (name: string) => {
     const { data, error } = await dbCategories.insert(name);

@@ -696,201 +696,6 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>Egresos<svg class="nav-chevron" id="chev-egresos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-egresos" style="display:none">
       <div class="nav-sub-item" id="nav-gastos-op">Gastos operativos</div>
-    word-break: break-all !important;
-  }
-  #gm-kpi-count {
-    font-size: clamp(24px, 8vw, 32px) !important;
-  }
-  /* Pills de categoría en celdas de tabla: nunca parten en varias líneas */
-  #gm-concept-body td span,
-  #gm-detail-body td span {
-    white-space: nowrap !important;
-  }
-}
-
-@media(max-width:420px){
-  .kpi-value{font-size:20px!important}
-  .kpi-card{padding:14px 10px}
-  .content-body{padding:8px 8px}
-  #kpi-occ{font-size:28px!important}
-}
-/* ===== SMALL LAPTOP (13" ~1024-1280px) ===== */
-@media(max-width:1280px){
-  /* Layout */
-  .sidebar{width:190px}
-  .content-body{padding:16px 20px 28px}
-  .page-header{padding:16px 20px 0}
-  .page-title{font-size:clamp(14px,1.6vw,22px)}
-  .nav-label{font-size:10px}
-  .nav-item{font-size:12px;padding:8px 8px}
-  .nav-sub-item{font-size:11px}
-
-  /* Dashboard KPI grid: 3 cols a 1280px */
-  .kpi-grid{grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-  .kpi-card{padding:13px 14px}
-  .kpi-value{font-size:clamp(13px,1.3vw,22px);letter-spacing:-.3px}
-  .kpi-label{font-size:10px}
-  .kpi-sub{font-size:10px}
-
-  /* Tables global */
-  table{font-size:12px}
-  th{padding:8px 10px!important;font-size:10px!important}
-  td{padding:9px 10px!important;font-size:12px!important}
-
-  /* Hotel: filtros + ocupación */
-  #panel-filter-occ{gap:10px}
-  #occ-card{flex:0 0 300px;min-width:240px;padding:16px 18px}
-  #kpi-occ{font-size:34px!important}
-  .hotel-filter-bar{font-size:12px}
-
-  /* GOP tables */
-  #gop-table th,#gop-table td{padding:7px 8px!important;font-size:11px!important}
-
-  /* Analysis section: reduce card sizes */
-  #panel-analisis .kpi-grid{grid-template-columns:repeat(3,1fr)}
-
-  /* Comisiones tables */
-  #panel-comisiones-canales table th,
-  #panel-comisiones-canales table td{padding:7px 8px!important;font-size:11px!important}
-
-  /* Dashboard section headers */
-  #panel-dashboard h2{font-size:18px}
-}
-
-/* ===== MEDIUM LAPTOP (11-13" ~1024-1100px) ===== */
-@media(max-width:1100px){
-  /* Sidebar: colapsa más */
-  .sidebar{width:170px}
-  .content-body{padding:12px 14px 24px}
-  .page-header{padding:12px 14px 0}
-  .brand-name{font-size:13px}
-  .brand-sub{font-size:10px}
-  .nav-item{font-size:11px;padding:7px 7px;gap:7px}
-  .nav-sub-item{font-size:10px;padding:5px 8px 5px 12px}
-
-  /* KPI: 2 cols en 1100px */
-  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
-  .kpi-card{padding:12px 12px}
-  .kpi-value{font-size:clamp(15px,1.6vw,22px)}
-
-  /* Hotel filtros + ocupación: apila verticalmente a 1100px */
-  #panel-filter-occ{
-    flex-direction:column;
-    gap:10px
-  }
-  #occ-card{
-    flex:none;
-    width:100%;
-    min-width:0;
-    padding:14px 16px;
-    flex-direction:row;
-    align-items:center;
-    gap:16px
-  }
-  #kpi-occ{font-size:30px!important}
-
-  /* Analysis KPI: 2 cols */
-  #panel-analisis .kpi-grid{grid-template-columns:repeat(2,1fr)}
-
-  /* Reduce gaps en GOP section */
-  #panel-gastos-op > div[style*="grid"]{gap:10px!important}
-}
-
-/* ===== EXTRA COMPACT (< 960px laptops/tablets landscape) ===== */
-@media(max-width:960px){
-  .sidebar{width:160px}
-  .content-body{padding:10px 12px 20px}
-  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
-  .kpi-card{padding:10px 10px;border-radius:12px}
-  .kpi-value{font-size:clamp(14px,1.8vw,20px)}
-  .kpi-label{font-size:9.5px;letter-spacing:.5px}
-
-  /* Todas las tablas: scroll si no caben */
-  .table-container{overflow-x:auto;-webkit-overflow-scrolling:touch}
-}
-
-/* ===== HOTEL TABLE COMPACT ===== */
-/* Base: tighten padding and font for all viewports */
-#hotel-main-table{
-  width:100%;table-layout:fixed;border-collapse:collapse;text-align:left
-}
-/* Column widths (proportional, 11 cols) */
-#hotel-main-table th:nth-child(1){width:9%}   /* Reserva */
-#hotel-main-table th:nth-child(2){width:10%}  /* Check-in */
-#hotel-main-table th:nth-child(3){width:13%}  /* Huésped */
-#hotel-main-table th:nth-child(4){width:9%}   /* Habitación */
-#hotel-main-table th:nth-child(5){width:5%}   /* Noches */
-#hotel-main-table th:nth-child(6){width:9%}   /* Canal */
-#hotel-main-table th:nth-child(7){width:9%}   /* Monto USD */
-#hotel-main-table th:nth-child(8){width:10%}  /* Monto MXN */
-#hotel-main-table th:nth-child(9){width:9%}   /* Com. USD */
-#hotel-main-table th:nth-child(10){width:10%} /* Com. MXN */
-#hotel-main-table th:nth-child(11){width:7%}  /* Estado */
-
-/* Tighter cells */
-#hotel-main-table th{
-  padding:8px 8px;font-size:10px;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis
-}
-#hotel-main-table td{
-  padding:10px 8px;font-size:clamp(10px,0.85vw,13px);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
-}
-/* Let Huésped column wrap (names can be longer) */
-#hotel-main-table td:nth-child(3){white-space:nowrap}
-
-/* Monetary values: tighter */
-#hotel-main-table td[style*="text-align:right"],
-#hotel-main-table th[style*="text-align:right"]{
-  text-align:right
-}
-
-/* Badges (canal) scale down */
-#hotel-main-table .channel-badge{
-  font-size:clamp(9px,0.75vw,12px);padding:2px 6px
-}
-/* Status badge */
-#hotel-main-table .status-badge{
-  font-size:clamp(9px,0.75vw,11px);padding:2px 7px
-}
-
-/* Small date text */
-#hotel-main-table .text-xs{font-size:clamp(9px,0.7vw,11px)}
-
-@media(max-width:1280px){
-  #hotel-main-table th{padding:6px 6px;font-size:9px}
-  #hotel-main-table td{padding:8px 6px;font-size:11px}
-  #hotel-main-table .channel-badge{font-size:9px;padding:2px 5px}
-  #hotel-main-table .status-badge{font-size:9px;padding:2px 6px}
-}
-.hotel-table-wrap{width:100%;overflow-x:auto}
-@media(min-width:1100px){.hotel-table-wrap{overflow-x:visible}}</style></head><body>
-<div id="globalLoader" class="loader-overlay"><div class="spinner"></div></div>
-<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
-<div class="mobile-header">
-  <button class="mobile-hamburger" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Menú">
-    <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
-  <span class="mobile-page-title" id="mobile-title">Finanzas · Gallo Azul</span>
-
-</div>
-<div class="sidebar" id="sidebar">
-  <div class="sidebar-brand">
-    <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m8 17 4 4 4-4"></path></svg></div>
-    <div class="brand-name">Finanzas</div>
-    <div class="brand-sub">Gallo Azul</div>
-  </div>
-  <nav class="sidebar-nav">
-    <div class="nav-label">Módulos</div>
-    <div class="nav-item active" id="nav-dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Dashboard</div>
-    <div class="nav-item" id="nav-ingresos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>Ingresos<svg class="nav-chevron" id="chev-ingresos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-    <div class="nav-sub" id="nav-sub-ingresos" style="display:none">
-      <div class="nav-sub-item" id="nav-hotel">Hotel</div>
-      <div class="nav-sub-item" id="nav-restaurante">Restaurante</div>
-    </div>
-    <div class="nav-item" id="nav-egresos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>Egresos<svg class="nav-chevron" id="chev-egresos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-    <div class="nav-sub" id="nav-sub-egresos" style="display:none">
-      <div class="nav-sub-item" id="nav-gastos-op">Gastos operativos</div>
       <div class="nav-sub-item" id="nav-remuneraciones">Remuneraciones</div>
       <div class="nav-sub-item" id="nav-comisiones-canales">Comisiones canales</div>
       <div class="nav-sub-item" id="nav-gastos-menores">Gastos menores (restaurante)</div>
@@ -902,7 +707,6 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <div class="nav-item" id="nav-analisis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Análisis<svg class="nav-chevron" id="chev-analisis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
     <div class="nav-sub" id="nav-sub-analisis" style="display:none">
       <div class="nav-sub-item" id="nav-analisis-sub">Análisis</div>
-      <div class="nav-sub-item" id="nav-datos-previos">Datos previos</div>
     </div>
   </nav>
 </div>
@@ -1542,7 +1346,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
 
     <!-- 2. Rentabilidad Restaurante -->
     <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);border-radius:16px;padding:20px;color:#fff;position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(59,130,246,.22)">
-      <svg style="position:absolute;right:-16px;bottom:-16px;opacity:.1;width:90px;height:90px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      <svg style="position:absolute;right:-16px;bottom:-16px;opacity:.1;width:90px;height:90px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;opacity:.85;text-transform:uppercase">Rentabilidad Restaurante</div>
       <div id="dash-rent-rest" style="font-size:30px;font-weight:900;margin:8px 0 2px;letter-spacing:-1px">—</div>
       <div id="dash-rent-rest-sub" style="font-size:11px;opacity:.7">Calculando…</div>
@@ -2303,6 +2107,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9">Rentabilidad Hotel</div>
       <div id="ana-rent-hotel" style="font-size:32px;font-weight:800;margin:8px 0 4px">0%</div>
       <div id="ana-rent-hotel-lbl" style="font-size:13px;opacity:0.8">Calculando...</div>
+      <div id="ana-rent-hotel-comp" style="font-size:13px;font-weight:600;margin-top:6px;opacity:0.9"></div>
       <svg style="position:absolute;right:-20px;bottom:-20px;width:120px;height:120px;opacity:0.1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
     </div>
     
@@ -2310,6 +2115,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9">Rentabilidad Restaurante</div>
       <div id="ana-rent-rest" style="font-size:32px;font-weight:800;margin:8px 0 4px">0%</div>
       <div id="ana-rent-rest-lbl" style="font-size:13px;opacity:0.8">Calculando...</div>
+      <div id="ana-rent-rest-comp" style="font-size:13px;font-weight:600;margin-top:6px;opacity:0.9"></div>
       <svg style="position:absolute;right:-20px;bottom:-20px;width:120px;height:120px;opacity:0.1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"></path></svg>
     </div>
     
@@ -2317,6 +2123,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
       <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9">Rentabilidad General</div>
       <div id="ana-rent-gen" style="font-size:32px;font-weight:800;margin:8px 0 4px">0%</div>
       <div id="ana-rent-gen-lbl" style="font-size:13px;opacity:0.8">Calculando...</div>
+      <div id="ana-rent-gen-comp" style="font-size:13px;font-weight:600;margin-top:6px;opacity:0.9"></div>
       <svg style="position:absolute;right:-20px;bottom:-20px;width:120px;height:120px;opacity:0.1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
     </div>
   </div>
@@ -2345,6 +2152,7 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:12px;padding:20px;color:#fff;box-shadow:0 4px 12px rgba(16,185,129,0.2)">
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9">Total Ingresos</div>
       <div id="con-kpi-ingresos" style="font-size:28px;font-weight:800;margin-top:4px">$0</div>
+      <div id="con-kpi-ingresos-comp" style="font-size:13px;font-weight:600;margin-top:6px;opacity:0.9"></div>
     </div>
     <div style="background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:12px;padding:20px;color:#fff;box-shadow:0 4px 12px rgba(244,63,94,0.2)">
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9">Total Egresos</div>
@@ -2385,120 +2193,6 @@ tr.row-test-entry:hover{background:#fef9c3!important}
     </table>
   </div>
 </div>
-
-  <div id="panel-datos-previos" style="display:none">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px">
-      <div>
-        <h2 style="font-size:24px;font-weight:800;color:#0f172a;margin:0">Datos previos</h2>
-        <p style="color:#64748b;font-size:14px;margin:4px 0 0">Histórico de ingresos 2021-2025</p>
-      </div>
-    </div>
-    
-    <div class="table-container" style="margin-bottom: 24px;">
-      <div class="table-header">
-        <div class="table-title">INGRESOS TOTALES</div>
-      </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th style="text-align:right">2021</th>
-              <th style="text-align:right">2022</th>
-              <th style="text-align:right">2023</th>
-              <th style="text-align:right">2024</th>
-              <th style="text-align:right">2025</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Enero</td><td style="text-align:right">$194.213,27</td><td style="text-align:right">$360.055,96</td><td style="text-align:right">$897.618,82</td><td style="text-align:right">$560.971,50</td><td style="text-align:right">$885.435,01</td></tr>
-            <tr><td>Febrero</td><td style="text-align:right">$146.024,50</td><td style="text-align:right">$348.179,08</td><td style="text-align:right">$1.013.025,79</td><td style="text-align:right">$603.539,69</td><td style="text-align:right">$682.944,60</td></tr>
-            <tr><td>Marzo</td><td style="text-align:right">$183.843,45</td><td style="text-align:right">$348.817,75</td><td style="text-align:right">$805.230,80</td><td style="text-align:right">$475.190,32</td><td style="text-align:right">$684.499,80</td></tr>
-            <tr><td>Abril</td><td style="text-align:right">$206.796,35</td><td style="text-align:right">$318.243,75</td><td style="text-align:right">$454.318,06</td><td style="text-align:right">$379.896,56</td><td style="text-align:right">$482.910,69</td></tr>
-            <tr><td>Mayo</td><td style="text-align:right">$246.122,40</td><td style="text-align:right">$227.065,21</td><td style="text-align:right">$315.960,68</td><td style="text-align:right">$269.871,07</td><td style="text-align:right">$343.628,24</td></tr>
-            <tr><td>Junio</td><td style="text-align:right">$206.578,92</td><td style="text-align:right">$187.564,99</td><td style="text-align:right">$256.612,73</td><td style="text-align:right">$147.365,87</td><td style="text-align:right">$185.710,83</td></tr>
-            <tr><td>Julio</td><td style="text-align:right">$151.789,78</td><td style="text-align:right">$152.760,32</td><td style="text-align:right">$279.711,80</td><td style="text-align:right">$248.560,80</td><td style="text-align:right">$419.860,28</td></tr>
-            <tr><td>Agosto</td><td style="text-align:right">$122.884,46</td><td style="text-align:right">$181.966,35</td><td style="text-align:right">$362.067,75</td><td style="text-align:right">$287.008,57</td><td style="text-align:right">$261.770,77</td></tr>
-            <tr><td>Septiembre</td><td style="text-align:right">$95.716,95</td><td style="text-align:right">$204.671,58</td><td style="text-align:right">$187.116,30</td><td style="text-align:right">$187.224,92</td><td style="text-align:right">$214.685,02</td></tr>
-            <tr><td>Octubre</td><td style="text-align:right">$259.839,07</td><td style="text-align:right">$243.488,85</td><td style="text-align:right">$220.528,52</td><td style="text-align:right">$303.964,12</td><td style="text-align:right">$329.497,24</td></tr>
-            <tr><td>Noviembre</td><td style="text-align:right">$351.828,52</td><td style="text-align:right">$527.002,54</td><td style="text-align:right">$495.577,18</td><td style="text-align:right">$490.698,84</td><td style="text-align:right">$469.159,17</td></tr>
-            <tr><td>Diciembre</td><td style="text-align:right">$330.906,32</td><td style="text-align:right">$571.746,47</td><td style="text-align:right">$526.546,76</td><td style="text-align:right">$673.303,00</td><td style="text-align:right">$620.299,38</td></tr>
-            <tr style="font-weight:bold;background:#f8fafc"><td>Total</td><td style="text-align:right">$2.496.543,99</td><td style="text-align:right">$3.671.562,84</td><td style="text-align:right">$5.814.315,19</td><td style="text-align:right">$4.627.595,26</td><td style="text-align:right">$5.580.401,03</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    
-    <div class="table-container" style="margin-bottom: 24px;">
-      <div class="table-header">
-        <div class="table-title">HOTEL</div>
-      </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th style="text-align:right">2021</th>
-              <th style="text-align:right">2022</th>
-              <th style="text-align:right">2023</th>
-              <th style="text-align:right">2024</th>
-              <th style="text-align:right">2025</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Enero</td><td style="text-align:right">$114.083,27</td><td style="text-align:right">$245.835,96</td><td style="text-align:right">$764.980,82</td><td style="text-align:right">$435.124,50</td><td style="text-align:right">$732.480,01</td></tr>
-            <tr><td>Febrero</td><td style="text-align:right">$85.459,50</td><td style="text-align:right">$229.144,08</td><td style="text-align:right">$855.985,79</td><td style="text-align:right">$485.354,69</td><td style="text-align:right">$538.074,70</td></tr>
-            <tr><td>Marzo</td><td style="text-align:right">$87.918,45</td><td style="text-align:right">$225.147,75</td><td style="text-align:right">$698.065,80</td><td style="text-align:right">$334.505,32</td><td style="text-align:right">$562.622,80</td></tr>
-            <tr><td>Abril</td><td style="text-align:right">$125.474,35</td><td style="text-align:right">$205.780,75</td><td style="text-align:right">$336.038,06</td><td style="text-align:right">$282.751,47</td><td style="text-align:right">$363.751,69</td></tr>
-            <tr><td>Mayo</td><td style="text-align:right">$182.832,40</td><td style="text-align:right">$163.845,21</td><td style="text-align:right">$204.846,68</td><td style="text-align:right">$182.202,87</td><td style="text-align:right">$251.732,24</td></tr>
-            <tr><td>Junio</td><td style="text-align:right">$127.538,92</td><td style="text-align:right">$114.274,99</td><td style="text-align:right">$163.181,73</td><td style="text-align:right">$79.245,87</td><td style="text-align:right">$100.600,83</td></tr>
-            <tr><td>Julio</td><td style="text-align:right">$63.204,78</td><td style="text-align:right">$68.849,82</td><td style="text-align:right">$137.086,80</td><td style="text-align:right">$164.085,80</td><td style="text-align:right">$286.684,03</td></tr>
-            <tr><td>Agosto</td><td style="text-align:right">$45.849,46</td><td style="text-align:right">$118.356,35</td><td style="text-align:right">$251.184,75</td><td style="text-align:right">$222.908,57</td><td style="text-align:right">$168.740,77</td></tr>
-            <tr><td>Septiembre</td><td style="text-align:right">$74.841,95</td><td style="text-align:right">$117.881,58</td><td style="text-align:right">$104.809,30</td><td style="text-align:right">$108.764,92</td><td style="text-align:right">$124.035,02</td></tr>
-            <tr><td>Octubre</td><td style="text-align:right">$117.219,07</td><td style="text-align:right">$141.482,85</td><td style="text-align:right">$146.067,52</td><td style="text-align:right">$184.989,12</td><td style="text-align:right">$221.886,24</td></tr>
-            <tr><td>Noviembre</td><td style="text-align:right">$186.898,52</td><td style="text-align:right">$418.797,54</td><td style="text-align:right">$378.672,18</td><td style="text-align:right">$395.588,84</td><td style="text-align:right">$360.850,17</td></tr>
-            <tr><td>Diciembre</td><td style="text-align:right">$211.802,32</td><td style="text-align:right">$462.196,47</td><td style="text-align:right">$392.116,76</td><td style="text-align:right">$495.605,10</td><td style="text-align:right">$494.311,38</td></tr>
-            <tr style="font-weight:bold;background:#f8fafc"><td>Total</td><td style="text-align:right">$1.423.122,99</td><td style="text-align:right">$2.511.593,34</td><td style="text-align:right">$4.433.036,19</td><td style="text-align:right">$3.371.127,07</td><td style="text-align:right">$4.205.769,88</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    
-    <div class="table-container" style="margin-bottom: 24px;">
-      <div class="table-header">
-        <div class="table-title">RESTAURANTE</div>
-      </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Mes</th>
-              <th style="text-align:right">2021</th>
-              <th style="text-align:right">2022</th>
-              <th style="text-align:right">2023</th>
-              <th style="text-align:right">2024</th>
-              <th style="text-align:right">2025</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Ene</td><td style="text-align:right">$80.130,00</td><td style="text-align:right">$114.220,00</td><td style="text-align:right">$132.638,00</td><td style="text-align:right">$125.847,00</td><td style="text-align:right">$152.955,00</td></tr>
-            <tr><td>Feb</td><td style="text-align:right">$60.565,00</td><td style="text-align:right">$119.035,00</td><td style="text-align:right">$157.040,00</td><td style="text-align:right">$118.185,00</td><td style="text-align:right">$144.870,00</td></tr>
-            <tr><td>Mar</td><td style="text-align:right">$95.925,00</td><td style="text-align:right">$123.670,00</td><td style="text-align:right">$107.165,00</td><td style="text-align:right">$140.685,00</td><td style="text-align:right">$121.877,00</td></tr>
-            <tr><td>Abr</td><td style="text-align:right">$81.322,00</td><td style="text-align:right">$112.463,00</td><td style="text-align:right">$114.280,00</td><td style="text-align:right">$97.145,09</td><td style="text-align:right">$119.159,00</td></tr>
-            <tr><td>May</td><td style="text-align:right">$63.290,00</td><td style="text-align:right">$63.220,00</td><td style="text-align:right">$111.114,00</td><td style="text-align:right">$87.668,00</td><td style="text-align:right">$91.896,00</td></tr>
-            <tr><td>Jun</td><td style="text-align:right">$79.040,00</td><td style="text-align:right">$73.290,00</td><td style="text-align:right">$93.440,00</td><td style="text-align:right">$68.120,00</td><td style="text-align:right">$85.110,00</td></tr>
-            <tr><td>Jul</td><td style="text-align:right">$88.585,00</td><td style="text-align:right">$83.910,50</td><td style="text-align:right">$117.825,00</td><td style="text-align:right">$84.475,00</td><td style="text-align:right">$133.176,25</td></tr>
-            <tr><td>Ago</td><td style="text-align:right">$77.035,00</td><td style="text-align:right">$63.610,00</td><td style="text-align:right">$86.283,00</td><td style="text-align:right">$64.100,00</td><td style="text-align:right">$93.030,00</td></tr>
-            <tr><td>Sep</td><td style="text-align:right">$20.875,00</td><td style="text-align:right">$86.790,00</td><td style="text-align:right">$82.277,00</td><td style="text-align:right">$78.460,00</td><td style="text-align:right">$90.650,00</td></tr>
-            <tr><td>Oct</td><td style="text-align:right">$142.620,00</td><td style="text-align:right">$102.006,00</td><td style="text-align:right">$99.261,00</td><td style="text-align:right">$113.975,00</td><td style="text-align:right">$107.611,00</td></tr>
-            <tr><td>Nov</td><td style="text-align:right">$164.930,00</td><td style="text-align:right">$108.205,00</td><td style="text-align:right">$116.905,00</td><td style="text-align:right">$95.110,00</td><td style="text-align:right">$108.309,00</td></tr>
-            <tr><td>Dic</td><td style="text-align:right">$119.104,00</td><td style="text-align:right">$109.550,00</td><td style="text-align:right">$134.430,00</td><td style="text-align:right">$177.698,00</td><td style="text-align:right">$125.988,00</td></tr>
-            <tr style="font-weight:bold;background:#f8fafc"><td>Total</td><td style="text-align:right">$1.073.421,00</td><td style="text-align:right">$1.159.969,50</td><td style="text-align:right">$1.352.658,00</td><td style="text-align:right">$1.251.468,09</td><td style="text-align:right">$1.374.631,25</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
 </div>
 <script>
 const SB='https://quzjixxqowxbezbcmqws.supabase.co';
@@ -2524,20 +2218,419 @@ const HISTORICO_INGRESOS = {
     2025: [732480.01, 538074.70, 562622.80, 363751.69, 251732.24, 100600.83, 286684.03, 168740.77, 124035.02, 221886.24, 360850.17, 494311.38]
   }
 };
+const CH={
+  'Booking.com':{label:'Booking.com',color:'#003580'},
+  'Airbnb':{label:'Airbnb',color:'#e00b27'},
+  'Expedia':{label:'Expedia',color:'#1a1a1a'},
+  'Webpage':{label:'Webpage',color:'#ca8a04'},
+  'Directo':{label:'Directo',color:'#ea580c'},
+  'Sitio Web':{label:'Sitio Web',color:'#ca8a04'}
+};
+const getCh=n=>CH[n]||{label:n||'—',color:'#64748b'};
+const COURTESY=[59085086];
+function normalizeRoom(n){
+  if(!n)return'—';
+  const l=n.toLowerCase();
+  if(l.includes('king size')||l.includes('single doble')||l.includes('single double'))return'Habitación';
+  if(['la curandera','la artesana','el mariachi','el charro'].some(k=>l.includes(k)))return'Loft';
+  return n;
+}
+async function loadHotelData(){
+  document.getElementById('globalLoader').classList.remove('hidden');
+  document.getElementById('hotel-table-badge').textContent='Cargando...';
+  allData=[];
+  try{
+    var y=filterYear==='all'?null:filterYear;
+    var df=y?('&arrival_date=gte.'+y+'-01-01&arrival_date=lte.'+y+'-12-31'):'&arrival_date=gte.2020-01-01&arrival_date=lte.2030-12-31';
+    const url=SB+'/rest/v1/financial_reservations?select=id,guest_name,room_name,arrival_date,departure_date,nights,total_amount,channel_commission,source_name,is_paid,booking_date,mxn_rate,mxn_amount,hv_verified'+
+      '&status=in.(new,confirmed,reserved,modified,ownerStay,inquiryPreapproved)'+
+      df+'&order='+(filterOrder==='checkin'?'arrival_date':'booking_date')+'.desc&limit=2000';;
+    const _ctrl=new AbortController();const _tid=setTimeout(()=>_ctrl.abort(),20000);const r=await fetch(url,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=none'},signal:_ctrl.signal});clearTimeout(_tid);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const batch=await r.json();
+    allData=Array.isArray(batch)?batch:[];
+    try{var biUrl2=SB+'/rest/v1/booking_income?select=id,year,month,amount_mxn,income_date'+(y?'&year=eq.'+y:'');var biR=await fetch(biUrl2,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=none'}});var biJson=await biR.json();bookingIncomeData=(Array.isArray(biJson)?biJson:[]).map(function(bi){return{id:'bi_'+bi.id,guest_name:'Pago consolidado Booking.com',room_name:null,arrival_date:bi.income_date,departure_date:bi.income_date,booking_date:bi.income_date,nights:0,total_amount:0,channel_commission:0,source_name:'Booking.com',is_paid:true,mxn_rate:0,mxn_amount:Number(bi.amount_mxn),hv_verified:true,is_booking_consolidated:true};});}catch(e){bookingIncomeData=[];}
+    buildChannelPills();
+    applyFilters();
+    updateTableHeaders();
+  }catch(err){
+    document.getElementById('hotel-table-body').innerHTML='<tr><td colspan="11" style="text-align:center;color:#f43f5e;padding:48px">Error: '+err.message+'</td></tr>';
+    document.getElementById('hotel-table-badge').textContent='Error';
+  }finally{
+    document.getElementById('globalLoader').classList.add('hidden');
+  }
+}
+function buildChannelPills(){
+  const ORDER=['Booking.com','Airbnb','Expedia','Webpage','Directo','Sitio Web'];
+  const found=[...new Set(allData.map(r=>r.source_name).filter(Boolean))];
+  const sorted=[...ORDER.filter(c=>found.includes(c)),...found.filter(c=>!ORDER.includes(c)).sort()];
+  const wrap=document.getElementById('hotel-channel-pills');
+  wrap.innerHTML='';
+  const mk=(ch,color)=>{
+    const b=document.createElement('button');
+    b.className='channel-pill';b.dataset.channel=ch;
+    const cfg=getCh(ch);b.textContent=cfg.label;
+    b.style.cssText=color?'background:'+cfg.color+';color:#fff;border-color:'+cfg.color:'';
+    b.onclick=()=>{filterChannel=ch;[...wrap.querySelectorAll('.channel-pill')].forEach(x=>{x.classList.remove('active');x.style.cssText='';});b.classList.add('active');b.style.cssText='background:'+cfg.color+';color:#fff;border-color:'+cfg.color;applyFilters();};
+    return b;
+  };
+  const all=document.createElement('button');
+  all.className='channel-pill active';all.dataset.channel='all';all.textContent='Todos';
+  all.style.cssText='background:#4f46e5;color:#fff;border-color:#4f46e5';
+  all.onclick=()=>{filterChannel='all';[...wrap.querySelectorAll('.channel-pill')].forEach(x=>{x.classList.remove('active');x.style.cssText='';});all.classList.add('active');all.style.cssText='background:#4f46e5;color:#fff;border-color:#4f46e5';applyFilters();};
+  wrap.appendChild(all);
+  sorted.forEach(ch=>wrap.appendChild(mk(ch,false)));
+}
+function applyFilters(){
+  var rows=allData;
+  var dateField=filterOrder==='checkin'?'arrival_date':'booking_date';
+  if(filterMonth!=='all')rows=rows.filter(function(r){return r[dateField]&&r[dateField].slice(5,7)===filterMonth;});
+  if(filterChannel!=='all')rows=rows.filter(function(r){return r.source_name===filterChannel;});
+  var biRows=bookingIncomeData.filter(function(r){
+    if(filterYear!=='all'&&(!r.arrival_date||r.arrival_date.slice(0,4)!==filterYear))return false;
+    if(filterMonth!=='all'&&(!r.arrival_date||r.arrival_date.slice(5,7)!==filterMonth))return false;
+    if(filterChannel!=='all'&&filterChannel!=='Booking.com')return false;
+    return true;
+  });
+  renderTable([...biRows,...rows]);
+}
+function renderTable(rows){
+  const TODAY=new Date().toISOString().slice(0,10);
+  const badge=document.getElementById('hotel-table-badge');
+  const tbody=document.getElementById('hotel-table-body');
+  badge.textContent=rows.length+' registros';
+  updateKPIs(rows);
+  updateOccupancy(rows);
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:48px;color:#94a3b8">Sin resultados para este filtro</td></tr>';return;}
+  tbody.innerHTML=rows.map(function(r){if(r.is_booking_consolidated){var mxnAmt=Number(r.mxn_amount);return '<tr style="background:#f0f9ff;border-left:4px solid #003580;border-bottom:2px solid #bfdbfe">'+(filterOrder==='checkin'?'<td style="font-weight:700;color:#1e40af">'+fmtDate(r.arrival_date)+'</td><td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td style="font-weight:700;color:#1e40af">'+fmtDate(r.booking_date)+'</td><td style="color:#94a3b8">'+fmtDate(r.arrival_date)+'</td>')+'<td style="font-weight:700;color:#1e40af;max-width:160px">📋 Pago consolidado Booking.com</td><td><span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700">Consolidado</span></td><td style="text-align:center;color:#94a3b8">—</td><td><span class="channel-badge" style="background:#00358022;color:#003580;border-color:#00358040">Booking.com</span></td><td style="text-align:right;color:#94a3b8">—</td><td style="text-align:right;font-weight:800;color:#16a34a;font-size:14px">'+fmtMXN(mxnAmt)+'</td><td style="text-align:right;color:#94a3b8">—</td><td style="text-align:right;color:#94a3b8">—</td><td><span class="status-paid">Pagado</span></td></tr>';}var isC=COURTESY.indexOf(Number(r.id))>-1;var amt=isC?0:Number(r.total_amount||0);var comm=isC?0:Number(r.channel_commission||0);var rate=Number(r.mxn_rate||0);var mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):amt*rate);var mxnComm=comm&&rate?comm*rate:0;var autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;var paid=isC||r.is_paid||autoP;var ch=getCh(r.source_name);var room=normalizeRoom(r.room_name);var isHV=amt>2000&&!r.hv_verified;var isTest=r.guest_name&&/test|prueba/i.test(r.guest_name);var isAirbnbPending=r.source_name==='Airbnb'&&!paid&&!isC;var st=isC?'<span class="status-courtesy">Cortesia</span>':paid?'<span class="status-paid">Pagado</span>':'<span class="status-pending">Pendiente</span>';var mxnCell='<td style="text-align:right">'+(mxnAmt?fmtMXN(mxnAmt):'-')+(rate?'<br><span style="font-size:10px;color:#94a3b8">@'+fmtUSD(rate)+'</span>':'')+(isHV?'<button class="edit-mxn-btn" onclick="openEdit('+r.id+')">✏ Editar MXN</button>':'')+'</td>';var guestCell='<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.guest_name||'-')+(isTest?' <span class="test-badge">⚠ TEST</span><button id="dtb-'+r.id+'" class="delete-test-btn" onclick="confirmDeleteTest('+r.id+')" title="Eliminar registro de prueba">🗑</button>':'')+'</td>';return '<tr class="'+(isHV?'row-high-value ':'')+(isTest?'row-test-entry':'')+'" data-rowid="'+r.id+'">'+(filterOrder==='checkin'?'<td>'+fmtDate(r.arrival_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.booking_date)+'</td>':'<td>'+fmtDate(r.booking_date)+'</td>'+'<td style="color:#94a3b8">'+fmtDate(r.arrival_date)+'</td>')+guestCell+'<td><span style="background:#f1f5f9;color:#334155;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700">'+room+'</span></td>'+'<td style="text-align:center;font-weight:600">'+(r.nights||'-')+'</td>'+'<td><span class="channel-badge" style="background:'+ch.color+'22;color:'+ch.color+';border-color:'+ch.color+'40">'+ch.label+'</span></td>'+'<td style="text-align:right;font-weight:700"><span style="font-size:10px;color:#94a3b8">USD </span>'+fmtUSD(amt)+(isHV?' <span class="hv-badge" title="Revisar — monto alto">⚠</span>':'')+'</td>'+mxnCell+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(comm?fmtUSD(comm):'-')+'</td>'+'<td style="text-align:right;color:#f43f5e;font-weight:600">'+(mxnComm?fmtMXN(mxnComm):'-')+'</td>'+'<td>'+st+(isAirbnbPending?' <span class="airbnb-alert" title="Pago de Airbnb pendiente de confirmar en plataforma">⚠ Cobro Airbnb</span><button class="edit-status-btn" onclick="openStatusEdit('+r.id+')" title="Editar estado de pago">✏</button>':'')+'</td>'+'</tr>';}).join('');
+}
+function updateKPIs(rows){
+  const TODAY=new Date().toISOString().slice(0,10);
+  let paidMXN=0,pendingMXN=0,nights=0,commMXN=0;
+  let incomeNights=0, incomeResCount=0; // solo reservas que generan ingreso (excluye Booking.com y cortesías)
+  rows.forEach(r=>{
+    const isC=COURTESY.includes(Number(r.id));
+    // Booking.com: se registra la reserva pero NO suma a ingresos ni al conteo de ADR
+    const isBooking = r.source_name === 'Booking.com';
+    const rate=Number(r.mxn_rate||0);
+    const mxnAmt=isC?0:(r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate);
+    // Commission: use stored channel_commission from DB
+    var commAmt = isC ? 0 : Number(r.channel_commission||0)*rate;
+    const autoP=(r.source_name==='Expedia'||r.source_name==='Directo')&&r.arrival_date&&r.arrival_date<TODAY;
+    const paid=isC||r.is_paid||autoP;
+    nights+=Number(r.nights||0); // noches totales (para ocupabilidad)
+    if(isC){
+      // cortesía: no suma a ingresos
+    } else if(r.is_booking_consolidated){
+      // Pago consolidado manual Booking.com: suma como ingreso pagado
+      paidMXN+=mxnAmt;
+    } else if(isBooking){
+      // Booking.com normal: no suma a ingresos ni al ADR
+    } else {
+      incomeResCount++;
+      incomeNights+=Number(r.nights||0);
+      if(paid){
+        paidMXN+=mxnAmt;
+      } else {
+        pendingMXN+=mxnAmt;
+      }
+    }
+    commMXN+=commAmt;
+  });
+  const totalMXN=paidMXN+pendingMXN;
+  const adrNight=incomeNights>0?totalMXN/incomeNights:0;
+  const adrRes=incomeResCount>0?totalMXN/incomeResCount:0;
+  document.getElementById('kpi-res').textContent=rows.length;
+  document.getElementById('kpi-paid').textContent=fmtMXN(paidMXN);
+  document.getElementById('kpi-pending').textContent=fmtMXN(pendingMXN);
+  document.getElementById('kpi-adr').textContent=fmtMXN(adrNight);
+  document.getElementById('kpi-adr-res').textContent=fmtMXN(adrRes);
+  document.getElementById('kpi-com').textContent=fmtMXN(commMXN);
+}
+function updateOccupancy(rows){
+  var ROOMS_LOFT=4, ROOMS_HAB=10, ROOMS_TOTAL=14;
+  var nightsLoft=0, nightsHab=0;
+  rows.forEach(function(r){
+    if(COURTESY.indexOf(Number(r.id))!==-1||r.is_booking_consolidated) return;
+    var n=Number(r.nights||0);
+    var nm=normalizeRoom(r.room_name);
+    if(nm==='Loft') nightsLoft+=n;
+    else if(nm==='Habitación') nightsHab+=n;
+  });
+  var totalNights=nightsLoft+nightsHab;
+  // Period calculation
+  var periodDays=0, periodLabel='14 habitaciones';
+  var now=new Date();
+  if(filterYear!=='all' && filterMonth!=='all'){
+    var y=parseInt(filterYear), m=parseInt(filterMonth)-1;
+    var daysInMonth=new Date(y,m+1,0).getDate();
+    var isCurrentMonth=(now.getFullYear()===y && now.getMonth()===m);
+    periodDays=isCurrentMonth?now.getDate():daysInMonth;
+    var monthNames=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    periodLabel=monthNames[m]+' '+y+' · '+daysInMonth+' días';
+  } else if(filterYear!=='all' && filterMonth==='all'){
+    var y=parseInt(filterYear);
+    var isCurrentYear=(now.getFullYear()===y);
+    var startOfYear=new Date(y,0,1);
+    periodDays=isCurrentYear
+      ?Math.floor((now-startOfYear)/86400000)+1
+      :(new Date(y,11,31)-startOfYear)/86400000+1;
+    periodLabel=y+' · '+Math.round(periodDays)+' días';
+  } else {
+    // All — show total nights only
+    document.getElementById('kpi-occ').textContent=totalNights+'n';
+    document.getElementById('kpi-occ-bar').style.width='0%';
+    document.getElementById('kpi-occ-sub').textContent='14 hab · noches totales';
+    document.getElementById('kpi-occ-loft').textContent=nightsLoft+'n';
+    document.getElementById('kpi-occ-loft-bar').style.width='0%';
+    document.getElementById('kpi-occ-hab').textContent=nightsHab+'n';
+    document.getElementById('kpi-occ-hab-bar').style.width='0%';
+    return;
+  }
+  var pd=Math.round(periodDays);
+  var pctTotal=pd>0?Math.min(100,(totalNights/(ROOMS_TOTAL*pd))*100):0;
+  var pctLoft=pd>0?Math.min(100,(nightsLoft/(ROOMS_LOFT*pd))*100):0;
+  var pctHab =pd>0?Math.min(100,(nightsHab /(ROOMS_HAB *pd))*100):0;
+  document.getElementById('kpi-occ').textContent=pctTotal.toFixed(1)+'%';
+  document.getElementById('kpi-occ-bar').style.width=pctTotal.toFixed(1)+'%';
+  document.getElementById('kpi-occ-sub').textContent=totalNights+' noches · '+periodLabel;
+  document.getElementById('kpi-occ-loft').textContent=pctLoft.toFixed(1)+'%';
+  document.getElementById('kpi-occ-loft-bar').style.width=pctLoft.toFixed(1)+'%';
+  document.getElementById('kpi-occ-hab').textContent=pctHab.toFixed(1)+'%';
+  document.getElementById('kpi-occ-hab-bar').style.width=pctHab.toFixed(1)+'%';
+}
 
-const ALL_PANELS = ['dashboard', 'hotel', 'restaurante', 'gastos-op', 'remuneraciones', 'comisiones-canales', 'gastos-menores', 'conciliaciones', 'analisis', 'datos-previos'];
+// ---- INLINE EDIT MXN ----
+function openEdit(id){
+  var r=allData.find(function(x){return Number(x.id)===id;});
+  if(!r)return;
+  var rate=Number(r.mxn_rate||0);
+  var currentMXN=r.mxn_amount?Number(r.mxn_amount):Number(r.total_amount||0)*rate;
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(!row)return;
+  // MXN cell is index 7
+  var mxnCell=row.cells[7];
+  mxnCell.innerHTML='<div class="edit-inline">'+
+    '<input id="ei-'+id+'" type="number" step="0.01" value="'+currentMXN.toFixed(2)+'" oninput="previewUSD('+id+','+rate+')"/>'+
+    '<span class="edit-usd-preview" id="ep-'+id+'">≈ '+fmtUSD(rate>0?currentMXN/rate:0)+' USD</span>'+
+    '<div class="edit-actions">'+
+      '<button id="eb-'+id+'" class="edit-save-btn" onclick="saveEdit('+id+','+rate+')">✓ Guardar</button>'+
+      '<button class="edit-cancel-btn" onclick="cancelEdit()">✕</button>'+
+    '</div>'+
+  '</div>';
+  document.getElementById('ei-'+id).focus();
+}
+function previewUSD(id,rate){
+  var inp=document.getElementById('ei-'+id);
+  var prv=document.getElementById('ep-'+id);
+  if(!inp||!prv)return;
+  var newMXN=Number(inp.value)||0;
+  var newUSD=rate>0?newMXN/rate:0;
+  prv.textContent='≈ '+fmtUSD(newUSD)+' USD';
+  prv.style.color=newUSD>2000?'#f43f5e':'#10b981';
+}
+async function saveEdit(id,rate){
+  var inp=document.getElementById('ei-'+id);
+  var btn=document.getElementById('eb-'+id);
+  var prv=document.getElementById('ep-'+id);
+  if(!inp)return;
+  var newMXN=Number(inp.value);
+  if(isNaN(newMXN)||newMXN<=0){
+    inp.style.borderColor='#f43f5e';
+    if(prv){prv.textContent='Ingresa un monto mayor a 0';prv.style.color='#f43f5e';}
+    return;
+  }
+  var newUSD=rate>0?newMXN/rate:0;
+  // Show loading state — no confirm() dialog needed
+  inp.disabled=true;
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;btn.style.background='#6366f1';}
+  if(prv){prv.textContent='Guardando en base de datos...';prv.style.color='#6366f1';}
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'PATCH',
+      headers:{
+        'apikey':KEY,
+        'Authorization':'Bearer '+KEY,
+        'Content-Type':'application/json',
+        'Prefer':'return=representation'
+      },
+      body:JSON.stringify({mxn_amount:newMXN,total_amount:parseFloat(newUSD.toFixed(2))})
+    });
+    if(!res.ok){
+      var errBody=await res.text();
+      throw new Error('HTTP '+res.status+' — '+errBody);
+    }
+    var updated=await res.json();
+    if(!updated||updated.length===0)throw new Error('No se actualizó ningún registro. Verifica permisos.');
+    // Update in-memory
+    var idx=allData.findIndex(function(x){return Number(x.id)===id;});
+    if(idx>-1){allData[idx].mxn_amount=newMXN;allData[idx].total_amount=parseFloat(newUSD.toFixed(2));}
+    // Brief success flash before re-render
+    if(prv){prv.textContent='✓ Guardado correctamente';prv.style.color='#10b981';}
+    if(btn){btn.textContent='✓';btn.style.background='#10b981';}
+    setTimeout(function(){applyFilters();},600);
+  }catch(err){
+    // Show error inline
+    if(prv){prv.textContent='✗ Error: '+err.message;prv.style.color='#f43f5e';}
+    if(btn){btn.textContent='✓ Guardar';btn.disabled=false;btn.style.background='#10b981';}
+    inp.disabled=false;
+    inp.style.borderColor='#f43f5e';
+  }
+}
+function cancelEdit(){
+  applyFilters();
+}
+// ---- INLINE STATUS EDIT (Airbnb pending) ----
+var _pendingStatusConfirm=null;
+function openStatusEdit(id){
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(!row)return;
+  _pendingStatusConfirm=null;
+  var cell=row.cells[10];
+  cell.innerHTML='<div class="status-edit-wrap">'+
+    '<select id="ss-'+id+'" class="status-select">'+
+      '<option value="pending">Pendiente</option>'+
+      '<option value="paid">Pagado</option>'+
+      '<option value="courtesy">Cortesía (monto = $0)</option>'+
+    '</select>'+
+    '<span class="status-preview" id="sp-'+id+'"></span>'+
+    '<div class="edit-actions">'+
+      '<button id="sb-'+id+'" class="edit-save-btn" onclick="confirmStatusEdit('+id+')">✓ Guardar</button>'+
+      '<button class="edit-cancel-btn" onclick="cancelEdit()">✕</button>'+
+    '</div>'+
+  '</div>';
+}
+function confirmStatusEdit(id){
+  var btn=document.getElementById('sb-'+id);
+  var sel=document.getElementById('ss-'+id);
+  if(!btn||!sel)return;
+  if(_pendingStatusConfirm!==id){
+    _pendingStatusConfirm=id;
+    var labels={pending:'Pendiente',paid:'Pagado',courtesy:'Cortesía — monto a $0'};
+    btn.textContent='⚠ ¿Confirmar '+labels[sel.value]+'?';
+    btn.style.background='#f59e0b';
+    btn.style.color='#78350f';
+    return;
+  }
+  _pendingStatusConfirm=null;
+  saveStatusEdit(id);
+}
+async function saveStatusEdit(id){
+  var sel=document.getElementById('ss-'+id);
+  var btn=document.getElementById('sb-'+id);
+  var prv=document.getElementById('sp-'+id);
+  if(!sel)return;
+  var newStatus=sel.value;
+  if(newStatus==='pending'){cancelEdit();return;}
+  var patchData={};
+  if(newStatus==='paid') patchData={is_paid:true};
+  if(newStatus==='courtesy') patchData={total_amount:0,mxn_amount:0,is_paid:true};
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;btn.style.background='#6366f1';btn.style.color='#fff';}
+  sel.disabled=true;
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(patchData)
+    });
+    if(!res.ok){var eb=await res.text();throw new Error('HTTP '+res.status+' — '+eb);}
+    var updated=await res.json();
+    if(!updated||updated.length===0)throw new Error('Sin filas actualizadas. Verifica permisos.');
+    var idx=allData.findIndex(function(x){return Number(x.id)===id;});
+    if(idx>-1){
+      if(newStatus==='paid') allData[idx].is_paid=true;
+      if(newStatus==='courtesy'){allData[idx].total_amount=0;allData[idx].mxn_amount=0;allData[idx].is_paid=true;if(!COURTESY.includes(Number(id)))COURTESY.push(Number(id));}
+    }
+    if(btn){btn.textContent='✓ Guardado';btn.style.background='#10b981';}
+    setTimeout(function(){applyFilters();},700);
+  }catch(err){
+    if(prv){prv.textContent='✗ '+err.message;prv.style.color='#f43f5e';}
+    if(btn){btn.textContent='✓ Guardar';btn.disabled=false;btn.style.background='#10b981';btn.style.color='#fff';}
+    sel.disabled=false;
+  }
+}
+// ---- DELETE TEST RECORDS ----
+var _pendingDeleteConfirm=null;
+function confirmDeleteTest(id){
+  var btn=document.getElementById('dtb-'+id);
+  if(!btn)return;
+  if(_pendingDeleteConfirm!==id){
+    _pendingDeleteConfirm=id;
+    btn.textContent='⚠ ¿Eliminar?';
+    btn.classList.add('confirming');
+    // Auto-reset after 4s
+    setTimeout(function(){
+      if(_pendingDeleteConfirm===id){
+        _pendingDeleteConfirm=null;
+        if(btn){btn.textContent='🗑';btn.classList.remove('confirming');}
+      }
+    },4000);
+    return;
+  }
+  _pendingDeleteConfirm=null;
+  deleteTestRecord(id);
+}
+async function deleteTestRecord(id){
+  var btn=document.getElementById('dtb-'+id);
+  var row=document.querySelector('tr[data-rowid="'+id+'"]');
+  if(btn){btn.textContent='Eliminando...';btn.disabled=true;}
+  if(row){row.style.opacity='0.4';row.style.transition='opacity .3s';}
+  try{
+    var res=await fetch(SB+'/rest/v1/financial_reservations?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    if(!res.ok){var eb=await res.text();throw new Error('HTTP '+res.status+' — '+eb);}
+    allData=allData.filter(function(x){return Number(x.id)!==Number(id);});
+    setTimeout(function(){applyFilters();},350);
+  }catch(err){
+    if(row){row.style.opacity='1';}
+    if(btn){btn.textContent='🗑';btn.disabled=false;btn.classList.remove('confirming');}
+    var errDiv=document.createElement('span');
+    errDiv.style.cssText='color:#f43f5e;font-size:10px;margin-left:8px';
+    errDiv.textContent='✗ '+err.message;
+    if(row&&row.cells[2])row.cells[2].appendChild(errDiv);
+  }
+}
+document.querySelectorAll('.year-pill').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.year-pill').forEach(function(x){x.classList.remove('active');});
+  b.classList.add('active');filterYear=b.dataset.year;filterMonth='all';
+  document.querySelectorAll('.month-pill').forEach(function(x){x.classList.remove('active');});
+  document.querySelector('.month-pill[data-month="all"]').classList.add('active');
+  loadHotelData();
+});});
+document.querySelectorAll('.month-pill').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.month-pill').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');filterMonth=b.dataset.month;applyFilters();
+}));
 
-const PAGE_TITLES = {
+window.addEventListener('error',e=>{document.getElementById('globalLoader').classList.add('hidden');});
+window.addEventListener('unhandledrejection',e=>{document.getElementById('globalLoader').classList.add('hidden');});
+
+// ---- NAV PANEL SWITCHING ----
+// Module → { sub-nav id, sub-panel ids, parent nav id, first-child panel }
+var NAV_MAP = {
+  'dashboard':          { parent:'nav-dashboard',    subId:null },
+  'hotel':               { parent:'nav-ingresos',      subId:'nav-hotel' },
+  'restaurante':         { parent:'nav-ingresos',      subId:'nav-restaurante' },
+  'gastos-op':           { parent:'nav-egresos',       subId:'nav-gastos-op' },
+  'remuneraciones':      { parent:'nav-egresos',       subId:'nav-remuneraciones' },
+  'comisiones-canales':  { parent:'nav-egresos',       subId:'nav-comisiones-canales' },
+  'gastos-menores':      { parent:'nav-egresos',       subId:'nav-gastos-menores' },
+  'conciliaciones':      { parent:'nav-conciliaciones',subId:'nav-conciliaciones-sub' },
+  'analisis':            { parent:'nav-analisis',      subId:'nav-analisis-sub' }
+};
+var ALL_PANELS = ['dashboard','hotel','restaurante','gastos-op','remuneraciones','comisiones-canales','gastos-menores','conciliaciones','analisis'];
+var PAGE_TITLES = {
   'dashboard':'Dashboard',
-  'hotel':'Ingresos Hotel',
+  'hotel':'Ingresos por venta de habitaciones',
   'restaurante':'Ingresos Restaurante',
   'gastos-op':'Egresos — Gastos Operativos',
   'remuneraciones':'Egresos — Remuneraciones',
   'comisiones-canales':'Egresos — Comisiones Canales',
   'gastos-menores':'Egresos — Gastos Menores (Restaurante)',
   'conciliaciones':'Conciliaciones',
-  'analisis':'Análisis',
-  'datos-previos':'Datos previos'
+  'analisis':'Análisis'
 };
 
 function toggleSubNav(mod) {
@@ -2826,6 +2919,37 @@ function renderSummary(month){
   S('summ-t-inc',fK(tInc));    S('summ-t-exp',fK(tExp));    S('summ-t-rent',fP(tRent));
   S('summ-t-util','Utilidad: '+fK(tUtil));
   S('summ-period-label',month==='ytd'?'Año en curso':names[mNum]||'');
+
+  // Comparativos históricos
+  var prevYear = curYear - 1;
+  var pIncH = 0, pIncR = 0;
+  if(HISTORICO_INGRESOS.hotel[prevYear]) {
+    if(mNum) {
+      pIncH = HISTORICO_INGRESOS.hotel[prevYear][mNum-1] || 0;
+      pIncR = HISTORICO_INGRESOS.restaurante[prevYear][mNum-1] || 0;
+    } else {
+      var maxM = (curYear === new Date().getFullYear()) ? new Date().getMonth() + 1 : 12;
+      for(var i=0; i<maxM; i++){
+        pIncH += HISTORICO_INGRESOS.hotel[prevYear][i] || 0;
+        pIncR += HISTORICO_INGRESOS.restaurante[prevYear][i] || 0;
+      }
+    }
+  }
+  
+  function renderComp(id, current, past) {
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(past <= 0) { el.textContent = '—'; el.style.color = '#94a3b8'; return; }
+    var diff = current - past;
+    var pct = (diff / past) * 100;
+    var sign = diff >= 0 ? '+' : '';
+    var color = diff >= 0 ? '#10b981' : '#ef4444';
+    el.innerHTML = '<span style="color:'+color+';font-weight:700">'+sign+fK(diff)+' ('+sign+fP(pct)+')</span> vs '+prevYear;
+  }
+
+  renderComp('summ-h-inc-comp', hInc, pIncH);
+  renderComp('summ-r-inc-comp', rInc, pIncR);
+  renderComp('summ-t-inc-comp', tInc, pIncH + pIncR);
 }
 function setSummMonth(m){
   document.querySelectorAll('.summ-tab').forEach(function(b){b.classList.remove('active');if(b.dataset.m==String(m))b.classList.add('active');});
@@ -4201,6 +4325,33 @@ var CONCILIACIONES = (function(){
     var kpiInc = total_hInc + total_rInc;
     var kpiExp = total_gop + total_nom + total_gm + total_comm;
     document.getElementById('con-kpi-ingresos').textContent = fmt(kpiInc);
+    
+    var mYear = parseInt(yearStr, 10);
+    var prevYear = mYear - 1;
+    var pIncH = 0, pIncR = 0;
+    if(HISTORICO_INGRESOS.hotel[prevYear]) {
+      var maxM = (mYear === new Date().getFullYear()) ? new Date().getMonth() + 1 : 12;
+      for(var i=0; i<maxM; i++){
+        pIncH += HISTORICO_INGRESOS.hotel[prevYear][i] || 0;
+        pIncR += HISTORICO_INGRESOS.restaurante[prevYear][i] || 0;
+      }
+    }
+    
+    var el = document.getElementById('con-kpi-ingresos-comp');
+    if(el) {
+      var past = pIncH + pIncR;
+      if(past <= 0) { 
+        el.textContent = '—'; el.style.color = '#94a3b8'; 
+      } else {
+        var diff = kpiInc - past;
+        var pct = (diff / past) * 100;
+        var sign = diff >= 0 ? '+' : '';
+        var color = diff >= 0 ? '#10b981' : '#f43f5e';
+        var fK = function(n) { return '$' + (n/1000).toFixed(1) + 'K'; };
+        var fP = function(n) { return n.toFixed(1) + '%'; };
+        el.innerHTML = '<span style="color:'+color+';font-weight:700">'+sign+fK(diff)+' ('+sign+fP(pct)+')</span> vs '+prevYear;
+      }
+    }
     document.getElementById('con-kpi-egresos').textContent = fmt(kpiExp);
     document.getElementById('con-kpi-balance').textContent = fmt(kpiInc - kpiExp);
 
@@ -4295,6 +4446,33 @@ var ANALISIS = (function(){
     
     document.getElementById('ana-rent-gen').textContent = fmtPct(rentGen);
     document.getElementById('ana-rent-gen-lbl').textContent = 'Utilidad general: ' + fmt(utilGen);
+    
+    var prevYear = mYear - 1;
+    var pIncH = 0, pIncR = 0;
+    if(HISTORICO_INGRESOS.hotel[prevYear]) {
+      var maxM = (mYear === curYear) ? curMonth : 12;
+      for(var i=0; i<maxM; i++){
+        pIncH += HISTORICO_INGRESOS.hotel[prevYear][i] || 0;
+        pIncR += HISTORICO_INGRESOS.restaurante[prevYear][i] || 0;
+      }
+    }
+    
+    function renderCompAna(id, current, past) {
+      var el = document.getElementById(id);
+      if(!el) return;
+      if(past <= 0) { el.textContent = '—'; el.style.color = '#94a3b8'; return; }
+      var diff = current - past;
+      var pct = (diff / past) * 100;
+      var sign = diff >= 0 ? '+' : '';
+      var color = diff >= 0 ? '#10b981' : '#ef4444';
+      var fK = function(n) { return '$' + (n/1000).toFixed(1) + 'K'; };
+      var fP = function(n) { return n.toFixed(1) + '%'; };
+      el.innerHTML = '<span style="color:'+color+';font-weight:700">'+sign+fK(diff)+' ('+sign+fP(pct)+')</span> vs '+prevYear;
+    }
+
+    renderCompAna('ana-rent-hotel-comp', hInc, pIncH);
+    renderCompAna('ana-rent-rest-comp', rInc, pIncR);
+    renderCompAna('ana-rent-gen-comp', totalInc, pIncH + pIncR);
 
     // Sincronizar Dashboard KPIs con exactamente los mismos valores calculados aquí
     // (Garantiza que Dashboard y Análisis muestren siempre el mismo número)

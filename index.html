@@ -33,13 +33,38 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
             .then(function (reg) {
-              console.log('SW registered:', reg.scope);
+              console.log('[SW] Registered:', reg.scope);
+
+              // Check for update immediately on load
+              reg.update();
+
+              // ── Polling: check for new SW every 60 seconds ──────────────────
+              // This is critical for installed PWAs (iOS & Android) that never
+              // trigger a normal SW update check on their own.
+              setInterval(function () {
+                reg.update().then(function () {
+                  console.log('[SW] Checked for update');
+                });
+              }, 60 * 1000);
             })
             .catch(function (err) {
-              console.warn('SW registration failed:', err);
+              console.warn('[SW] Registration failed:', err);
             });
+
+          // ── Handle update signal from SW (all platforms) ────────────────────
+          // When a new SW activates, it sends SW_UPDATED to all open clients.
+          // iOS standalone PWAs NEVER reload on their own — this forces it.
+          // Android Chrome PWAs also benefit from this explicit reload.
+          navigator.serviceWorker.addEventListener('message', function (event) {
+            if (event.data && event.data.type === 'SW_UPDATED') {
+              console.log('[SW] New version detected (' + event.data.version + '), reloading...');
+              setTimeout(function () {
+                window.location.reload();
+              }, 300);
+            }
+          });
         });
       }
     </script>

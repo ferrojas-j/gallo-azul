@@ -5,7 +5,7 @@ import {
   FileEdit, PlusCircle, TrendingUp, TrendingDown, CalendarDays, Calendar, Search, StickyNote,
 
   Pencil, ChevronDown, ChevronUp, AlertTriangle, Zap, Eye, Clock, Printer, Wallet, Building, Globe, ShoppingBag, CreditCard, PenTool, ClipboardList,
-  FileText, Package, Utensils,
+  FileText, Package, Utensils, LogOut,
 
   UserMinus, ExternalLink, CheckCircle2, AlertCircle, Calculator
 
@@ -15,10 +15,14 @@ import { CATEGORIES, CATEGORY_MAPPING } from './data/menu';
 import type { MenuItem, MenuVariant } from './data/menu';
 import { supabase } from './lib/supabase';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
-import type { UserRow } from './lib/supabaseService';
+import type { UserRow, AppUserRow } from './lib/supabaseService';
 import { getUpcomingCheckins, updateReservationStatus, createReservation, addTransaction } from './lib/hostawayService';
 import type { Reservation } from './lib/hostawayService';
 import { bluetoothPrinter, buildEscPos, tryRawBt } from './utils/bluetoothPrinter';
+import { StaffManager } from './components/StaffManager';
+import { ExpenseManager } from './components/ExpenseManager';
+import { LoginScreen } from './components/LoginScreen';
+import { UserManager } from './components/UserManager';
 
 // BUILD: 2026-05-11T21:00:00Z — cortesia-icon v8
 const _BUILD_VERSION = '2026-05-11T21:00:00Z';
@@ -147,7 +151,7 @@ function HistoryReportCard({ report, formatCurrency, onDelete }: { report: any, 
   const hotelIncome = Number(report.hotel_income || 0);
   const totalExpenses = Number(report.expenses || 0);
   const netBalance = totalIncome + hotelIncome + totalTips - totalExpenses;
-  const grandTotalSales = totalIncome + hotelIncome + totalTips;
+  const grandTotalSales = totalIncome + hotelIncome; // Solo ventas, las propinas son aparte
 
   // New handover fields (fallbacks for old reports)
   const hCash = report.handover_cash ?? (Number(report.cash_income || 0) + Number(report.cash_tips || 0) - totalExpenses);
@@ -178,8 +182,8 @@ function HistoryReportCard({ report, formatCurrency, onDelete }: { report: any, 
         
         <div className="rpc-metrics-summary">
           <div className="rpc-m-item">
-            <span className="rpc-m-label">VENTAS TOTALES</span>
-            <span className="rpc-m-val">{formatCurrency(grandTotalSales)}</span>
+            <span className="rpc-m-label">VENTAS RESTAURANTE</span>
+            <span className="rpc-m-val">{formatCurrency(totalIncome)}</span>
           </div>
           <div className="rpc-m-item">
             <span className="rpc-m-label">BALANCE NETO</span>
@@ -191,113 +195,208 @@ function HistoryReportCard({ report, formatCurrency, onDelete }: { report: any, 
         </div>
       </div>
 
-      {expanded && (
-        <div className="rpc-details fade-in">
-          <div className="rpc-section">
-            <h5><LayoutGrid size={16} /> UNIDADES DE NEGOCIO</h5>
-            <div className="rpc-grid-premium">
-              <div className="rpc-metric-card">
-                <span className="rpc-metric-label">Restaurante</span>
-                <span className="rpc-metric-value">{formatCurrency(totalIncome)}</span>
-              </div>
-              <div className="rpc-metric-card">
-                <span className="rpc-metric-label">Hotel</span>
-                <span className="rpc-metric-value">{formatCurrency(hotelIncome)}</span>
-              </div>
-              <div className="rpc-metric-card highlight">
-                <span className="rpc-metric-label">Total Ingresos</span>
-                <span className="rpc-metric-value">{formatCurrency(totalIncome + hotelIncome)}</span>
-              </div>
-              <div className="rpc-metric-card highlight-green">
-                <span className="rpc-metric-label">Total Propinas</span>
-                <span className="rpc-metric-value" style={{ color: '#10b981' }}>{formatCurrency(totalTips)}</span>
-              </div>
-            </div>
-          </div>
+      {expanded && (() => {
+        // ── Reconstruir exactamente los mismos cálculos que el modal de cierre ──
+        const ventasRestaurante = Number(report.income || 0);
+        const ventasHotel       = Number(report.hotel_income || 0);
+        const ventasTotales     = ventasRestaurante + ventasHotel;
 
-          <div className="rpc-section">
-            <h5><Wallet size={16} /> MÉTODOS DE PAGO</h5>
-            <div className="rpc-methods-grid">
-               <div className="rpc-method-row">
-                 <div className="rpc-method-icon cash">
-                   <Wallet size={18} />
-                 </div>
-                 <div className="rpc-method-content">
-                   <span className="rm-name">Efectivo</span>
-                   <span className="rm-base">{formatCurrency(report.cash_income || 0)}</span>
-                   {Number(report.cash_tips || 0) > 0 && (
-                     <span className="rm-tip">+{formatCurrency(report.cash_tips || 0)}</span>
-                   )}
-                 </div>
-               </div>
-               <div className="rpc-method-row">
-                 <div className="rpc-method-icon card">
-                   <Printer size={18} />
-                 </div>
-                 <div className="rpc-method-content">
-                   <span className="rm-name">Tarjetas / TC</span>
-                   <span className="rm-base">{formatCurrency((report.card_income || 0) + (report.card_tips || 0) + (report.debit_tips || 0) + (report.credit_tips || 0))}</span>
-                 </div>
-               </div>
-               <div className="rpc-method-row">
-                 <div className="rpc-method-icon transfer">
-                   <Building size={18} />
-                 </div>
-                 <div className="rpc-method-content">
-                   <span className="rm-name">Transferencia</span>
-                   <span className="rm-base">{formatCurrency((report.transfer_income || 0) + (report.transfer_tips || 0))}</span>
-                 </div>
-               </div>
-            </div>
-          </div>
+        const pettyCash         = Number(report.petty_cash_at_close || 0);
+        const gastos            = Number(report.expenses || 0);
+        const cashIncome        = Number(report.cash_income || 0);
+        const cardIncome        = Number(report.card_income || 0);
+        const transferIncome    = Number(report.transfer_income || 0);
+        const cashTips          = Number(report.cash_tips || 0);
+        const cardTips          = Number(report.card_tips || 0);
+        const debitTips         = Number(report.debit_tips || 0);
+        const creditTips        = Number(report.credit_tips || 0);
+        const transferTips      = Number(report.transfer_tips || 0);
+        const hotelCashIncome   = Number(report.hotel_cash_income || 0);
+        const hotelCardIncome   = Number(report.hotel_card_income || 0);
+        const hDollars          = Number(report.handover_dollars || 0);
 
-          <div className="rpc-section">
-            <h5><Check size={16} /> RESUMEN DE ENTREGA FINAL</h5>
-            <div className="rpc-handover-panel">
-              <div className="rpc-h-item">
-                <span className="rpc-h-label">EFECTIVO A ENTREGAR</span>
-                <span className="rpc-h-val">{formatCurrency(hCash)}</span>
-              </div>
-              <div className="rpc-h-item">
-                <span className="rpc-h-label">DÓLARES (CONVERTIDOS)</span>
-                <span className="rpc-h-val">{formatCurrency(hDollars)}</span>
-              </div>
-              <div className="rpc-h-item">
-                <span className="rpc-h-label">TARJETAS (TC)</span>
-                <span className="rpc-h-val">{formatCurrency(hCard)}</span>
-              </div>
-              <div className="rpc-h-item total">
-                <span className="rpc-h-label">ENTREGA TOTAL</span>
-                <span className="rpc-h-val total-val">{formatCurrency(hTotal)}</span>
-              </div>
-            </div>
-          </div>
+        // Corte
+        const totalEfectivoPesos = cashIncome + hotelCashIncome;
+        const totalTarjeta       = cardIncome + hotelCardIncome;
+        const propinasTC         = cardTips + transferTips;
+        const pesosBruto         = pettyCash - gastos + totalEfectivoPesos;
+        const fondoPropinas      = pesosBruto + hDollars + (totalTarjeta + cardTips) + (transferIncome + transferTips) + gastos - ventasTotales;
+        const fondo              = fondoPropinas - propinasTC;
 
-          {report.expenses_list?.length > 0 && (
-            <div className="rpc-section">
-              <h5><TrendingDown size={16} /> GASTOS REGISTRADOS</h5>
-              <div className="rpc-expenses-list">
-                {report.expenses_list.map((exp: any, i: number) => (
-                  <div key={i} className="rpc-expense-row">
-                    <span>{exp.concept} {exp.detail ? `(${exp.detail})` : ''}</span>
-                    <span className="exp-amt">-{formatCurrency(exp.amount)}</span>
+        // Propinas
+        const propinasTotal = cashTips + cardTips + debitTips + creditTips + transferTips;
+
+        // Entrega
+        const entregaFinal = ventasTotales + propinasTotal - gastos;
+
+        // Desglose
+        const hCash     = Number(report.handover_cash || 0);
+        const hCard     = Number(report.handover_card || 0);
+        const hTotal    = entregaFinal; // Siempre igual a entregaFinal para coherencia
+
+        const fechaCorte = new Date(report.created_at).toLocaleString('es-MX', {
+          timeZone: 'America/Mazatlan', dateStyle: 'long', timeStyle: 'short'
+        });
+
+        const row = (label: string, value: string | number, opts?: { bold?: boolean; color?: string; border?: boolean }) => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px',
+            fontWeight: opts?.bold ? 700 : 600,
+            color: opts?.color || '#64748b',
+            ...(opts?.border ? { marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1' } : {})
+          }}>
+            <span>{label}</span>
+            <span style={{ color: opts?.color || '#0f172a' }}>{typeof value === 'number' ? formatCurrency(value) : value}</span>
+          </div>
+        );
+
+        const section = (title: string, children: React.ReactNode, bg = '#f8fafc', border = '#e2e8f0', titleColor = '#0f172a') => (
+          <div style={{ background: bg, padding: '16px', borderRadius: '12px', border: `1px solid ${border}` }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 800, color: titleColor, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px 0' }}>{title}</h4>
+            <div style={{ display: 'grid', gap: '8px' }}>{children}</div>
+          </div>
+        );
+
+        return (
+          <div className="rpc-details fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* REPORTE DIARIO */}
+            {section('Reporte Diario', <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
+                <span>Fecha y hora del corte:</span>
+                <span style={{ color: '#0f172a', fontWeight: 500 }}>{fechaCorte}</span>
+              </div>
+              {row('Ventas restaurante:', ventasRestaurante, { border: true })}
+              {row('Ventas hotel:', ventasHotel)}
+              {row('Ventas totales:', ventasTotales, { bold: true, color: '#4f46e5', border: true })}
+            </>)}
+
+            {/* CORTE */}
+            {section('Corte', <>
+              {row('Pesos:', pesosBruto)}
+              {row('Dólares convertidos:', hDollars)}
+              {row('Tarjetas:', totalTarjeta + cardTips)}
+              {row('Transferencias:', transferIncome + transferTips)}
+              {row('Compras:', gastos, { color: '#dc2626' })}
+              {row('Ventas restaurante:', ventasRestaurante)}
+              {row('Fondo + Prop:', fondoPropinas, { border: true })}
+              {row('Propinas en tarjetas:', propinasTC)}
+              {row('Fondo:', fondo, { bold: true, color: '#0f172a', border: true })}
+            </>)}
+
+            {/* PROPINAS */}
+            {section('Propinas', <>
+              {row('Propinas en efectivo:', cashTips)}
+              {row('Propinas en tarjetas:', propinasTC)}
+              {row('Total propinas:', propinasTotal, { bold: true, color: '#16a34a', border: true })}
+            </>)}
+
+            {/* ENTREGA */}
+            {section('Entrega', <>
+              {row('Ventas totales:', ventasTotales)}
+              {row('Total propinas:', propinasTotal)}
+              {row('Gastos:', gastos, { color: '#dc2626' })}
+              {row('Entrega final del día:', entregaFinal, { bold: true, color: '#1e3a8a', border: true })}
+            </>, '#eff6ff', '#bfdbfe', '#1e3a8a')}
+
+            {/* DESGLOSE ENTREGA */}
+            {section('Desglose de Entrega', <>
+              {row('Efectivo:', hCash)}
+              {row('Dólares:', hDollars)}
+              {row('Tarjetas (incl. propina):', hCard)}
+              {row('Entrega:', hTotal, { bold: true, color: '#1e3a8a', border: true })}
+            </>)}
+
+            {/* GASTOS DETALLE */}
+            {report.expenses_list?.length > 0 && (
+              <div style={{ background: '#fff7ed', padding: '16px', borderRadius: '12px', border: '1px solid #fed7aa' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#c2410c', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 12px 0' }}>Gastos Registrados</h4>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {report.expenses_list.map((exp: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#7c2d12' }}>
+                      <span>{exp.concept}{exp.detail ? ` (${exp.detail})` : ''}</span>
+                      <span style={{ fontWeight: 700 }}>-{formatCurrency(exp.amount)}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 800, color: '#c2410c', marginTop: '6px', paddingTop: '8px', borderTop: '1px dashed #fed7aa' }}>
+                    <span>Total Deducciones</span>
+                    <span>-{formatCurrency(gastos)}</span>
                   </div>
-                ))}
-                <div className="rpc-expense-total">
-                  <span>Total Deducciones</span>
-                  <span>-{formatCurrency(totalExpenses)}</span>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="rpc-actions">
-            <button className="rpc-delete-btn" onClick={(e) => { e.stopPropagation(); onDelete(report.id); }}>
-              <Trash2 size={16} /> Eliminar Reporte de Historial
-            </button>
+            <div className="rpc-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {/* Compartir cierre histórico */}
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const fw = (n: number) => `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                  const texto = [
+                    '🐓 GALLO AZUL — CIERRE DE JORNADA',
+                    `📅 ${fechaCorte}`,
+                    '',
+                    '── REPORTE DIARIO ──',
+                    `Ventas restaurante:    ${fw(ventasRestaurante)}`,
+                    `Ventas hotel:          ${fw(ventasHotel)}`,
+                    `Ventas totales:        ${fw(ventasTotales)}`,
+                    '',
+                    '── CORTE ──',
+                    `Pesos:                 ${fw(pesosBruto)}`,
+                    `Dólares convertidos:   ${fw(hDollars)}`,
+                    `Tarjetas:              ${fw(totalTarjeta + cardTips)}`,
+                    `Transferencias:        ${fw(transferIncome + transferTips)}`,
+                    `Compras:              -${fw(gastos)}`,
+                    `Ventas restaurante:    ${fw(ventasRestaurante)}`,
+                    `Fondo + Prop:          ${fw(fondoPropinas)}`,
+                    `Propinas en tarjetas:  ${fw(propinasTC)}`,
+                    `Fondo:                 ${fw(fondo)}`,
+                    '',
+                    '── PROPINAS ──',
+                    `Efectivo:              ${fw(cashTips)}`,
+                    `Tarjetas:              ${fw(propinasTC)}`,
+                    `Total propinas:        ${fw(propinasTotal)}`,
+                    '',
+                    '── ENTREGA ──',
+                    `Ventas totales:        ${fw(ventasTotales)}`,
+                    `Total propinas:        ${fw(propinasTotal)}`,
+                    `Gastos:               -${fw(gastos)}`,
+                    `Entrega final del día: ${fw(entregaFinal)}`,
+                    '',
+                    '── DESGLOSE DE ENTREGA ──',
+                    `Efectivo:              ${fw(hCash)}`,
+                    `Dólares:               ${fw(hDollars)}`,
+                    `Tarjetas (incl. prop): ${fw(hCard)}`,
+                    `Entrega:               ${fw(hTotal)}`,
+                    ...(report.expenses_list?.length > 0 ? [
+                      '',
+                      '── GASTOS ──',
+                      ...report.expenses_list.map((exp: any) => `${exp.concept}${exp.detail ? ` (${exp.detail})` : ''}: -${fw(exp.amount)}`),
+                      `Total gastos:         -${fw(gastos)}`,
+                    ] : []),
+                    '',
+                    `Reportado por: ${report.admin_name || 'Administrador'}`,
+                  ].join('\n');
+                  if (navigator.share) {
+                    try { await navigator.share({ title: 'Cierre Gallo Azul', text: texto }); }
+                    catch (err: any) { if (err.name !== 'AbortError') alert('No se pudo compartir: ' + err.message); }
+                  } else {
+                    await navigator.clipboard.writeText(texto);
+                    alert('Texto copiado al portapapeles. Pégalo en WhatsApp u otra app.');
+                  }
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1.5px solid #bbf7d0', background: '#dcfce7', color: '#16a34a', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Compartir
+              </button>
+              <button className="rpc-delete-btn" onClick={(e) => { e.stopPropagation(); onDelete(report.id); }}>
+                <Trash2 size={16} /> Eliminar Reporte de Historial
+              </button>
+            </div>
+
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -313,7 +412,6 @@ const FORM_I18N: Record<string, {
   phone: string; phonePh: string;
   city: string; cityPh: string;
   country: string; countryPh: string;
-  address: string; addressPh: string;
   room: string; roomNum: string; roomNumPh: string; source: string; pax: string;
   arrival: string; departure: string; nights: string; price: string;
   captureDoc: string; useCamera: string; uploadFile: string; formats: string;
@@ -331,7 +429,6 @@ const FORM_I18N: Record<string, {
     phone: 'Celular / Teléfono', phonePh: 'Número sin código',
     city: 'Ciudad', cityPh: 'Ciudad de origen',
     country: 'País', countryPh: 'Seleccionar país...',
-    address: 'Dirección', addressPh: 'Calle, número, colonia...',
     room: 'Habitación Asignada', roomNum: 'No. de Habitación', roomNumPh: 'Seleccionar...', source: 'Origen de Reserva', pax: 'PAX (Cantidad de personas)',
     arrival: 'Fecha de Llegada', departure: 'Fecha de Salida', nights: 'Noches', price: 'Precio de Estancia',
     captureDoc: 'Captura una foto clara del documento', useCamera: '📸 Usar Cámara', uploadFile: '📁 Subir Archivo',
@@ -350,7 +447,6 @@ const FORM_I18N: Record<string, {
     phone: 'Mobile / Phone', phonePh: 'Number without code',
     city: 'City', cityPh: 'City of origin',
     country: 'Country', countryPh: 'Select country...',
-    address: 'Address', addressPh: 'Street, number, neighborhood...',
     room: 'Assigned Room', roomNum: 'Room Number', roomNumPh: 'Select...', source: 'Booking Source', pax: 'PAX (Number of guests)',
     arrival: 'Arrival Date', departure: 'Departure Date', nights: 'Nights', price: 'Stay Price',
     captureDoc: 'Capture a clear photo of the document', useCamera: '📸 Use Camera', uploadFile: '📁 Upload File',
@@ -369,7 +465,6 @@ const FORM_I18N: Record<string, {
     phone: 'Mobile / Téléphone', phonePh: 'Numéro sans indicatif',
     city: 'Ville', cityPh: 'Ville d\'origine',
     country: 'Pays', countryPh: 'Sélectionner un pays...',
-    address: 'Adresse', addressPh: 'Rue, numéro, quartier...',
     room: 'Chambre assignée', roomNum: 'Numéro de chambre', roomNumPh: 'Sélectionner...', source: 'Origine de la réservation', pax: 'PAX (Nombre de personnes)',
     arrival: 'Date d\'arrivée', departure: 'Date de départ', nights: 'Nuits', price: 'Prix du séjour',
     captureDoc: 'Prenez une photo nette du document', useCamera: '📸 Utiliser la caméra', uploadFile: '📁 Téléverser un fichier',
@@ -529,11 +624,12 @@ export default function App() {
   } = useSupabaseSync();
 
   // UI state
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: 'Administrador' | 'Staff' | 'Encargado' } | null>({
-    id: 'default-admin', name: 'Administrador', role: 'Administrador'
+  const [currentUser, setCurrentUser] = useState<AppUserRow | null>(() => {
+    const saved = localStorage.getItem('gallo_app_user');
+    return saved ? JSON.parse(saved) : null;
   });
 
-  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros' | 'control-financiero'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'salon' | 'pedidos' | 'impresora' | 'admin' | 'mesa' | 'checkout' | 'checkin' | 'registros' | 'control-financiero' | 'staff' | 'expenses' | 'usermanager'>('home');
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [adminSubView, setAdminSubView] = useState<'main' | 'menu' | 'users' | 'tables' | 'stats'>('main');
   const [expandedAdminCategories, setExpandedAdminCategories] = useState<Set<string>>(new Set());
@@ -591,6 +687,7 @@ export default function App() {
   const [isEnCasaExpanded, setIsEnCasaExpanded] = useState(true);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState<any>(null);
+  const [showGuestInfoModal, setShowGuestInfoModal] = useState<any>(null);
   const [contractViewLang, setContractViewLang] = useState<string>('es');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [registroSourceFilter, setRegistroSourceFilter] = useState('Todos');
@@ -802,6 +899,41 @@ export default function App() {
     }
   }, [checkinForm.phone, showCheckinModal]);
 
+  // Android fix: bloquea el scroll/pan del modal mientras el usuario firma.
+  // React registra onTouchMove como passive listener (ignora preventDefault),
+  // por lo que necesitamos el listener nativo con { passive: false }.
+  useEffect(() => {
+    if (!showCheckinModal) return;
+
+    const blockScroll = (e: TouchEvent) => {
+      const canvas = document.getElementById('signature-canvas') as HTMLCanvasElement | null;
+      if (canvas && (canvas as any).isDrawing) {
+        e.preventDefault();
+      }
+    };
+
+    // Registrar en el canvas con passive:false para poder llamar preventDefault
+    const attachListener = () => {
+      const canvas = document.getElementById('signature-canvas') as HTMLCanvasElement | null;
+      if (canvas) {
+        canvas.addEventListener('touchmove', blockScroll, { passive: false });
+        canvas.addEventListener('touchstart', blockScroll, { passive: false });
+      }
+    };
+
+    // Pequeño delay para esperar que el DOM renderice el canvas
+    const timer = setTimeout(attachListener, 150);
+
+    return () => {
+      clearTimeout(timer);
+      const canvas = document.getElementById('signature-canvas') as HTMLCanvasElement | null;
+      if (canvas) {
+        canvas.removeEventListener('touchmove', blockScroll);
+        canvas.removeEventListener('touchstart', blockScroll);
+      }
+    };
+  }, [showCheckinModal]);
+
   const navTo = (view: typeof currentView) => {
     setCurrentView(view);
     if (view !== 'mesa' && view !== 'checkout') {
@@ -823,7 +955,7 @@ export default function App() {
         return;
       }
       const parts = hash.split('-');
-      const validViews = ['home', 'salon', 'pedidos', 'impresora', 'admin', 'mesa', 'checkout', 'checkin', 'control-financiero'];
+      const validViews = ['home', 'salon', 'pedidos', 'impresora', 'admin', 'mesa', 'checkout', 'checkin', 'control-financiero', 'expenses'];
       if (validViews.includes(parts[0])) {
          setCurrentView(parts[0] as any);
          if (parts[1] && !isNaN(parseInt(parts[1], 10)) && parseInt(parts[1], 10) !== 0) {
@@ -937,6 +1069,7 @@ export default function App() {
       alert('❌ No hay reserva de Hostaway asociada.');
       return;
     }
+
     if (hotelPaymentForm.amount === undefined || hotelPaymentForm.amount === null || hotelPaymentForm.amount < 0) {
       alert('❌ Ingresa un monto válido (puede ser 0 para cortesías).');
       return;
@@ -1415,7 +1548,7 @@ export default function App() {
       // Generar ticket para imprimir
       const ticket = {
         table_id: printCuentaModal.tableId,
-        printed_by: currentUser?.name || 'Unknown',
+        printed_by: currentUser?.username || 'Unknown',
         created_at: new Date().toISOString(),
         items_summary: summary,
         total: total,
@@ -1719,15 +1852,17 @@ export default function App() {
     let catId = newItemCategory;
     if (newItemCategory === 'NEW') {
       if (!newCategoryName.trim()) return;
-      const { data } = await addCategory(newCategoryName.trim());
+      const { data, error } = await addCategory(newCategoryName.trim());
       if (data) {
         catId = data.id;
       } else {
+        console.error('Error creating category:', error);
+        alert('Error al crear categoría: ' + (error?.message || JSON.stringify(error)));
         return;
       }
     }
 
-    const { data: itemData } = await addMenuItem({
+    const { data: itemData, error: itemError } = await addMenuItem({
       name: newItemName.trim(),
       price: newItemType === 'fixed' ? parseFloat(newItemPrice) || 0 : 0,
       category_id: catId,
@@ -1735,17 +1870,27 @@ export default function App() {
       active: true,
     });
 
+    if (itemError) {
+      console.error('Error creating product:', itemError);
+      alert('Error al crear producto: ' + itemError.message);
+      return;
+    }
+
     if (itemData && newItemType === 'variants') {
       let order = 0;
       for (const v of newItemVariants) {
         if (v.label.trim()) {
-           await addMenuVariant({
+           const { error: variantError } = await addMenuVariant({
              menu_item_id: itemData.id,
              label: v.label.trim(),
              price: parseFloat(v.price) || 0,
              active: true,
              sort_order: order++,
            });
+           if (variantError) {
+             console.error('Error creating variant:', variantError);
+             alert('Error al crear variante: ' + variantError.message);
+           }
         }
       }
     }
@@ -1785,7 +1930,7 @@ export default function App() {
     stats: 'Historial de Cierres'
   };
 
-  const isSubView = ['mesa', 'checkout', 'registros'].includes(currentView) || (currentView === 'admin' && adminSubView !== 'main');
+  const isSubView = ['mesa', 'checkout', 'registros', 'staff', 'expenses', 'usermanager'].includes(currentView) || (currentView === 'admin' && adminSubView !== 'main');
 
   const renderAdminMain = () => {
     const mexicoDate = currentTime.toLocaleDateString('es-MX', {
@@ -2404,6 +2549,9 @@ export default function App() {
             onClick={() => {
               if (currentView === 'admin' && adminSubView !== 'main') setAdminSubView('main');
               else if (currentView === 'registros') setCurrentView('checkin');
+              else if (currentView === 'staff') setCurrentView('home');
+              else if (currentView === 'expenses') setCurrentView('home');
+              else if (currentView === 'usermanager') setCurrentView('home');
               else setCurrentView('salon');
             }}
             style={{
@@ -2428,6 +2576,9 @@ export default function App() {
               {currentView === 'admin' && 'Admin'}
               {currentView === 'checkin' && 'Hotel'}
               {currentView === 'registros' && 'Registros Hotel'}
+              {currentView === 'staff' && 'Gestión de Staff'}
+              {currentView === 'expenses' && 'Gastos'}
+              {currentView === 'usermanager' && 'Control de usuarios'}
             </span>
           </div>
         )}
@@ -2469,7 +2620,19 @@ export default function App() {
                 Instalar
               </button>
             )}
-              <div className="header-user-avatar">{currentUser.name[0].toUpperCase()}</div>
+              <div className="header-user-avatar">{currentUser.username[0].toUpperCase()}</div>
+
+              <button
+                className="btn-premium"
+                style={{ width: 'auto', padding: '10px', background: '#fee2e2', color: '#ef4444', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: '1px solid #fecaca' }}
+                onClick={() => {
+                  setCurrentUser(null);
+                  localStorage.removeItem('gallo_app_user');
+                }}
+                title="Cerrar sesión"
+              >
+                <LogOut size={16} strokeWidth={2.5} />
+              </button>
 
               {/* Bluetooth Printer Button */}
               {bluetoothPrinter.isSupported() && (
@@ -2564,37 +2727,76 @@ export default function App() {
           <div className="home-clock-time">{timeStr}</div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="home-actions-grid">
-          <div className="home-action-btn pos" onClick={() => navTo('salon')}>
-            <div className="home-action-icon-wrap">
-              <Utensils size={24} />
+        {/* Sections */}
+        {currentUser?.role !== 'Servicios' && (
+        <div className="home-section">
+          <h3 className="home-section-title">Operaciones Gallo Azul</h3>
+          <div className="home-actions-grid">
+            {(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado' || currentUser?.role === 'Staff Hotel') && (
+            <div className="home-action-btn checkin" onClick={() => navTo('checkin')}>
+              <div className="home-action-icon-wrap">
+                <Building size={24} />
+              </div>
+              <span className="home-action-label">Hotel</span>
             </div>
-            <span className="home-action-label">Restaurante</span>
-          </div>
-          <div className="home-action-btn checkin" onClick={() => navTo('checkin')}>
-            <div className="home-action-icon-wrap">
-              <Building size={24} />
+            )}
+            {(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado' || currentUser?.role === 'Staff Resta') && (
+            <div className="home-action-btn pos" onClick={() => navTo('salon')}>
+              <div className="home-action-icon-wrap">
+                <Utensils size={24} />
+              </div>
+              <span className="home-action-label">Restaurante</span>
             </div>
-            <span className="home-action-label">Hotel</span>
-          </div>
-          <div className="home-action-btn financial" onClick={() => window.open('https://gallops.cloud/finanzas_corporativas/', '_blank')} style={{ gridColumn: 'span 2', marginTop: '12px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white' }}>
-            <div className="home-action-icon-wrap" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <TrendingUp size={24} />
-            </div>
-            <span className="home-action-label" style={{ color: 'white' }}>Control financiero</span>
-          </div>
-          <div
-            className="home-action-btn"
-            onClick={() => alert('Sección en configuración')}
-            style={{ gridColumn: 'span 2', marginTop: '8px', background: 'linear-gradient(135deg, #475569 0%, #1e293b 100%)', color: 'white', cursor: 'pointer' }}
-          >
-            <div className="home-action-icon-wrap" style={{ background: 'rgba(255,255,255,0.15)' }}>
-              <Users size={24} color="white" />
-            </div>
-            <span className="home-action-label" style={{ color: 'white' }}>Control de usuarios</span>
+            )}
           </div>
         </div>
+        )}
+
+        {(currentUser?.role === 'Administrador' || currentUser?.role === 'Servicios') && (
+        <div className="home-section">
+          <h3 className="home-section-title">Data input</h3>
+          <div className="home-actions-grid">
+            <div className="home-action-btn staff" onClick={() => navTo('staff')}>
+              <div className="home-action-icon-wrap">
+                <User size={24} />
+              </div>
+              <span className="home-action-label">Registro de salarios</span>
+            </div>
+            <div className="home-action-btn expenses" onClick={() => navTo('expenses')}>
+              <div className="home-action-icon-wrap">
+                <Wallet size={24} />
+              </div>
+              <span className="home-action-label">Registro de gastos</span>
+            </div>
+          </div>
+        </div>
+        )}
+
+        {currentUser?.role === 'Administrador' && (
+        <div className="home-section">
+          <h3 className="home-section-title">Administración</h3>
+          <div className="home-actions-grid">
+            <div
+              className="home-action-btn users"
+              onClick={() => navTo('usermanager')}
+            >
+              <div className="home-action-icon-wrap">
+                <Users size={24} />
+              </div>
+              <span className="home-action-label">Control de usuarios</span>
+            </div>
+            <div 
+              className="home-action-btn financial" 
+              onClick={() => navTo('control-financiero')} 
+            >
+              <div className="home-action-icon-wrap">
+                <TrendingUp size={24} />
+              </div>
+              <span className="home-action-label">Control financiero</span>
+            </div>
+          </div>
+        </div>
+        )}
       </div>
     );
   };
@@ -3431,14 +3633,22 @@ export default function App() {
                               if (reg) {
                                 return (
                                   <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
                                       <button 
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setShowContractModal(reg);
                                         }}
-                                        style={{ background: '#dcfce7', color: '#166534', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s' }}>
+                                        style={{ background: '#dcfce7', color: '#166534', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
                                         <Check size={14} strokeWidth={3} /> Ingreso registrado
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowGuestInfoModal(reg);
+                                        }}
+                                        style={{ background: '#f1f5f9', color: '#475569', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                                        <User size={14} /> Ver datos
                                       </button>
                                     </div>
                                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3860,49 +4070,6 @@ export default function App() {
               />
             </div>
 
-            {/* Room number */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>🚪 Habitación asignada</label>
-              <select
-                value={hotelPaymentForm.roomNumber}
-                onChange={(e) => {
-                  const num = e.target.value;
-                  const label = num ? (parseInt(num) <= 4 ? `Loft ${num}` : `Habitación ${num}`) : '';
-                  // Also update roomName to keep consistency with the label shown
-                  setHotelPaymentForm({ ...hotelPaymentForm, roomNumber: num, roomName: num ? label : hotelPaymentForm.roomName });
-                }}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #e2e8f0', fontSize: 15, fontWeight: 600, background: '#fff', outline: 'none', color: hotelPaymentForm.roomNumber ? '#0f172a' : '#94a3b8' }}
-              >
-                <option value="">Sin asignar / mantener existente</option>
-                {[...Array(14)].map((_, i) => {
-                  const num = String(i + 1);
-                  const label = i < 4 ? `Loft ${num}` : `Habitación ${num}`;
-                  const today = new Date();
-                  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                  const isOccupied = registrations.some((r: any) => {
-                    if (String(r.room_number) !== num || !r.arrival_date || !r.departure_date) return false;
-                    const arr = String(r.arrival_date).slice(0, 10);
-                    const dep = String(r.departure_date).slice(0, 10);
-                    if (!(arr <= todayStr && dep > todayStr)) return false;
-                    // Solo contar como ocupada si la reserva Hostaway sigue activa
-                    if (r.hostaway_reservation_id) {
-                      return upcomingCheckins.some((res: any) => String(res.id) === String(r.hostaway_reservation_id));
-                    }
-                    return true;
-                  });
-                  return (
-                    <option key={num} value={num} disabled={isOccupied} style={{ color: isOccupied ? '#94a3b8' : '#0f172a' }}>
-                      {label}{isOccupied ? ' 🔴 Ocupada' : ' 🟢'}
-                    </option>
-                  );
-                })}
-              </select>
-              {hotelPaymentForm.roomNumber && (
-                <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>
-                  {parseInt(hotelPaymentForm.roomNumber) <= 4 ? `Loft ${hotelPaymentForm.roomNumber}` : `Habitación ${hotelPaymentForm.roomNumber}`}
-                </div>
-              )}
-            </div>
 
             {/* Description */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -4415,6 +4582,10 @@ export default function App() {
     const t = FORM_I18N[contractLang] || FORM_I18N.es;
 
     const handleSave = async () => {
+      if (!checkinForm.roomNumber) {
+        alert('Por favor, selecciona el No. de Habitación antes de finalizar el registro.');
+        return;
+      }
       try {
         const payload = {
           hostaway_reservation_id: selectedReservation?.id,
@@ -4596,12 +4767,7 @@ export default function App() {
               </select>
             </div>
 
-            <div className="form-group-premium" style={{ gridColumn: 'span 2' }}>
-              <label>{t.address}</label>
-              <input type="text" value={checkinForm.homeAddress}
-                onChange={e => setCheckinForm({...checkinForm, homeAddress: e.target.value})}
-                placeholder={t.addressPh} />
-            </div>
+
           </div>
 
           <div className="checkin-section-title">
@@ -4618,35 +4784,49 @@ export default function App() {
             </div>
 
             <div className="form-group-premium">
-              <label>{t.roomNum}</label>
+              <label>
+                {t.roomNum}
+                <span style={{ color: '#ef4444', marginLeft: 4, fontWeight: 700 }}>*</span>
+              </label>
               <div style={{ position: 'relative' }}>
-                <HomeIcon size={16} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <HomeIcon size={16} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: checkinForm.roomNumber ? '#94a3b8' : '#ef4444' }} />
                 <select
                   value={checkinForm.roomNumber}
                   onChange={e => setCheckinForm({...checkinForm, roomNumber: e.target.value})}
-                  style={{ width: '100%', height: 48, paddingLeft: 44, borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 16, fontWeight: 600, color: '#0f172a', background: 'white', appearance: 'none' }}
+                  style={{ width: '100%', height: 48, paddingLeft: 44, borderRadius: 12, border: checkinForm.roomNumber ? '1px solid #e2e8f0' : '2px solid #ef4444', fontSize: 16, fontWeight: 600, color: '#0f172a', background: checkinForm.roomNumber ? 'white' : '#fff5f5', appearance: 'none' }}
                 >
                   <option value="">{t.roomNumPh}</option>
                   {[...Array(14)].map((_, i) => {
                     const num = String(i + 1);
-                    const label = i < 4 ? `Loft ${num}` : `Habitación ${num}`;
+                    const isLoft = i < 4;
+                    const label = isLoft ? `Loft ${num}` : `Habitación ${num}`;
+                    // Name-based room type restriction
+                    const hostawayNameIsLoft = (checkinForm.roomName || '').toLowerCase().includes('loft');
+                    const wrongType = hostawayNameIsLoft ? !isLoft : isLoft;
                     const today = new Date();
                     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
                     const isOccupied = registrations.some((r: any) => {
-                      if (String(r.room_number) !== num || !r.arrival_date || !r.departure_date) return false;
+                      if (String(r.room_number) !== num || !r.arrival_date) return false;
                       const arr = String(r.arrival_date).slice(0, 10);
-                      const dep = String(r.departure_date).slice(0, 10);
-                      if (!(arr <= todayStr && dep > todayStr)) return false;
+                      // Fuente de verdad para la salida:
+                      // Si tiene reserva Hostaway, usar la fecha de salida REAL de Hostaway (soporta extensiones)
+                      let dep: string;
                       if (r.hostaway_reservation_id) {
-                        return upcomingCheckins.some((res: any) => String(res.id) === String(r.hostaway_reservation_id));
+                        const hostawayRes = upcomingCheckins.find((res: any) => String(res.id) === String(r.hostaway_reservation_id));
+                        if (!hostawayRes) return false; // Reserva ya no existe en Hostaway
+                        dep = String(hostawayRes.departureDate || r.departure_date || '').slice(0, 10);
+                      } else {
+                        if (!r.departure_date) return false;
+                        dep = String(r.departure_date).slice(0, 10);
                       }
-                      return true;
+                      // Ocupada si el huésped ya llegó y todavía no ha salido
+                      return arr <= todayStr && dep > todayStr;
                     });
                     const isCurrent = checkinForm.roomNumber === num;
-                    const disabled = isOccupied && !isCurrent;
+                    const disabled = (isOccupied || wrongType) && !isCurrent;
                     return (
                       <option key={i + 1} value={num} disabled={disabled} style={{ color: disabled ? '#94a3b8' : '#0f172a' }}>
-                        {label}{disabled ? ' 🔴 Ocupada' : ' 🟢 Disponible'}
+                        {label}{isOccupied ? ' 🔴 Ocupada' : wrongType ? ' 🚫' : ' 🟢 Disponible'}
                       </option>
                     );
                   })}
@@ -5014,10 +5194,10 @@ export default function App() {
           </div>
 
           <div className="form-group-premium">
-            <div className="signature-pad-container" style={{ height: 180 }}>
+            <div className="signature-pad-container" style={{ height: 180, touchAction: 'none' }}>
               <canvas 
                 id="signature-canvas"
-                style={{ width: '100%', height: '100%', cursor: 'crosshair', display: 'block' }}
+                style={{ width: '100%', height: '100%', cursor: 'crosshair', display: 'block', touchAction: 'none' }}
                 onMouseDown={(e) => {
                   const canvas = e.currentTarget as HTMLCanvasElement;
                   const ctx = canvas.getContext('2d');
@@ -6309,15 +6489,22 @@ export default function App() {
 
   // ── Render ───────────────────────────────────────────
 
-
+  if (!currentUser) {
+    return <LoginScreen onLogin={user => {
+      setCurrentUser(user);
+      localStorage.setItem('gallo_app_user', JSON.stringify(user));
+    }} />;
+  }
 
   return (
     <>
-
       <div className="app-container">
       {renderHeader()}
       <div className="content-area">
         {currentView === 'home' && renderHome()}
+        {currentView === 'staff' && <StaffManager />}
+        {currentView === 'expenses' && <ExpenseManager />}
+        {currentView === 'usermanager' && <UserManager onBack={() => navTo('home')} />}
         {currentView === 'checkin' && renderCheckin()}
         {currentView === 'registros' && renderRegistros()}
         {currentView === 'salon' && renderSalon()}
@@ -6333,17 +6520,20 @@ export default function App() {
         {currentView === 'control-financiero' && renderControlFinanciero()}
       </div>
 
-      {['home', 'salon', 'pedidos', 'impresora', 'admin', 'checkin', 'registros'].includes(currentView) && adminSubView === 'main' && (
+      {['home', 'salon', 'pedidos', 'impresora', 'admin', 'checkin', 'registros', 'usermanager'].includes(currentView) && adminSubView === 'main' && (
         <div className="bottom-nav">
           {[
             { view: 'home', icon: <HomeIcon className="nav-icon" />, label: 'Inicio' },
-            { view: 'checkin', icon: <Globe className="nav-icon" />, label: 'Hotel' },
-            { view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Restaurante' },
-            { view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Comandas' },
-            { view: 'impresora', icon: <Printer className="nav-icon" />, label: 'Cuentas' },
-            ...(currentUser?.role === 'Administrador' || currentUser?.role === 'Encargado'
-              ? [{ view: 'admin', icon: <Settings className="nav-icon" />, label: 'Admin' }]
-              : []),
+            ...(['Administrador', 'Encargado', 'Staff Hotel'].includes(currentUser?.role || '')
+              ? [{ view: 'checkin', icon: <Globe className="nav-icon" />, label: 'Hotel' }] : []),
+            ...(['Administrador', 'Encargado', 'Staff Resta'].includes(currentUser?.role || '')
+              ? [{ view: 'salon', icon: <LayoutGrid className="nav-icon" />, label: 'Restaurante' }] : []),
+            ...(['Administrador', 'Encargado', 'Staff Resta'].includes(currentUser?.role || '')
+              ? [{ view: 'pedidos', icon: <ClipboardCheck className="nav-icon" />, label: 'Comandas' }] : []),
+            ...(['Administrador', 'Encargado', 'Staff Resta'].includes(currentUser?.role || '')
+              ? [{ view: 'impresora', icon: <Printer className="nav-icon" />, label: 'Cuentas' }] : []),
+            ...(['Administrador', 'Encargado'].includes(currentUser?.role || '')
+              ? [{ view: 'admin', icon: <Settings className="nav-icon" />, label: 'Admin' }] : []),
           ].map(({ view, icon, label }) => (
             <div key={view} className={`nav-item ${currentView === view ? 'active' : ''}`} onClick={() => navTo(view as any)}>
               {icon}{label}
@@ -6704,7 +6894,7 @@ export default function App() {
                         try {
                           setIsClosingTurn(true);
                           const result = await closeDay(
-                            currentUser?.name || 'Administrador',
+                            currentUser?.username || 'Administrador',
                             overrideCashTips !== '' ? Number(overrideCashTips) : todayCashTips
                           );
                           if (!result.success) {
@@ -6764,12 +6954,19 @@ export default function App() {
                 const fondoProp = (pettyCashInitial - todayExpenses + totalEfectivoPesos) + dolaresConv + (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips) + todayExpenses - ventasTotales;
                 const fondo = fondoProp - propinasTC;
 
+                const entregaEfectivo = (pettyCashInitial + totalEfectivoPesos - todayExpenses) - 5000;
+                const entregaDolares = dolaresConv;
+                const entregaTarjetas = (totalTarjeta + todayCardTips) + (totalTransferencia + todayTransferTips);
+                const entregaTotal = entregaEfectivo + entregaDolares + entregaTarjetas;
+
                 const texto = [
                   '🐓 GALLO AZUL — CIERRE DE JORNADA',
                   `📅 ${fechaImp}`,
                   '',
                   '── REPORTE DIARIO ──',
                   `Ventas restaurante:   ${fw(todayIncome)}`,
+                  `Ventas hotel:         ${fw(ventasHotel)}`,
+                  `Ventas totales:       ${fw(ventasTotales)}`,
                   '',
                   '── CORTE ──',
                   `Pesos:                ${fw(pettyCashInitial - todayExpenses + totalEfectivoPesos)}`,
@@ -6787,11 +6984,21 @@ export default function App() {
                   `Tarjetas:             ${fw(propinasTC)}`,
                   `Total propinas:       ${fw(propinasTotales)}`,
                   '',
-                  '── ENTREGA FINAL ──',
-                  `${fw(entregaFinal)}`,
+                  '── ENTREGA ──',
+                  `Ventas totales:       ${fw(ventasTotales)}`,
+                  `Total propinas:       ${fw(propinasTotales)}`,
+                  `Gastos:              -${fw(todayExpenses)}`,
+                  `Entrega final del día: ${fw(entregaFinal)}`,
                   '',
-                  `Reportado por: ${currentUser?.name || 'Administrador'}`,
+                  '── DESGLOSE DE ENTREGA ──',
+                  `Efectivo:             ${fw(entregaEfectivo)}`,
+                  `Dólares:              ${fw(entregaDolares)}`,
+                  `Tarjetas (incl. prop): ${fw(entregaTarjetas)}`,
+                  `Entrega:              ${fw(entregaTotal)}`,
+                  '',
+                  `Reportado por: ${currentUser?.username || 'Administrador'}`,
                 ].join('\n');
+
 
                 if (navigator.share) {
                   try {
@@ -6864,7 +7071,7 @@ export default function App() {
 <div class="row"><span>Tarjetas (incl. propina):</span><span>${fw(totalTarjeta + todayCardTips)}</span></div>
 <div class="row"><span>Transferencias:</span><span>${fw(totalTransferencia + todayTransferTips)}</span></div>
 <div class="row grand"><span>Entrega:</span><span>${fw(entregaTotal)}</span></div>
-<div class="foot">Impreso por: ${currentUser?.name || 'Administrador'}</div>
+<div class="foot">Impreso por: ${currentUser?.username || 'Administrador'}</div>
 <button onclick="window.close()" class="btn-volver">← Volver a la app</button>
 </body></html>`);
                 printWin.document.close();
@@ -7298,7 +7505,7 @@ export default function App() {
             <div className="ticket-print-area">
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <h2 style={{ margin: 0, fontSize: 20 }}>Gallo Azul Resto</h2>
-                <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {currentUser?.name}</div>
+                <div style={{ fontSize: 14, color: '#64748b' }}>Atendido por: {currentUser?.username}</div>
                 <div style={{ fontSize: 14, color: '#64748b' }}>Mesa: {printCuentaModal.tableId}</div>
                 <div style={{ fontSize: 14, color: '#64748b', textTransform: 'capitalize' }}>
                   Fecha: {new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mazatlan', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -8326,7 +8533,129 @@ export default function App() {
         );
       })()}
 
+      {/* Modal: Ver datos del huésped */}
+      {showGuestInfoModal && (() => {
+        const reg = showGuestInfoModal;
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)', maxHeight: '90vh' }}>
+              {/* Header */}
+              <div style={{ background: '#f8fafc', borderRadius: '24px 24px 0 0', padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dbeafe', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={20} strokeWidth={2.5} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Datos del Huésped</h3>
+                </div>
+                <button onClick={() => setShowGuestInfoModal(null)} style={{ background: '#f1f5f9', border: 'none', padding: 8, borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#64748b' }}>
+                  <X size={18} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Body scrollable */}
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 28 }}>
+                {/* Nombre */}
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Nombre Completo</div>
+                  <div style={{ fontSize: 15, color: '#0f172a', fontWeight: 600 }}>{reg.name || '-'}</div>
+                </div>
+
+                {/* Nacionalidad */}
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Nacionalidad</div>
+                  <div style={{ fontSize: 15, color: '#0f172a', fontWeight: 600 }}>
+                    {reg.nationality ? <>{findCountryWithFlag(reg.nationality)}</> : '-'}
+                  </div>
+                </div>
+
+                {/* Teléfono / Email */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Teléfono</div>
+                    <div style={{ fontSize: 15, color: '#0f172a', fontWeight: 600 }}>{reg.phone || '-'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Email</div>
+                    <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600, wordBreak: 'break-all' }}>{reg.email || '-'}</div>
+                  </div>
+                </div>
+
+                {/* Ciudad / Noches */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Ciudad</div>
+                    <div style={{ fontSize: 15, color: '#0f172a', fontWeight: 600 }}>{reg.city || '-'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Noches</div>
+                    <div style={{ fontSize: 15, color: '#0f172a', fontWeight: 700 }}>
+                      {(() => {
+                        if (reg.nights) return `${reg.nights} noche${reg.nights !== 1 ? 's' : ''}`;
+                        if (reg.arrival_date && reg.departure_date) {
+                          const diff = Math.round((new Date(reg.departure_date).getTime() - new Date(reg.arrival_date).getTime()) / 86400000);
+                          return diff > 0 ? `${diff} noche${diff !== 1 ? 's' : ''}` : '-';
+                        }
+                        return '-';
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Check-in / Check-out */}
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 12, border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Check In</div>
+                    <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 700 }}>{reg.arrival_date || '-'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Check Out</div>
+                    <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 700 }}>{reg.departure_date || '-'}</div>
+                  </div>
+                </div>
+
+                {/* Monto pagado + Habitación */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div style={{ background: '#f0fdf4', padding: '14px', borderRadius: 12, border: '1px solid #bbf7d0' }}>
+                    <div style={{ fontSize: 11, color: '#15803d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Monto Pagado</div>
+                    <div style={{ fontSize: 15, color: '#14532d', fontWeight: 800 }}>
+                      {reg.price !== null && reg.price !== undefined
+                        ? Number(reg.price) === 0
+                          ? '🎁 Cortesía'
+                          : `${reg.currency || 'MXN'} $${Number(reg.price).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+                        : '-'}
+                    </div>
+                  </div>
+                  <div style={{ background: '#eff6ff', padding: '14px', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                    <div style={{ fontSize: 11, color: '#1d4ed8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Habitación</div>
+                    <div style={{ fontSize: 15, color: '#1e3a8a', fontWeight: 800 }}>
+                      {reg.room_number
+                        ? (parseInt(reg.room_number) <= 4 ? `Loft ${reg.room_number}` : `Habitación ${reg.room_number}`)
+                        : (reg.room_name || 'Sin asignar')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Firma */}
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Firma del Huésped</div>
+                  {(reg.signature_data || reg.signature) ? (
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 8, display: 'flex', justifyContent: 'center' }}>
+                      <img src={reg.signature_data || reg.signature} alt="Firma" style={{ maxWidth: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8 }} />
+                    </div>
+                  ) : (
+                    <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                      Sin firma registrada
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       </div>
     </>
   );
 }
+

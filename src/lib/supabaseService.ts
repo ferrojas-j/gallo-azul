@@ -223,8 +223,19 @@ export const dbMenu = {
 export const dbCategories = {
   updateName: (id: string, name: string) =>
     supabase.from('menu_categories').update({ name }).eq('id', id),
-  insert: (name: string) =>
-    supabase.from('menu_categories').insert({ name }).select().single(),
+  insert: async (name: string) => {
+    const { data: existing, error: fetchError } = await supabase
+      .from('menu_categories')
+      .select('*')
+      .ilike('name', name)
+      .maybeSingle();
+      
+    if (existing) {
+      return { data: existing, error: null };
+    }
+    
+    return supabase.from('menu_categories').insert({ name }).select().single();
+  },
 };
 
 export const dbUsers = {
@@ -310,5 +321,72 @@ export const dbPrintedTickets = {
 export const dbHotelSales = {
   archiveSales: (ids: string[]) =>
     supabase.from('hotel_sales').update({ status: 'archived' }).in('id', ids),
+};
+
+export type CollaboratorRow = {
+  id: string;
+  name: string;
+  unit: 'Hotel' | 'Restaurante' | 'Servicios profesionales';
+  role: string | null;
+  remuneration: number;
+  payment_frequency: 'Semanal' | 'Mensual';
+  active: boolean;
+  created_at: string;
+};
+
+export const dbCollaborators = {
+  getAll: () => supabase.from('collaborators').select('*').order('name'),
+  insert: (collab: { name: string; unit: string; role?: string; remuneration: number; payment_frequency?: string }) =>
+    supabase.from('collaborators').insert(collab).select().single(),
+  update: (id: string, collab: { name?: string; unit?: string; role?: string; remuneration?: number; payment_frequency?: string; active?: boolean }) =>
+    supabase.from('collaborators').update(collab).eq('id', id),
+  delete: (id: string) => supabase.from('collaborators').delete().eq('id', id),
+};
+
+export type PayrollRecord = {
+  id: string;
+  year: number;
+  month: number;
+  week: number;
+  created_at: string;
+};
+
+export const dbPayroll = {
+  getAll: () => supabase.from('payroll_records').select('*').order('year', { ascending: false }).order('week', { ascending: false }),
+  insert: (record: { year: number; month: number; week: number }) => supabase.from('payroll_records').insert(record).select().single(),
+  delete: (id: string) => supabase.from('payroll_records').delete().eq('id', id),
+};
+
+export type OperationalExpense = {
+  id: string;
+  date: string;
+  category: 'Servicios' | 'Impuestos' | 'Compras';
+  unit: 'Hotel' | 'Restaurante' | 'General';
+  concept: string;
+  amount: number;
+  created_at?: string;
+};
+
+export const dbOperationalExpenses = {
+  getAll: () => supabase.from('operational_expenses').select('*').order('date', { ascending: false }),
+  insert: (expense: Omit<OperationalExpense, 'id' | 'created_at'>) => supabase.from('operational_expenses').insert(expense).select().single(),
+  update: (id: string, expense: Partial<OperationalExpense>) => supabase.from('operational_expenses').update(expense).eq('id', id),
+  delete: (id: string) => supabase.from('operational_expenses').delete().eq('id', id),
+};
+
+export type AppUserRow = {
+  id: string;
+  username: string;
+  password?: string;
+  role: 'Administrador' | 'Encargado' | 'Staff Hotel' | 'Staff Resta' | 'Servicios';
+  created_at?: string;
+};
+
+export const dbAppUsers = {
+  getAll: () => supabase.from('app_users').select('id, username, role, created_at').order('username'),
+  login: (username: string, password: string) => supabase.from('app_users').select('id, username, role').eq('username', username).eq('password', password).single(),
+  insert: (user: Omit<AppUserRow, 'id' | 'created_at'>) => supabase.from('app_users').insert(user).select().single(),
+  update: (id: string, user: Partial<AppUserRow>) => supabase.from('app_users').update(user).eq('id', id).select().single(),
+  delete: (id: string) => supabase.from('app_users').delete().eq('id', id),
 };
 
