@@ -2787,7 +2787,7 @@ export default function App() {
             </div>
             <div 
               className="home-action-btn financial" 
-              onClick={() => navTo('control-financiero')} 
+              onClick={() => window.open('/finanzas_corporativas/', '_blank')} 
             >
               <div className="home-action-icon-wrap">
                 <TrendingUp size={24} />
@@ -5392,7 +5392,18 @@ export default function App() {
               )}
             </div>
             <div className={category === 'Pedidos para llevar' || category === 'Day Pass' ? "delivery-list" : "card-grid"}>
-              {safeTables.filter(t => t.category === category).map(table => {
+              {safeTables.filter(t => t.category === category).sort((a, b) => {
+                if (category === 'Terraza') {
+                  const getOrder = (name: string) => {
+                    if (name === 'T1') return 1;
+                    if (name === 'T2') return 2;
+                    if (name === 'T3') return 3;
+                    return 99;
+                  };
+                  return getOrder(a.name) - getOrder(b.name);
+                }
+                return 0;
+              }).map(table => {
                 const effectiveStatus = getEffectiveStatus(table.id);
                 const tableItems = safeActiveItems.filter(i => i.table_id === table.id);
                 const activeTotal = tableItems.reduce((s, i) => s + i.price * i.qty, 0);

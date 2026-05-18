@@ -153,14 +153,19 @@ export function useSupabaseSync() {
 
   const fetchTodayTotals = useCallback(async () => {
     try {
-      const results = await Promise.allSettled([
+      const timeoutMs = 10000;
+      const wrap = (p: any) => Promise.race([
+        Promise.resolve(p), 
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+      ]);
 
-        dbOrders.getTodayIncome(),
-        dbExpenses.getToday(),
-        dbOrders.getTodayClosedOrders(),
-        supabase.from('hotel_sales')
+      const results = await Promise.allSettled([
+        wrap(dbOrders.getTodayIncome()),
+        wrap(dbExpenses.getToday()),
+        wrap(dbOrders.getTodayClosedOrders()),
+        wrap(supabase.from('hotel_sales')
           .select('*')
-          .eq('status', 'closed')
+          .eq('status', 'closed'))
       ]);
 
       const [incomeRes, expensesRes, closedOrdersRes, hotelRes] = results.map(r => 
@@ -261,9 +266,6 @@ export function useSupabaseSync() {
         setTodayCardTips(0);
         setTodayTotalTips(0);
       }
-      const { data: tickets } = await dbPrintedTickets.getToday();
-      if (tickets) setPendingTickets(tickets);
-
     } catch (err) {
       console.error('Error fetching today totals:', err);
     }
@@ -297,23 +299,38 @@ export function useSupabaseSync() {
     if (fetching.current) return;
     fetching.current = true;
     setIsLoading(true);
+
+    // Hard safety net: guarantee loading screen disappears after 12s no matter what
+    const safetyTimer = setTimeout(() => {
+      console.warn('fetchAll: safety timeout triggered, forcing isLoading=false');
+      setIsLoading(false);
+      fetching.current = false;
+    }, 12000);
+
     try {
-      await Promise.all([
-        fetchTables(), 
-        fetchOrdersAndItems(), 
-        fetchMenu(), 
-        fetchUsers(), 
-        fetchTodayTotals(),
-        fetchDailySummaries(),
-        fetchTodayTickets(),
-        fetchRegistrations(),
-        fetchExchangeRate()
+      const timeoutMs = 8000;
+      const wrap = (p: any) => Promise.race([
+        Promise.resolve(p), 
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+      ]);
+
+      await Promise.allSettled([
+        wrap(fetchTables()), 
+        wrap(fetchOrdersAndItems()), 
+        wrap(fetchMenu()), 
+        wrap(fetchUsers()), 
+        wrap(fetchTodayTotals()),
+        wrap(fetchDailySummaries()),
+        wrap(fetchTodayTickets()),
+        wrap(fetchRegistrations()),
+        wrap(fetchExchangeRate())
       ]);
     } finally {
+      clearTimeout(safetyTimer);
       setIsLoading(false);
       fetching.current = false;
     }
-  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchTodayTickets, fetchExchangeRate]);
+  }, [fetchTables, fetchOrdersAndItems, fetchMenu, fetchUsers, fetchTodayTotals, fetchDailySummaries, fetchTodayTickets, fetchRegistrations, fetchExchangeRate]);
 
   const fetchTodayTotalsRef = useRef(fetchTodayTotals);
   fetchTodayTotalsRef.current = fetchTodayTotals;
@@ -340,8 +357,12 @@ export function useSupabaseSync() {
     
     // Auto-update exchange rate every hour
     const rateInterval = setInterval(fetchExchangeRate, 3600000);
-    return () => clearInterval(rateInterval);
-  }, [fetchAll, fetchExchangeRate]);
+    return () => {
+      clearInterval(rateInterval);
+      fetching.current = false; // Reset so StrictMode remount can re-fetch
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Realtime subscriptions (hardened) ───────────────
   useEffect(() => {
